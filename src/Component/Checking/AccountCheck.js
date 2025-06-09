@@ -1,15 +1,112 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from '../../context/userContext';
 import { doc, Timestamp, updateDoc } from '@firebase/firestore';
 import { db } from '../../firebase/firestore';
+import styled from 'styled-components';
+import { berryTheme } from '../../Theme';
+
+const VerificationContainer = styled.div`
+  background: ${berryTheme.colors.backgroundGradient};
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+`;
+
+const BerryHeader = styled.div`
+  text-align: center;
+  margin-bottom: 3rem;
+`;
+
+const BerryLogo = styled.img`
+  height: 5rem;
+  margin-bottom: 1.5rem;
+`;
+
+const VerificationTitle = styled.h1`
+  font-size: 2.2rem;
+  color: ${berryTheme.colors.primary};
+  margin-bottom: 1rem;
+  font-weight: 700;
+`;
+
+const VerificationSubtitle = styled.p`
+  font-size: 1.1rem;
+  color: ${berryTheme.colors.textDark};
+  max-width: 500px;
+  line-height: 1.6;
+`;
+
+const VerificationGrid = styled.div`
+  width: 100%;
+  max-width: 500px;
+  background: white;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+`;
+
+const VerificationItem = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid ${berryTheme.colors.grey200};
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+`;
+
+const VerificationIcon = styled.div`
+  width: 3rem;
+  height: 3rem;
+  background: ${props => props.$complete ? berryTheme.colors.primaryLight : '#f5f5f5'};
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1.5rem;
+  transition: all 0.3s ease;
+`;
+
+const VerificationContent = styled.div`
+  flex: 1;
+`;
+
+const VerificationLabel = styled.h3`
+  font-size: 1rem;
+  color: ${berryTheme.colors.primaryDark};
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+`;
+
+const VerificationDescription = styled.p`
+  font-size: 0.9rem;
+  color: ${berryTheme.colors.textSecondary};
+  line-height: 1.5;
+`;
+
+const VerificationProgress = styled.div`
+  height: 6px;
+  background: ${berryTheme.colors.grey200};
+  border-radius: 3px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+`;
+
+const VerificationProgressFill = styled.div`
+  height: 100%;
+  background: ${berryTheme.colors.primary};
+  border-radius: 3px;
+  transition: width 0.5s ease;
+`;
 
 const AccountCheck = () => {
-
-  // eslint-disable-next-line
-  const [awardedPoint, setAwardedPoint] = useState(0);
-  const {id, setLastCheckIn, setBalance, setWelcomeBonus} = useUser()
-
-
+  const {id, setLastCheckIn, setBalance, setWelcomeBonus} = useUser();
   const [progress, setProgress] = useState({
     accountAge: 0,
     activityLevel: 0,
@@ -17,13 +114,32 @@ const AccountCheck = () => {
     ogStatus: 0,
   });
 
-  const awardPointsNotPrem = async () => {
-    // Get the first digit of the user ID
+  const verificationSteps = [
+    {
+      key: 'accountAge',
+      title: 'Account History',
+      description: 'Checking your Telegram legacy and activity history'
+    },
+    {
+      key: 'activityLevel',
+      title: 'Community Participation',
+      description: 'Analyzing your engagement in Berry communities'
+    },
+    {
+      key: 'telegramPremium',
+      title: 'Premium Status',
+      description: 'Checking for Telegram Premium benefits'
+    },
+    {
+      key: 'ogStatus',
+      title: 'Early Adopter',
+      description: 'Verifying your OG status in Berry ecosystem'
+    }
+  ];
+
+  const awardPointsNotPrem = useCallback(async () => {
     const firstDigit = parseInt(id.toString()[0]);
-  
-    // Calculate points to award based on the first digit
     const pointsToAward = firstDigit * 1000;
-    // Calculate the new balance
     const newBalance = pointsToAward;
   
     try {
@@ -31,28 +147,26 @@ const AccountCheck = () => {
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         balance: newBalance,
-        welcomeBonus: pointsToAward, // Assuming you want to track the points awarded for years separately
+        welcomeBonus: pointsToAward,
         lastCheckIn: Timestamp.fromDate(now),
-
       });
+      
       setTimeout(() => {
         setBalance(newBalance);
-      }, 3800)
+      }, 3800);
 
-      setAwardedPoint(pointsToAward);
       setLastCheckIn(now);
       setWelcomeBonus(pointsToAward);
     } catch (error) {
       console.error('Error updating user points:', error);
     }
-  };
+  }, [id, setBalance, setLastCheckIn, setWelcomeBonus]);
 
   useEffect(() => {
     if (id) {
-        awardPointsNotPrem();
+      awardPointsNotPrem();
     }
-  // eslint-disable-next-line
-  }, [id]);
+  }, [id, awardPointsNotPrem]);
 
   useEffect(() => {
     const intervals = {
@@ -77,52 +191,37 @@ const AccountCheck = () => {
   };
 
   return (
-    
-    <div style={{ padding: '20px', textAlign: 'center' }}>
-      <img src='/bitget-logo.png' alt="Bitget" style={{ width: '50px', marginBottom: '20px' }} />
-      <h1 style={{ marginBottom: '40px', fontSize: '28px', fontWeight: 'bold', marginTop: '20px' }}>
-        Checking <br /> your account
-      </h1>
-
-      {['Account Age Verified', 'Activity Level Analyzed', 'Telegram Premium Checked', 'OG Status Confirmed'].map(
-        (label, index) => {
-          const key = Object.keys(progress)[index];
-          return (
-            <div key={key} style={{ marginBottom: '30px', width: '80%', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '19px' }}>
-                <div style={{ textAlign: 'left', marginBottom: '-24px' }}>{label}</div>
-                <img
-                  src={progress[key] === 100 ? '/blueCheckmark.png' : '/grayCheckmark.png'} // Conditionally render gray or blue checkmark
-                  alt="Checkmark"
-                  style={{ width: '24px', height: '24px', marginLeft: '10px' }}
-                />
-              </div>
-              <div style={{ position: 'relative', marginBottom: '12px' }}>
-                <div
-                  style={{
-                    background: '#E3F2FD', // Light blue background for unfilled part
-                    borderRadius: '10px',
-                    width: '100%',
-                    height: '15px',
-                    position: 'relative',
-                  }}
-                >
-                  <div
-                    style={{
-                      background: '#1877F2', // Blue for filled part of the progress bar
-                      height: '100%',
-                      width: `${progress[key]}%`,
-                      borderRadius: '10px',
-                      transition: 'width 0.5s ease-in-out',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        }
-      )}
-    </div>
+    <VerificationContainer>
+      <BerryHeader>
+        <BerryLogo src="/Berry.png" alt="Berry Rewards" />
+        <VerificationTitle>Unlocking Your Berry Rewards</VerificationTitle>
+        <VerificationSubtitle>
+          We're verifying your eligibility for special rewards in the Berry ecosystem.
+          Earn tokens for being an active Telegram user!
+        </VerificationSubtitle>
+      </BerryHeader>
+      
+      <VerificationGrid>
+        {verificationSteps.map((step) => (
+          <VerificationItem key={step.key}>
+            <VerificationIcon $complete={progress[step.key] === 100}>
+              {progress[step.key] === 100 ? (
+                <span style={{ color: berryTheme.colors.primary }}>✓</span>
+              ) : (
+                <span style={{ color: '#999' }}>○</span>
+              )}
+            </VerificationIcon>
+            <VerificationContent>
+              <VerificationLabel>{step.title}</VerificationLabel>
+              <VerificationDescription>{step.description}</VerificationDescription>
+              <VerificationProgress>
+                <VerificationProgressFill style={{ width: `${progress[step.key]}%` }} />
+              </VerificationProgress>
+            </VerificationContent>
+          </VerificationItem>
+        ))}
+      </VerificationGrid>
+    </VerificationContainer>
   );
 };
 
