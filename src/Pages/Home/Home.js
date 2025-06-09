@@ -29,7 +29,7 @@ const Home = () => {
       
 
       {/* White background for the rest of the page */}
-      <div className="bg-white min-h-screen p-5 rounded-t-[20px] -mt-6 z-10">
+      <div className="bg-black min-h-screen p-5 rounded-t-[20px] -mt-6 z-10">
         <CatsCounter />
         <Dailytask />
         <Task />
