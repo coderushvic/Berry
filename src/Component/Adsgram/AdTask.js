@@ -4,8 +4,8 @@ import { FaAd, FaCrown, FaSyncAlt } from "react-icons/fa";
 import { doc, updateDoc, increment, arrayUnion, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useUser } from "../../context/userContext";
+import "./AdTask.css";
 
-// Move defaultConfig outside the component since it never changes
 const defaultConfig = {
   bonus: 1000,
   dailyLimit: 50,
@@ -48,16 +48,13 @@ const AdTask = () => {
     estimatedTime: "15-30 seconds"
   });
 
-  // Memoize the task object since it depends on adsConfig
   const task = useMemo(() => ({
     bonus: adsConfig?.bonus || defaultConfig.bonus,
   }), [adsConfig?.bonus]);
 
-  // Generate task ID function is stable since it doesn't depend on component scope
   const generateTaskId = useMemo(() => () => `adTask_${new Date().getTime()}`, []);
   const [taskId, setTaskId] = useState(generateTaskId());
 
-  // Load ads configuration from Firestore
   useEffect(() => {
     const loadAdsConfig = async () => {
       try {
@@ -74,18 +71,16 @@ const AdTask = () => {
     };
 
     loadAdsConfig();
-  }, []); // Empty array is safe since we moved defaultConfig outside
+  }, []);
 
-  // Load user's ads watched today
   useEffect(() => {
     if (!userData) return;
     
     const today = new Date().toISOString().split('T')[0];
     const adsToday = userData.dailyAdsWatched?.[today] || 0;
     setAdsWatchedToday(adsToday);
-  }, [userData]); // Only depends on userData
+  }, [userData]);
 
-  // Load current ad details
   useEffect(() => {
     if (!adsConfig || !adsConfig.ads || adsConfig.ads.length === 0) return;
 
@@ -116,9 +111,8 @@ const AdTask = () => {
       name: currentAd.name || "Advertisement",
       estimatedTime: currentAd.estimatedTime || "15-30 seconds"
     });
-  }, [adsConfig, taskId]); // Reset when taskId changes
+  }, [adsConfig, taskId]);
 
-  // Load current ad script
   useEffect(() => {
     if (!adsConfig || !adsConfig.ads || adsConfig.ads.length === 0) return;
 
@@ -150,7 +144,7 @@ const AdTask = () => {
         document.body.removeChild(tag);
       }
     };
-  }, [adsConfig, currentAdIndex]); // Only depends on these values
+  }, [adsConfig, currentAdIndex]);
 
   const showAd = async () => {
     if (showAdCooldown > 0) return;
@@ -256,42 +250,38 @@ const AdTask = () => {
   const progressPercentage = Math.min(100, (adsWatchedToday / dailyLimit) * 100);
 
   return (
-    <div className="mb-6">
-      {/* Task Card */}
-      <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 shadow-lg border border-red-200">
-        {/* Task Header with Crown Icon */}
-        <div className="flex items-center mb-3">
-          <div className="bg-red-500 p-2 rounded-lg mr-3">
-            <FaAd className="text-white text-xl" />
+    <div className="ad-task-container">
+      <div className="task-card">
+        <div className="task-header">
+          <div className="task-icon">
+            <FaAd />
           </div>
-          <div>
-            <h3 className="font-bold text-xl text-red-900">Watch Ads & Earn</h3>
-            <p className="text-red-700 text-sm">Complete simple tasks to earn rewards</p>
+          <div className="task-title">
+            <h3>Watch Ads & Earn</h3>
+            <p>Complete simple tasks to earn rewards</p>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-sm text-red-800 mb-1">
+        <div className="progress-container">
+          <div className="progress-info">
             <span>Ads watched today: {adsWatchedToday}/{dailyLimit}</span>
             <span>{remainingAds} remaining</span>
           </div>
-          <div className="w-full bg-red-200 rounded-full h-2.5">
+          <div className="progress-bar">
             <div 
-              className="bg-red-600 h-2.5 rounded-full transition-all duration-300" 
+              className="progress-fill"
               style={{ width: `${progressPercentage}%` }}
             ></div>
           </div>
         </div>
 
-        {/* Current Ad Info */}
-        <div className="bg-white rounded-lg p-3 border border-red-100 mb-4">
-          <div className="flex justify-between items-start mb-2">
+        <div className="ad-info">
+          <div className="ad-info-header">
             <div>
-              <h4 className="font-semibold text-gray-800">Current Ad</h4>
-              <p className="text-gray-600 text-sm">{adDetails.name}</p>
+              <h4>Current Ad</h4>
+              <p>{adDetails.name}</p>
             </div>
-            <div className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+            <div className="ad-time">
               {adDetails.estimatedTime}
             </div>
           </div>
@@ -299,41 +289,35 @@ const AdTask = () => {
           {adsConfig?.ads?.length > 1 && (
             <button 
               onClick={() => setTaskId(generateTaskId())}
-              className="text-xs text-red-600 hover:text-red-800 flex items-center mt-2"
+              className="switch-ad-btn"
               disabled={isAdLoading || showAdCooldown > 0}
             >
-              <FaSyncAlt className="mr-1" /> Switch Ad
+              <FaSyncAlt /> Switch Ad
             </button>
           )}
         </div>
 
-        {/* Reward Display */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex justify-between items-center">
+        <div className="reward-display">
           <div>
-            <p className="text-xs text-yellow-700">You'll earn</p>
-            <p className="font-bold text-yellow-800">{task.bonus} NEWCATS</p>
+            <p className="reward-label">You'll earn</p>
+            <p className="reward-amount">{task.bonus} NEWCATS</p>
           </div>
-          <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+          <div className="reward-badge">
             +{task.bonus} Points
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex space-x-2">
+        <div className="action-buttons">
           <button
             onClick={showAd}
             disabled={showAdCooldown > 0 || isAdLoading || remainingAds <= 0}
-            className={`flex-1 py-3 rounded-lg font-medium transition-all flex items-center justify-center ${
-              showAdCooldown > 0 || isAdLoading || remainingAds <= 0
-                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                : "bg-red-600 text-white hover:bg-red-700 shadow-md transform hover:scale-[1.02] transition-transform"
-            }`}
+            className={`show-ad-btn ${showAdCooldown > 0 || isAdLoading || remainingAds <= 0 ? 'disabled' : ''}`}
           >
             {isAdLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <span className="loading-spinner">
+                <svg className="spinner" viewBox="0 0 24 24">
+                  <circle className="spinner-bg" cx="12" cy="12" r="10"></circle>
+                  <path className="spinner-fg" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Loading Ad...
               </span>
@@ -349,19 +333,13 @@ const AdTask = () => {
           <button
             onClick={claimReward}
             disabled={!adWatched || claiming}
-            className={`flex-1 py-3 rounded-lg font-medium transition-all ${
-              claiming
-                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                : adWatched
-                ? "bg-green-600 text-white hover:bg-green-700 shadow-md transform hover:scale-[1.02] transition-transform"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
+            className={`claim-btn ${claiming ? 'claiming' : adWatched ? 'active' : 'disabled'}`}
           >
             {claiming ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <span className="loading-spinner">
+                <svg className="spinner" viewBox="0 0 24 24">
+                  <circle className="spinner-bg" cx="12" cy="12" r="10"></circle>
+                  <path className="spinner-fg" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Claiming
               </span>
@@ -371,41 +349,37 @@ const AdTask = () => {
           </button>
         </div>
 
-        {/* Error Message */}
         {adError && (
-          <div className="mt-3 text-xs text-red-700 bg-red-100 p-2 rounded border border-red-200 flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="error-message">
+            <svg className="error-icon" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             {adError}
           </div>
         )}
 
-        {/* Premium Upgrade Suggestion */}
         {remainingAds <= 0 && (
-          <div className="mt-3 bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm flex items-center">
-            <FaCrown className="text-yellow-500 mr-2 text-lg" />
+          <div className="premium-upsell">
+            <FaCrown className="premium-icon" />
             <div>
-              <p className="font-medium">Want to watch more ads?</p>
+              <p className="premium-title">Want to watch more ads?</p>
               <p>Upgrade to premium for unlimited ad watching!</p>
             </div>
           </div>
         )}
 
-        {/* Ad Rotation Info */}
         {adsConfig?.ads?.length > 1 && (
-          <div className="mt-3 text-xs text-gray-500 text-center">
+          <div className="ad-rotation-info">
             Ads rotate automatically • Current ad {currentAdIndex + 1} of {adsConfig.ads.length}
           </div>
         )}
       </div>
 
-      {/* Success Notification */}
       {congrats && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2">
-            <IoCheckmarkCircleSharp className="text-green-500 text-xl" />
-            <span className="font-medium">+{task.bonus} NEWCATS earned!</span>
+        <div className="congrats-notification">
+          <div className="congrats-content">
+            <IoCheckmarkCircleSharp className="congrats-icon" />
+            <span className="congrats-text">+{task.bonus} NEWCATS earned!</span>
           </div>
         </div>
       )}
