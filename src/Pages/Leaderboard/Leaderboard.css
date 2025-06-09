@@ -1,0 +1,162 @@
+/* src/App.css */
+
+:root {
+  --primary-color: #4361ee;
+  --secondary-color: #3f37c9;
+  --accent-color: #4895ef;
+  --light-color: #f8f9fa;
+  --dark-color: #212529;
+  --success-color: #4cc9f0;
+  --warning-color: #f8961e;
+  --danger-color: #f72585;
+  --border-radius: 12px;
+  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
+.App {
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  padding: 20px;
+  background-color: var(--light-color);
+  max-width: 600px;
+  margin: 2rem auto;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  padding: 15px 20px;
+  color: white;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+  margin-bottom: 1.5rem;
+}
+
+.back-button, .plus-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.back-button:hover, .plus-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+/* Main Title */
+.main-title {
+  text-align: center;
+  margin: 20px 0;
+  color: var(--dark-color);
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+/* User List */
+.user-list {
+  padding: 0;
+}
+
+/* User Card */
+.user-card {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  background-color: white;
+  border-radius: var(--border-radius);
+  margin-bottom: 15px;
+  box-shadow: var(--box-shadow);
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.user-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.green { background-color: #38b000; }
+.yellow { background-color: #ffbe0b; }
+.blue { background-color: var(--accent-color); }
+.purple { background-color: #7209b7; }
+
+.user-info {
+  flex: 1;
+  padding: 0 15px;
+}
+
+.username {
+  font-weight: 600;
+  color: var(--dark-color);
+  margin-bottom: 3px;
+}
+
+.cats {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.medal {
+  font-size: 1.8rem;
+  color: #ffd700;
+  margin-left: 10px;
+}
+
+/* Status indicator */
+.status {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.status.online {
+  background-color: var(--success-color);
+  box-shadow: 0 0 8px var(--success-color);
+}
+
+.status.offline {
+  background-color: #adb5bd;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .App {
+    padding: 15px;
+    margin: 1rem auto;
+  }
+  
+  .header {
+    padding: 12px 15px;
+  }
+  
+  .avatar {
+    width: 45px;
+    height: 45px;
+  }
+}

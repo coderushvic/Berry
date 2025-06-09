@@ -1,0 +1,15 @@
+/* Static slot-machine style */
+.slot-machine {
+  display: inline-block;
+  font-size: 2em;
+  font-family: 'Courier', monospace; /* Monospace font for a slot machine feel */
+  letter-spacing: 0.15em; /* Adds some space between digits for better readability */
+  color: #1d4ed8; /* Blue color */
+  animation: slot-spin 1.5s ease-in-out infinite; /* Continuous animation */
+}
+
+/* No movement, just simulate number changes */
+@keyframes slot-spin {
+  0% { content: '16396'; }
+  100% { content: '74281'; } /* Keep changing to random numbers */
+}
