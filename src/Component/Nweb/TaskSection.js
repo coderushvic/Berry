@@ -139,7 +139,7 @@ function TaskSection() {
       reward: '$1/ad',
       accentColor: '#28C76F',
       iconColor: '#28C76F',
-      path: '/ads',
+      path: '/AdTask',
       showBadge: true,
       badgeCount: remainingAds
     },
