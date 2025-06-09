@@ -17,7 +17,7 @@ const AppContainer = styled.div`
 
 const Content = styled.div`
   padding: ${berryTheme.spacing.medium};
-  max-width: 600px;
+  max-width: auto;
   margin: 0 auto;
 `;
 
