@@ -44,7 +44,7 @@ const VideoCard = styled.div`
   overflow: hidden;
   box-shadow: 0 15px 30px rgba(0,0,0,0.1);
   transition: all 0.3s ease;
-  max-width: auto;
+  max-width: 600px;
   margin: 0 auto;
   cursor: pointer;
   
