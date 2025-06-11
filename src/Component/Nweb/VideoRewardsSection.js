@@ -44,7 +44,7 @@ const VideoCard = styled.div`
   overflow: hidden;
   box-shadow: 0 15px 30px rgba(0,0,0,0.1);
   transition: all 0.3s ease;
-  max-width: 600px;
+  max-width: auto;
   margin: 0 auto;
   cursor: pointer;
   
@@ -55,7 +55,7 @@ const VideoCard = styled.div`
 `;
 
 const VideoContainer = styled.div`
-  height: 150px;
+  height: 120px;
   background: linear-gradient(135deg, #FF6B8B, #E30B5C);
   display: flex;
   align-items: center;
