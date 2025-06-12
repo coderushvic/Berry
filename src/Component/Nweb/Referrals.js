@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaLink, FaCopy, FaShareAlt, FaWhatsapp, FaTelegram, FaEnvelope, FaUserFriends } from 'react-icons/fa';
+import { FaLink, FaCopy, FaShareAlt, FaWhatsapp, FaTelegram, FaUserFriends, FaFacebook, FaTwitter, FaTimes } from 'react-icons/fa';
 import NavBar from './NavBar';
+import { useUser } from "../../context/userContext";
 
 // Animation for shimmer effect
 const shimmer = keyframes`
@@ -10,7 +11,7 @@ const shimmer = keyframes`
   100% { background-position: 200% 0; }
 `;
 
-// Main container - updated to match Home1
+// Main container
 const AppContainer = styled.div`
   font-family: ${berryTheme.fonts.main};
   background: ${berryTheme.colors.backgroundGradient};
@@ -18,15 +19,15 @@ const AppContainer = styled.div`
   max-width: auto;
   margin: 0 auto;
   position: relative;
-  padding-bottom: 80px; // Space for nav
+  padding-bottom: 80px;
 `;
 
-// Content wrapper - updated padding to match Home1
+// Content wrapper
 const Content = styled.div`
   padding: ${berryTheme.spacing.medium};
 `;
 
-// Header - added from Home1
+// Header
 const Header = styled.header`
   padding: ${berryTheme.spacing.large} ${berryTheme.spacing.medium} ${berryTheme.spacing.medium};
   display: flex;
@@ -56,17 +57,17 @@ const Card = styled.div`
   margin-bottom: 16px;
 `;
 
-// Referral link card (now first)
+// Referral link card
 const ReferralLinkCard = styled(Card)`
   border-top-color: ${berryTheme.colors.primaryDark};
 `;
 
-// Earnings card (now second)
+// Earnings card
 const EarningsCard = styled(Card)`
   border-top-color: ${berryTheme.colors.primary};
 `;
 
-// Referrals card (now third)
+// Referrals card
 const ReferralsCard = styled(Card)`
   border-top-color: ${berryTheme.colors.primaryLight};
 `;
@@ -192,21 +193,22 @@ const ShareModal = styled.div`
 const ShareContent = styled.div`
   background: white;
   border-radius: 16px;
-  padding: 24px;
   width: 90%;
   max-width: 400px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 `;
 
 const ShareTitle = styled.h3`
-  margin: 0 0 20px 0;
+  margin: 0;
   color: ${berryTheme.colors.textDark};
+  padding: 24px 24px 0 24px;
 `;
 
 const ShareOptions = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+  padding: 24px;
 `;
 
 const ShareOption = styled.button`
@@ -237,28 +239,126 @@ const ShareLabel = styled.div`
   color: ${berryTheme.colors.textDark};
 `;
 
+const ModalHeader = styled.div`
+  padding: 16px 24px;
+  border-bottom: 1px solid ${berryTheme.colors.grey200};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const ReferralList = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
+const ReferralItem = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid ${berryTheme.colors.grey100};
+`;
+
+const Avatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: ${props => props.color || berryTheme.colors.primary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  margin-right: 12px;
+`;
+
+const ReferralInfo = styled.div`
+  flex: 1;
+`;
+
+const ReferralName = styled.div`
+  font-weight: 600;
+  color: ${berryTheme.colors.textDark};
+`;
+
+const ReferralBonus = styled.div`
+  font-weight: 600;
+  color: ${berryTheme.colors.primary};
+`;
+
+const EmptyState = styled.div`
+  padding: 24px;
+  text-align: center;
+  color: ${berryTheme.colors.grey500};
+`;
+
 function Referrals() {
+  const { id, referrals = [], loading, processedReferrals = [] } = useUser();
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const referralStats = {
-    totalReferrals: 24,
-    earnedAmount: 86.50,
-    referralLink: 'berryapp.com/invite/yourusername123'
+  // Calculate total referral earnings in dollars
+  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
+    return total + (referral.refBonus || 0) * 0.01; // Convert points to dollars (100 points = $1)
+  }, 0);
+
+  const getInitials = (fullName = "") => {
+    const nameParts = fullName.split(" ");
+    return nameParts[0]?.charAt(0).toUpperCase() + (nameParts[1] ? nameParts[1].charAt(0).toUpperCase() : "");
+  };
+
+  const getRandomColor = () => {
+    const colors = [
+      berryTheme.colors.secondary,
+      berryTheme.colors.accent,
+      berryTheme.colors.primaryLight,
+      '#F87171', // red-400
+      '#60A5FA', // blue-400
+      '#34D399', // green-400
+      '#FBBF24', // yellow-400
+      '#A78BFA'  // purple-400
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(referralStats.referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const reflink = `https://t.me/Fuhdhdbot?start=r${id}\nJoin me on Berry App and earn rewards together!`;
+    
+    navigator.clipboard
+      .writeText(reflink)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
+      })
+      .catch((err) => console.error("Failed to copy text: ", err));
   };
 
-  const shareLink = () => {
-    setShowShareModal(true);
-  };
+  const shareOnSocialMedia = (platform) => {
+    const shareUrl = `https://t.me/Fuhdhdbot?start=r${id}`;
+    const shareText = "Join me on Berry App and earn rewards together!";
 
-  const closeModal = () => {
-    setShowShareModal(false);
+    let url = "";
+    switch (platform) {
+      case "facebook":
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+        break;
+      case "whatsapp":
+        url = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
+        break;
+      case "telegram":
+        url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+        break;
+      case "twitter":
+        url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`;
+        break;
+      default:
+        break;
+    }
+
+    if (url) {
+      window.open(url, "_blank");
+      setShowShareModal(false);
+    }
   };
 
   return (
@@ -268,12 +368,12 @@ function Referrals() {
         <LogoText>berry</LogoText>
       </Header>
       <Content>
-        {/* Referral Link Card - Now first */}
+        {/* Referral Link Card */}
         <ReferralLinkCard>
           <CardTitle>Your Unique Referral Link</CardTitle>
           <LinkContainer>
             <FaLink color={berryTheme.colors.primary} style={{ marginRight: '12px' }} />
-            <ReferralLink>{referralStats.referralLink}</ReferralLink>
+            <ReferralLink>{`https://t.me/Fuhdhdbot?start=r${id}`}</ReferralLink>
             <ActionButton 
               onClick={copyToClipboard} 
               $copied={copied}
@@ -287,7 +387,7 @@ function Referrals() {
             </ActionButton>
           </LinkContainer>
           <ButtonGroup>
-            <ActionButton onClick={shareLink}>
+            <ActionButton onClick={() => setShowShareModal(true)}>
               <IconWrapper><FaShareAlt /></IconWrapper>
               Share Link
             </ActionButton>
@@ -298,42 +398,79 @@ function Referrals() {
           </ButtonGroup>
         </ReferralLinkCard>
 
-        {/* Earnings Card - Now second */}
+        {/* Earnings Card */}
         <EarningsCard>
           <CardTitle>Total Earnings From Referrals</CardTitle>
           <EarningsAmount>
             <FaUserFriends />
-            ${referralStats.earnedAmount.toFixed(2)}
+            ${totalReferralEarnings.toFixed(2)}
           </EarningsAmount>
         </EarningsCard>
 
-        {/* Referrals Card - Now third */}
+        {/* Referrals Card */}
         <ReferralsCard>
           <CardTitle>People Joined Using Your Link</CardTitle>
           <StatValue>
             <FaUserFriends />
-            {referralStats.totalReferrals}
+            {referrals.length}
           </StatValue>
+          
+          {loading ? (
+            <EmptyState>Loading friends list...</EmptyState>
+          ) : referrals.length === 0 ? (
+            <EmptyState>
+              <div style={{ marginBottom: '8px' }}>No friends joined yet</div>
+              <p style={{ fontSize: '0.9rem' }}>Invite friends to start earning</p>
+            </EmptyState>
+          ) : (
+            <ReferralList>
+              {referrals.map((user, index) => (
+                <ReferralItem key={index}>
+                  <Avatar color={getRandomColor()}>
+                    {getInitials(user.fullName || user.username || "N/A")}
+                  </Avatar>
+                  <ReferralInfo>
+                    <ReferralName>{user.username || "Anonymous"}</ReferralName>
+                  </ReferralInfo>
+                  <ReferralBonus>
+                    ${((user.refBonus || 0) * 0.01).toFixed(2)}
+                  </ReferralBonus>
+                </ReferralItem>
+              ))}
+            </ReferralList>
+          )}
         </ReferralsCard>
       </Content>
       
       {/* Share Modal */}
       {showShareModal && (
-        <ShareModal onClick={closeModal}>
+        <ShareModal onClick={() => setShowShareModal(false)}>
           <ShareContent onClick={e => e.stopPropagation()}>
-            <ShareTitle>Share via</ShareTitle>
+            <ModalHeader>
+              <ShareTitle>Share via</ShareTitle>
+              <button 
+                onClick={() => setShowShareModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <FaTimes size={20} color={berryTheme.colors.grey500} />
+              </button>
+            </ModalHeader>
             <ShareOptions>
-              <ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("facebook")}>
+                <ShareIcon><FaFacebook /></ShareIcon>
+                <ShareLabel>Facebook</ShareLabel>
+              </ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("whatsapp")}>
                 <ShareIcon><FaWhatsapp /></ShareIcon>
                 <ShareLabel>WhatsApp</ShareLabel>
               </ShareOption>
-              <ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("telegram")}>
                 <ShareIcon><FaTelegram /></ShareIcon>
                 <ShareLabel>Telegram</ShareLabel>
               </ShareOption>
-              <ShareOption>
-                <ShareIcon><FaEnvelope /></ShareIcon>
-                <ShareLabel>Email</ShareLabel>
+              <ShareOption onClick={() => shareOnSocialMedia("twitter")}>
+                <ShareIcon><FaTwitter /></ShareIcon>
+                <ShareLabel>Twitter</ShareLabel>
               </ShareOption>
             </ShareOptions>
           </ShareContent>

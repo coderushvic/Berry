@@ -3,14 +3,14 @@ import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaWallet, FaUserFriends, FaPlayCircle, FaTasks } from 'react-icons/fa';
 import { FiRefreshCw } from 'react-icons/fi';
+import { useUser } from "../../context/userContext";
 
-// Animation for shimmer effect (from Referrals)
+// Animation for shimmer effect
 const shimmer = keyframes`
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 `;
 
-// Base card styling (from Referrals)
 const Card = styled.div`
   background: ${berryTheme.colors.cardBackground};
   border-radius: 16px;
@@ -22,13 +22,11 @@ const Card = styled.div`
   overflow: hidden;
 `;
 
-// Content wrapper
 const Content = styled.div`
   position: relative;
   z-index: 1;
 `;
 
-// Card title styling (from Referrals)
 const CardTitle = styled.h3`
   color: ${berryTheme.colors.textDark};
   font-size: 1.2rem;
@@ -41,7 +39,6 @@ const CardTitle = styled.h3`
   gap: 8px;
 `;
 
-// Balance amount (adapted from Referrals' StatValue)
 const BalanceAmount = styled.div`
   font-size: 2.2rem;
   font-weight: 700;
@@ -53,7 +50,6 @@ const BalanceAmount = styled.div`
   margin: 16px 0;
 `;
 
-// Status wrapper (kept from original but adjusted)
 const StatusWrapper = styled.div`
   display: flex;
   align-items: center;
@@ -66,7 +62,6 @@ const StatusWrapper = styled.div`
   backdrop-filter: blur(4px);
 `;
 
-// Status text (adjusted)
 const StatusText = styled.div`
   font-size: 0.9rem;
   font-weight: 500;
@@ -76,7 +71,6 @@ const StatusText = styled.div`
   gap: 8px;
 `;
 
-// Refresh icon (kept from original)
 const RefreshIcon = styled(FiRefreshCw)`
   color: ${berryTheme.colors.primary};
   cursor: pointer;
@@ -88,7 +82,6 @@ const RefreshIcon = styled(FiRefreshCw)`
   }
 `;
 
-// Status indicator (kept from original)
 const StatusIndicator = styled.div`
   width: 10px;
   height: 10px;
@@ -112,7 +105,6 @@ const StatusIndicator = styled.div`
   }
 `;
 
-// Action buttons (from Referrals)
 const ActionButton = styled.button`
   background: ${berryTheme.colors.primary};
   color: white;
@@ -164,7 +156,6 @@ const ButtonGroup = styled.div`
   margin-top: 20px;
 `;
 
-// Icon components for different card types
 const ReferralIcon = styled(FaUserFriends)`
   color: ${berryTheme.colors.primaryLight};
 `;
@@ -177,7 +168,42 @@ const TaskIcon = styled(FaTasks)`
   color: ${berryTheme.colors.primaryDark};
 `;
 
-function BalanceCard({ balance, cardType = 'balance' }) {
+const BreakdownSection = styled.div`
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  font-size: 0.9rem;
+`;
+
+const BreakdownItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+`;
+
+function BalanceCard({ cardType = 'balance' }) {
+  const { 
+    adsBalance = 0, 
+    processedReferrals = [],
+    balance = 0
+  } = useUser();
+
+  // Calculate total referral earnings in dollars
+  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
+    return total + (referral.refBonus || 0) * 0.01; // Convert points to dollars (100 points = $1)
+  }, 0);
+
+  // Calculate total video earnings (assuming adsBalance is in dollars)
+  const totalVideoEarnings = adsBalance || 0;
+
+  // Calculate total balance
+  const totalBalance = cardType === 'balance' ? 
+    (balance || 0) + totalReferralEarnings + totalVideoEarnings :
+    cardType === 'referral' ? totalReferralEarnings :
+    cardType === 'video' ? totalVideoEarnings :
+    0;
+
   const getIcon = () => {
     switch(cardType) {
       case 'referral':
@@ -216,7 +242,24 @@ function BalanceCard({ balance, cardType = 'balance' }) {
           {getIcon()}
           {getTitle()}
         </CardTitle>
-        <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+        <BalanceAmount>${totalBalance.toFixed(2)}</BalanceAmount>
+        
+        {cardType === 'balance' && (
+          <BreakdownSection>
+            <BreakdownItem>
+              <span>Base Balance:</span>
+              <span>${balance.toFixed(2)}</span>
+            </BreakdownItem>
+            <BreakdownItem>
+              <span>Referral Earnings:</span>
+              <span>${totalReferralEarnings.toFixed(2)}</span>
+            </BreakdownItem>
+            <BreakdownItem>
+              <span>Video Rewards:</span>
+              <span>${totalVideoEarnings.toFixed(2)}</span>
+            </BreakdownItem>
+          </BreakdownSection>
+        )}
         
         <ButtonGroup>
           <ActionButton>

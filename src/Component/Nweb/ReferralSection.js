@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaUserFriends, FaLink, FaCopy, FaShareAlt } from 'react-icons/fa';
+import { FaUserFriends, FaLink, FaCopy, FaShareAlt, FaFacebook, FaWhatsapp, FaTelegram, FaTwitter, FaTimes } from 'react-icons/fa';
+import { useUser } from "../../context/userContext";
 
-// Animation for shimmer effect (from Referrals)
+// Animation for shimmer effect
 const shimmer = keyframes`
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -30,7 +31,6 @@ const ReferralIcon = styled(FaUserFriends)`
   font-size: 1.4rem;
 `;
 
-// Updated Card to match Referrals style
 const Card = styled.div`
   background: ${berryTheme.colors.cardBackground};
   border-radius: 16px;
@@ -48,7 +48,6 @@ const Description = styled.p`
   text-align: center;
 `;
 
-// Updated InviteLink to match Referrals style
 const InviteLink = styled.div`
   background: white;
   border-radius: 12px;
@@ -70,7 +69,6 @@ const LinkText = styled.span`
   gap: 8px;
 `;
 
-// Updated Button to match Referrals style
 const Button = styled.button`
   background: ${props => props.$copied ? '#4CAF50' : berryTheme.colors.primary};
   color: white;
@@ -125,7 +123,6 @@ const IconWrapper = styled.span`
   margin-right: 8px;
 `;
 
-// Copy button
 const CopyButton = styled.button`
   background: ${berryTheme.colors.primary};
   color: white;
@@ -144,14 +141,121 @@ const CopyButton = styled.button`
   }
 `;
 
+// Share modal styling
+const ShareModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+`;
+
+const ShareContent = styled.div`
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+`;
+
+const ShareTitle = styled.h3`
+  margin: 0;
+  color: ${berryTheme.colors.textDark};
+  padding: 24px 24px 0 24px;
+`;
+
+const ShareOptions = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 24px;
+`;
+
+const ShareOption = styled.button`
+  background: ${berryTheme.colors.cardBackground};
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${berryTheme.colors.grey200};
+    transform: translateY(-3px);
+  }
+`;
+
+const ShareIcon = styled.div`
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+  color: ${berryTheme.colors.primary};
+`;
+
+const ShareLabel = styled.div`
+  font-size: 0.8rem;
+  color: ${berryTheme.colors.textDark};
+`;
+
+const ModalHeader = styled.div`
+  padding: 16px 24px;
+  border-bottom: 1px solid ${berryTheme.colors.grey200};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
 function ReferralSection() {
+  const { id, referrals = [] } = useUser();
   const [copied, setCopied] = useState(false);
-  const referralLink = 'berryapp.com/invite/berry-friend';
+  const [showShareModal, setShowShareModal] = useState(false);
+  const referralLink = `https://t.me/Fuhdhdbot?start=r${id}`;
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const shareText = "Join me on Berry App and earn rewards together!";
+    const fullText = `${shareText} ${referralLink}`;
+    
+    navigator.clipboard.writeText(fullText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch((err) => console.error("Failed to copy text: ", err));
+  };
+
+  const shareOnSocialMedia = (platform) => {
+    const shareText = "Join me on Berry App and earn rewards together!";
+    let url = "";
+
+    switch (platform) {
+      case "facebook":
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`;
+        break;
+      case "whatsapp":
+        url = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`;
+        break;
+      case "telegram":
+        url = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
+        break;
+      case "twitter":
+        url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`;
+        break;
+      default:
+        break;
+    }
+
+    if (url) {
+      window.open(url, "_blank");
+      setShowShareModal(false);
+    }
   };
 
   return (
@@ -163,6 +267,7 @@ function ReferralSection() {
       <Card>
         <Description>
           Share your invite link & get $10 bonus when friends complete their first task.
+          {referrals.length > 0 && ` ${referrals.length} friends joined so far!`}
         </Description>
         <InviteLink>
           <LinkText>
@@ -178,12 +283,47 @@ function ReferralSection() {
             <IconWrapper><FaCopy /></IconWrapper>
             {copied ? 'Copied!' : 'Copy Link'}
           </Button>
-          <Button>
+          <Button onClick={() => setShowShareModal(true)}>
             <IconWrapper><FaShareAlt /></IconWrapper>
             Share Link
           </Button>
         </ButtonGroup>
       </Card>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareModal onClick={() => setShowShareModal(false)}>
+          <ShareContent onClick={e => e.stopPropagation()}>
+            <ModalHeader>
+              <ShareTitle>Share via</ShareTitle>
+              <button 
+                onClick={() => setShowShareModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <FaTimes size={20} color={berryTheme.colors.grey500} />
+              </button>
+            </ModalHeader>
+            <ShareOptions>
+              <ShareOption onClick={() => shareOnSocialMedia("facebook")}>
+                <ShareIcon><FaFacebook /></ShareIcon>
+                <ShareLabel>Facebook</ShareLabel>
+              </ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("whatsapp")}>
+                <ShareIcon><FaWhatsapp /></ShareIcon>
+                <ShareLabel>WhatsApp</ShareLabel>
+              </ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("telegram")}>
+                <ShareIcon><FaTelegram /></ShareIcon>
+                <ShareLabel>Telegram</ShareLabel>
+              </ShareOption>
+              <ShareOption onClick={() => shareOnSocialMedia("twitter")}>
+                <ShareIcon><FaTwitter /></ShareIcon>
+                <ShareLabel>Twitter</ShareLabel>
+              </ShareOption>
+            </ShareOptions>
+          </ShareContent>
+        </ShareModal>
+      )}
     </Section>
   );
 }

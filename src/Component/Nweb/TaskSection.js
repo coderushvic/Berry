@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaGem, FaGamepad, FaAd } from 'react-icons/fa';
@@ -107,31 +107,44 @@ const AdsBadge = styled.div`
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 `;
 
+const LoadingMessage = styled.div`
+  text-align: center;
+  color: ${berryTheme.colors.textLight};
+  padding: ${berryTheme.spacing.large} 0;
+`;
+
 function TaskSection() {
   const navigate = useNavigate();
-  const { userData } = useUser();
+  const { adsWatched, userData, loading } = useUser();
 
-  // Calculate remaining ads from user data (same logic as AdTask)
-  const dailyLimit = 50; // Default from your AdTask component
-  const adsWatchedToday = userData?.dailyAdsWatched?.[new Date().toISOString().split('T')[0]] || 0;
-  const remainingAds = dailyLimit - adsWatchedToday;
+  // Calculate remaining ads with all safeguards
+  const remainingAds = useMemo(() => {
+    if (loading || typeof adsWatched !== 'number') return null;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const dailyWatched = userData?.dailyAdsWatched?.[today] || 0;
+    const dailyLimit = userData?.dailyAdLimit || 100;
+    
+    return Math.max(0, dailyLimit - dailyWatched);
+  }, [adsWatched, userData, loading]);
 
-  const tasks = [
+  // Memoize tasks configuration
+  const tasks = useMemo(() => [
     { 
       icon: <FaGem />, 
       name: 'Daily Bonus', 
       reward: '$5',
       accentColor: '#FF9F43',
       iconColor: '#FF9F43',
-      path: '/daily-bonus'
+      path: '/DailyReward'
     },
     { 
       icon: <FaGamepad />, 
       name: 'Play Games', 
-      reward: '$2/hr',
+      reward: '$',
       accentColor: '#7367F0',
       iconColor: '#7367F0',
-      path: '/play-games'
+      path: '/GameComponent'
     },
     { 
       icon: <FaAd />, 
@@ -141,14 +154,26 @@ function TaskSection() {
       iconColor: '#28C76F',
       path: '/AdsPage',
       showBadge: true,
-      badgeCount: remainingAds
+      badgeCount: remainingAds !== null ? remainingAds : 0
     },
-  ];
+  ], [remainingAds]);
 
   const handleTaskClick = (path) => {
     navigate(path);
   };
-  
+
+  if (loading) {
+    return (
+      <Section>
+        <Header>
+          <TaskIcon>🎯</TaskIcon>
+          <Title>Earn Money</Title>
+        </Header>
+        <LoadingMessage>Loading tasks...</LoadingMessage>
+      </Section>
+    );
+  }
+
   return (
     <Section>
       <Header>
@@ -158,12 +183,13 @@ function TaskSection() {
       <TaskGrid>
         {tasks.map((task, index) => (
           <TaskCard 
-            key={index} 
+            key={`task-${index}`}
             $accentColor={task.accentColor}
             onClick={() => handleTaskClick(task.path)}
+            aria-label={`${task.name} task`}
           >
             {task.showBadge && task.badgeCount > 0 && (
-              <AdsBadge>
+              <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
                 {task.badgeCount > 9 ? '9+' : task.badgeCount}
               </AdsBadge>
             )}

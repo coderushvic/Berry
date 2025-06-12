@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { 
@@ -10,6 +10,7 @@ import {
   FaShareAlt
 } from 'react-icons/fa';
 import NavBar from './NavBar';
+import { useUser } from '../../context/userContext';
 
 // Styled Components
 const AppContainer = styled.div`
@@ -27,6 +28,10 @@ const Content = styled.div`
   gap: 16px;
   max-width: 1200px;
   margin: 0 auto;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Header = styled.header`
@@ -114,6 +119,10 @@ const ButtonGroup = styled.div`
   gap: 16px;
   width: 100%;
   margin-top: 16px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+  }
 `;
 
 const ActionButton = styled.button`
@@ -135,6 +144,11 @@ const ActionButton = styled.button`
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(227, 11, 92, 0.3);
   }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey300};
+    cursor: not-allowed;
+  }
 `;
 
 const IconWrapper = styled.span`
@@ -144,24 +158,90 @@ const IconWrapper = styled.span`
 
 const ProfilePage = () => {
   const [copied, setCopied] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const [isTelegram, setIsTelegram] = useState(false);
+  const {
+    id = '',
+    fullName = '',
+    username = '',
+    adsWatched = 0,
+    videoWatched = 0,
+    processedReferrals = [],
+    balance = 0,
+    adsBalance = 0,
+    dollarBalance2 = 0,
+    walletAddress = ''
+  } = useUser();
 
-  // User data
-  const user = {
-    id: "USR-78945612",
-    name: "Alex Johnson",
-    image: "https://randomuser.me/api/portraits/men/32.jpg",
-    stats: {
-      referrals: 24,
-      adsWatched: 156,
-      videosWatched: 89,
-      totalRevenue: "$428.50"
+  useEffect(() => {
+    // Check if running in Telegram WebApp
+    if (window.Telegram?.WebApp?.initDataUnsafe) {
+      setIsTelegram(true);
+      const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
+      if (telegramUser?.photo_url) {
+        setProfileImage(`${telegramUser.photo_url}?size=large`);
+      }
+    }
+  }, []);
+
+  // Calculate stats
+  const referralCount = processedReferrals?.length || 0;
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2);
+
+  const copyUserId = () => {
+    if (id) {
+      navigator.clipboard.writeText(id).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(err => {
+        console.error('Failed to copy ID:', err);
+      });
     }
   };
 
-  const copyUserId = () => {
-    navigator.clipboard.writeText(user.id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const shareProfile = async () => {
+    const shareText = `Join me on Berry! Use my referral ID: ${id}`;
+    const shareUrl = `${window.location.origin}?ref=${id}`;
+
+    try {
+      if (isTelegram && window.Telegram.WebApp.share) {
+        window.Telegram.WebApp.share(shareText);
+      } else if (navigator.share) {
+        await navigator.share({
+          title: 'Berry App',
+          text: shareText,
+          url: shareUrl
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Referral link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Referral link copied to clipboard!');
+      } catch (copyErr) {
+        console.error('Failed to copy:', copyErr);
+      }
+    }
+  };
+
+  const getAvatarUrl = () => {
+    if (profileImage) return profileImage;
+    const name = fullName || username || 'U';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+  };
+
+  const getDisplayName = () => {
+    if (fullName) return fullName;
+    if (username) return username;
+    return 'Berry User';
+  };
+
+  const getTruncatedWallet = () => {
+    if (!walletAddress || walletAddress.length < 10) return null;
+    return `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
   };
 
   return (
@@ -172,28 +252,39 @@ const ProfilePage = () => {
       </Header>
       
       <Content>
-        {/* Profile Card - full width */}
         <ProfileCard $borderColor={berryTheme.colors.primaryDark}>
           <AvatarImage 
-            src={user.image} 
-            alt={user.name}
+            src={getAvatarUrl()} 
+            alt={getDisplayName()}
             onError={(e) => {
-              e.target.onerror = null; 
-              e.target.src = "https://via.placeholder.com/100";
+              e.target.onerror = null;
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getDisplayName().charAt(0))}&background=random`;
             }}
           />
-          <UserName>{user.name}</UserName>
-          <UserId>ID: {user.id}</UserId>
+          <UserName>{getDisplayName()}</UserName>
+          {id && <UserId>ID: {id}</UserId>}
+          {walletAddress && (
+            <UserId style={{ marginTop: '-8px', fontSize: '0.8rem' }}>
+              Wallet: {getTruncatedWallet()}
+            </UserId>
+          )}
           
           <ButtonGroup>
-            <ActionButton onClick={copyUserId} $copied={copied}>
+            <ActionButton 
+              onClick={copyUserId} 
+              $copied={copied}
+              disabled={!id}
+            >
               <IconWrapper>
                 {copied ? '✓' : <FaCopy />}
               </IconWrapper>
               {copied ? 'Copied' : 'Copy ID'}
             </ActionButton>
             
-            <ActionButton>
+            <ActionButton 
+              onClick={shareProfile}
+              disabled={!id}
+            >
               <IconWrapper>
                 <FaShareAlt />
               </IconWrapper>
@@ -202,19 +293,18 @@ const ProfilePage = () => {
           </ButtonGroup>
         </ProfileCard>
 
-        {/* Stats Cards - in grid layout */}
         <StatCard $borderColor="#7367F0">
           <StatValue>
             <FaMoneyBillWave />
-            {user.stats.totalRevenue}
+            ${totalRevenue.toFixed(2)}
           </StatValue>
-          <StatLabel>Total Revenue</StatLabel>
+          <StatLabel>Total Earnings</StatLabel>
         </StatCard>
 
         <StatCard $borderColor="#FF9F43">
           <StatValue>
             <FaUsers />
-            {user.stats.referrals}
+            {referralCount}
           </StatValue>
           <StatLabel>Referrals</StatLabel>
         </StatCard>
@@ -222,7 +312,7 @@ const ProfilePage = () => {
         <StatCard $borderColor="#EA5455">
           <StatValue>
             <FaAd />
-            {user.stats.adsWatched}
+            {adsWatched}
           </StatValue>
           <StatLabel>Ads Watched</StatLabel>
         </StatCard>
@@ -230,7 +320,7 @@ const ProfilePage = () => {
         <StatCard $borderColor="#00CFE8">
           <StatValue>
             <FaVideo />
-            {user.stats.videosWatched}
+            {videoWatched}
           </StatValue>
           <StatLabel>Videos Watched</StatLabel>
         </StatCard>

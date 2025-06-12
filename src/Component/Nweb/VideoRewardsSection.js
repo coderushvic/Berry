@@ -55,7 +55,7 @@ const VideoCard = styled.div`
 `;
 
 const VideoContainer = styled.div`
-  height: 100px;
+  height: 150px;
   background: linear-gradient(135deg, #FF6B8B, #E30B5C);
   display: flex;
   align-items: center;
