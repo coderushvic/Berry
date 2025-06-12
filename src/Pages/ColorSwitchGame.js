@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Footer from '../Component/Footer/Footer';
 import { db } from '../firebase/firestore';
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import { useUser } from '../context/userContext'; // Import the useUser hook
+import NavBar from '../Component/Nweb/NavBar';
 
 const GameComponent = () => {
   const canvasRef = useRef(null);
@@ -592,7 +592,7 @@ const GameComponent = () => {
         </div>
       )}
       <canvas ref={canvasRef} />
-      <Footer />
+      <NavBar />
     </>
   );
 };
