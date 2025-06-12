@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useUser } from '../../context/userContext';
 import { FiDollarSign, FiClock, FiCheckCircle, FiXCircle, FiRefreshCw, FiExternalLink } from 'react-icons/fi';
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
