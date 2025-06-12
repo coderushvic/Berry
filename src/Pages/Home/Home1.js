@@ -1,26 +1,11 @@
 import React from 'react';
 import { berryTheme } from '../../Theme';
 import styled from 'styled-components';
-import NavBar from '../../Component/Nweb/NavBar';
+import MainLayout from '../../Component/Nweb/MainLayout';
 import ReferralSection from '../../Component/Nweb/ReferralSection';
 import TaskSection from '../../Component/Nweb/TaskSection';
 import VideoRewardsSection from '../../Component/Nweb/VideoRewardsSection';
 import { useUser } from "../../context/userContext";
-
-const AppContainer = styled.div`
-  font-family: ${berryTheme.fonts.main};
-  background: ${berryTheme.colors.backgroundGradient};
-  min-height: 100vh;
-  margin: 0 auto;
-  position: relative;
-  padding-bottom: 80px;
-`;
-
-const Content = styled.div`
-  padding: ${berryTheme.spacing.medium};
-  max-width: 600px;
-  margin: 0 auto;
-`;
 
 const Header = styled.header`
   padding: ${berryTheme.spacing.large} ${berryTheme.spacing.medium} ${berryTheme.spacing.medium};
@@ -110,7 +95,7 @@ function Home1() {
     processedReferrals = []
   } = useUser();
 
-  // Calculate total referral earnings from both direct refBonus and processed referrals
+  // Calculate total referral earnings
   const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
     return total + (parseFloat(referral.refBonus) || 0);
   }, 0);
@@ -118,57 +103,56 @@ function Home1() {
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
 
   return (
-    <AppContainer>
+    <MainLayout>
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
         <LogoText>berry</LogoText>
       </Header>
-      <Content>
-        <StyledBalanceCard>
-          <BalanceContent>
-            <BalanceLabel>Available Balance</BalanceLabel>
-            <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
-            
-            <BalanceBreakdown>
-              {adsBalance > 0 && (
-                <BreakdownItem>
-                  <span>Ad Earnings:</span>
-                  <span>${adsBalance.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-              {dollarBalance2 > 0 && (
-                <BreakdownItem>
-                  <span>Video Earnings:</span>
-                  <span>${dollarBalance2.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-              {taskPoints > 0 && (
-                <BreakdownItem>
-                  <span>Task Earnings:</span>
-                  <span>${taskPoints.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-              {checkinRewards > 0 && (
-                <BreakdownItem>
-                  <span>Check-in Rewards:</span>
-                  <span>${checkinRewards.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-              {totalReferralEarnings > 0 && (
-                <BreakdownItem>
-                  <span>Referral Bonuses:</span>
-                  <span>${totalReferralEarnings.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-            </BalanceBreakdown>
-          </BalanceContent>
-        </StyledBalanceCard>
-        <ReferralSection />
-        <VideoRewardsSection />
-        <TaskSection />
-      </Content>
-      <NavBar />
-    </AppContainer>
+      
+      <StyledBalanceCard>
+        <BalanceContent>
+          <BalanceLabel>Available Balance</BalanceLabel>
+          <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+          
+          <BalanceBreakdown>
+            {adsBalance > 0 && (
+              <BreakdownItem>
+                <span>Ad Earnings:</span>
+                <span>${adsBalance.toFixed(2)}</span>
+              </BreakdownItem>
+            )}
+            {dollarBalance2 > 0 && (
+              <BreakdownItem>
+                <span>Video Earnings:</span>
+                <span>${dollarBalance2.toFixed(2)}</span>
+              </BreakdownItem>
+            )}
+            {taskPoints > 0 && (
+              <BreakdownItem>
+                <span>Task Earnings:</span>
+                <span>${taskPoints.toFixed(2)}</span>
+              </BreakdownItem>
+            )}
+            {checkinRewards > 0 && (
+              <BreakdownItem>
+                <span>Check-in Rewards:</span>
+                <span>${checkinRewards.toFixed(2)}</span>
+              </BreakdownItem>
+            )}
+            {totalReferralEarnings > 0 && (
+              <BreakdownItem>
+                <span>Referral Bonuses:</span>
+                <span>${totalReferralEarnings.toFixed(2)}</span>
+              </BreakdownItem>
+            )}
+          </BalanceBreakdown>
+        </BalanceContent>
+      </StyledBalanceCard>
+      
+      <ReferralSection />
+      <VideoRewardsSection />
+      <TaskSection />
+    </MainLayout>
   );
 }
 
