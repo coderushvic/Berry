@@ -102,3 +102,13 @@
     font-size: 16px;
     color: #fff;
   }
+/* Add this to your index.css or App.css */
+body {
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+* {
+  box-sizing: border-box;
+}
