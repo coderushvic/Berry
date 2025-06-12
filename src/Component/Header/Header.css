@@ -1,0 +1,106 @@
+._BrowserHeader_m63td_55 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 3rem;
+    width: 100%;
+    padding-inline: .5625rem .8125rem;
+    position: relative;
+    z-index: 1;
+}
+
+button.btn-icon_BrowserHeaderButton_m63td_65 {
+    text-align: center;
+    font-size: 1.5rem;
+    line-height: 1;
+    border-radius: 50% !important;
+    color: var(--secondary-text-color);
+    background-color: transparent;
+    border: none;
+    padding: .5rem;
+    position: relative;
+    transition: color .15s ease-in-out, opacity .15s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+div.scrollable.scrollable-x._BrowserHeaderTabsScrollable_m63td_81.scrolled-start.scrolled-end {
+    display: flex;
+    position: relative;
+    flex: 1 1 auto;
+    margin-inline: -5px 1rem;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 .5rem, #000 calc(100% - 30px), transparent);
+    width: 100%;
+    height: 100%;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    max-height: 100%;
+    position: absolute;
+    inset: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+div._BrowserHeaderTabs_m63td_72 {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    box-sizing: inherit;
+    unicode-bidi: isolate;
+    --size: .5rem;
+    position: relative;
+}
+
+div._BrowserHeaderSelector_m63td_174 {
+    position: absolute;
+    background-color: var(--surface-color);
+    height: 100%;
+    z-index: -1;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    pointer-events: none;
+    opacity: 1;
+    box-shadow: 0 0 5px #00000014;
+}
+
+div._BrowserHeaderTab_m63td_72._active_m63td_157._first_m63td_96.animated-item {
+    -webkit-mask-image: linear-gradient(to right, #000 2.875rem, #000 calc(100% - 30px), transparent);
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    transform: translate(0);
+}
+
+button.btn-icon._BrowserHeaderButton_m63td_65._BrowserHeaderTabIcon_m63td_111._BrowserHeaderNewButton_m63td_214 {
+    opacity: 1;
+    margin-left: .25rem;
+    font-size: 1.5rem;
+    width: 1.875rem !important;
+    height: 1.875rem !important;
+    margin: 0 .25rem;
+    flex: 0 0 auto;
+    text-align: center;
+    line-height: 1;
+    border-radius: 50% !important;
+    color: var(--secondary-text-color);
+    background-color: transparent;
+    border: none;
+    padding: .5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    outline: none;
+    cursor: pointer;
+}
+
+span._BrowserHeaderTabIconInner_m63td_117 {
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    font-family: var(--font-regular);
+    text-rendering: auto;
+    line-height: normal;
+    text-align: center;
+    cursor: default;
+    --size: .5rem;
+}

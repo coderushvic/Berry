@@ -1,0 +1,84 @@
+body {
+    margin: 0;
+  }
+  
+  .reward-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    height: 100vh;
+    background-color: #ffffff;
+    position: relative;
+    padding: 20px 0;
+  }
+  
+  .reward-header {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+  }
+  
+  .reward-logo {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .reward-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 100px; /* Move content lower by 5px */
+  }
+  
+  .reward-image {
+        margin-left: auto;
+        margin-right: auto;
+        width: 80%;
+        max-width: 60rem; /* Assuming 80 in Tailwind refers to 80rem */
+        aspect-ratio: 1 / 1; /* Ensures the aspect square (1:1 ratio) */
+        margin-bottom: 5px;
+      
+  }
+  
+  .reward-title {
+    font-size: 1.5rem;
+    margin-bottom: 15px; /* Move title down by 5px */
+    color: #333;
+    font-weight: bold;
+  }
+  
+  .reward-text {
+    font-size: 1rem;
+    color: #777;
+    font-weight: 500;
+    margin-bottom: 55px; /* More space below text */
+  }
+  
+  .reward-button {
+    background-color: #007bff;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 10px 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0px 4px 8px rgba(0, 123, 255, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    width: 90%; /* Button is now longer (75% of container width) */
+    max-width: 450px;
+    margin-bottom: 12px; /* Push button closer to the bottom */
+  }
+  
+  .reward-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0px 6px 12px rgba(0, 123, 255, 0.4);
+  }
+  
+  .reward-button:active {
+    transform: translateY(0);
+    box-shadow: 0px 4px 8px rgba(0, 123, 255, 0.3);
+  }
+  

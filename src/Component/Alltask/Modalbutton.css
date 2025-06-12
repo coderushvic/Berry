@@ -1,0 +1,24 @@
+.close-btn {
+    position: absolute;
+    top: -10px;
+    right: 10px;
+    background-color: #ff0000;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+  }
+  
+  .close-icon {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .close-btn:hover {
+    background-color: #d10000;
+  }
+  

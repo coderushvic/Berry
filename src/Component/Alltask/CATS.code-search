@@ -1,0 +1,234 @@
+# Query: CATS
+# ContextLines: 1
+
+70 results - 19 files
+
+package-lock.json:
+  1  {
+  2:   "name": "cats-clone",
+  3    "version": "0.1.0",
+
+  7      "": {
+  8:       "name": "cats-clone",
+  9        "version": "0.1.0",
+
+package.json:
+  1  {
+  2:   "name": "cats-clone",
+  3    "version": "0.1.0",
+
+public\tonconnect-manifest.json:
+  2  {
+  3:     "url": "https://newcatsclonev1460.netlify.app", 
+  4:     "name": "NewCats Airdrop",                   
+  5:     "iconUrl": "https://newcatsclonev1460.netlify.app/banner.jpg",          
+  6      "termsOfUseUrl": "",  
+
+src\App.js:
+  67  
+  68: <TonConnectUIProvider manifestUrl="https://newcatsclonev1460.netlify.app/tonconnect-manifest.json">
+  69  {restrictAccess ? (
+
+  73            <p className='text-[28px] font-semibold'>
+  74:             Meow!!!! NewCats 😎 Open on your mobile device to play now!
+  75            </p>
+
+src\Component\ManualTasks.js:
+  127              <span className="text-sm font-medium text-black">
+  128:             +{formatNumber(task.bonus)} NEWCATS
+  129              </span>
+
+src\Component\NewUser.js:
+  409        <p className='text-[16px] font-semibold pb-14'>
+  410:         Here is your NEWCATS rewards
+  411        </p>
+
+  430        <p className='text-[16px] !mt-0'>
+  431:       NEWCATS
+  432        </p>
+
+  479      <p className='text-[16px] text-white !mt-1'>
+  480:   +{formatNumber(checkinPoint)} NEWCATS
+  481      </p>
+
+src\Component\Ranking.js:
+  111                    
+  112:                 {formatNumber(user.balance)} MEWCATS
+  113                  </span>
+
+src\Component\RefRewards.js:
+   44              <h3 className="font-medium text-[20px] text-[#ffffff] pt-2 pb-2">
+   45:               <span className="text-accent">+{formatNumber(reward.bonusAward)}</span> NEWCATS CLAIMED
+   46              </h3>
+
+  118                        <span className=''>
+  119:                         +{formatNumber(reward.bonusAward)} NEWCATS
+  120                        </span>
+
+src\Component\TasksMenu.js:
+  166              <span className="text-sm font-medium text-black">
+  167:             +{formatNumber(task.bonus)} NEWCATS
+  168              </span>
+
+src\Component\Alltask\Catsandfrens.js:
+   12      buttonText: 'Complete',
+   13:     modalTitle: 'More NewCats with KuCoin (OKX)',
+   14:     modalDescription: 'Complete tasks with OKX to get more NewCATS',
+   15      tasks: [
+
+   24      buttonText: 'Complete',
+   25:     modalTitle: 'More NewCats with Bitget',
+   26:     modalDescription: 'Complete tasks with Bitget to get more NewCATS',
+   27      tasks: [
+
+   43  
+   44: function Catsandfrens() {
+   45    const [activeModal, setActiveModal] = useState(null);
+
+   62          balance: increment(reward),
+   63:         catsAndFriends: arrayUnion(taskId),
+   64          taskPoints: increment(reward)
+
+   76        <p className="mb-4 text-2xl font-semibold text-black">
+   77:         NewCats <span className="text-xl text-black">&amp;</span> Frens
+   78        </p>
+
+  157                    <div className="flex items-center gap-2">
+  158:                     <span className="text-sm font-medium text-black">+{task.reward} NEWCATS</span>
+  159                    </div>
+
+  186  
+  187: export default Catsandfrens;
+
+src\Component\Alltask\CatsCounter.css:
+   1: .cats-counter-container {
+   2      text-align: center;
+
+   6    
+   7:   .cats-counter-header {
+   8      font-size: 2.5rem;
+
+  14    
+  15:   .cats-counter-stats {
+  16      display: flex;
+
+  21    
+  22:   .cats-counter-item {
+  23      text-align: center;
+
+  26    
+  27:   .cats-counter-label {
+  28      margin-bottom: 5px;
+
+  33    
+  34:   .cats-counter-value {
+  35      display: flex;
+
+  41    
+  42:   .cats-counter-value img {
+  43      margin-left: 5px;
+
+  47    
+  48:   .cats-counter-item p, .cats-counter-item span {
+  49      color: black; /* Ensure text is visible */
+
+src\Component\Alltask\CatsCounter.js:
+   1  import React from 'react';
+   2: import './CatsCounter.css'; 
+   3  import { useUser } from '../../context/userContext';
+   4  
+   5: const CatsCounter = () => {
+   6    const {balance, welcomeBonus, taskPoints, refBonus} = useUser();
+   7    return (
+   8:     <div className="cats-counter-container ">
+   9:       <h1 className="cats-counter-header">{balance} NEWCATS</h1>
+  10:       <div className="cats-counter-stats">
+  11:         <div className="cats-counter-item">
+  12:           <p className="cats-counter-label opacity-60">Rewards</p>
+  13:           <span className="cats-counter-value relative font-semibold">
+  14              +{welcomeBonus} 
+
+  19          </div>
+  20:         <div className="cats-counter-item">
+  21:           <p className="cats-counter-label opacity-60">Tasks</p>
+  22:           <span className={`cats-counter-value relative font-semibold`}>
+  23            <span className={` ${taskPoints > 0 ? '' : 'opacity-50'}`}>
+
+  30          </div>
+  31:         <div className="cats-counter-item">
+  32:           <p className="cats-counter-label opacity-60">Invites</p>
+  33:           <span className={`cats-counter-value relative font-semibold`}>
+  34            <span className={` ${refBonus > 0 ? '' : 'opacity-50'}`}>
+
+  46  
+  47: export default CatsCounter;
+
+src\Component\Alltask\Moretask.js:
+  62                <span className="text-sm font-medium text-black">
+  63:                 +{formatNumber(task.bonus)} NEWCATS
+  64                </span>
+
+  82                <span className="text-sm font-medium text-black">
+  83:                 +{formatNumber(taskd.bonus)} NEWCATS
+  84                </span>
+
+src\Component\Alltask\TonTask.js:
+   81  
+   82:           <span className="text-accent">+2,000 NEWCATS CLAIMED</span>
+   83                </span>
+
+   86          <p className="pb-6 text-[15px] w-full text-center">
+   87:           Perform more activities or buy more NEWCATS to stay ahead and claim listing giveaway bonues!😎
+   88          </p>
+
+  139                        <span className='text-sm font-medium text-black'>
+  140:                         +{formatNumber(bonusAward)} NEWCATS
+  141                        </span>
+
+src\Component\Checking\RewardPage.js:
+  42          <img
+  43:           src='/cats-gif.gif' // Replace this URL with the image of the cat in the suitcase
+  44            alt="CatGif"
+
+src\context\userContext.js:
+  104          setCompletedDailyTasks(userData.dailyTasksCompleted || []);
+  105:         setCompletedCatTasks(userData.catsAndFriends || []);
+  106          setTaskPoints(userData.taskPoints);
+
+src\Pages\Friends\InviteFrens.js:
+   40      const shareData = {
+   41:       title: "Mine NEWCATS tokens now!",
+   42        // eslint-disable-next-line
+   43:       url: `https://t.me/newcats_bot?start=r${id}\n\ `, // Replace with your link
+   44:       text: "NEWCATS tokens mining is live! Two is better than one!  Join my squad, and let's double the fun (and earnings 🤑)! ALPHADOGS Power Tap! 🚀",
+   45      };
+
+   61        // eslint-disable-next-line
+   62:       `${shareData.url} \n\NEWCATS tokens mining is live! Two is better than one!  Join my squad, and let\'s double the fun (and earnings 🤑)! NEWCATS Power Tap! 🚀`
+   63      );
+
+  166          <p className="mt-6 text-center text-[30px] font-semibold leading-[1.15]">
+  167:          Invite frens <br /> and get more NEWCATS
+  168         </p>
+
+src\Pages\Home\Home.js:
+   5  import Banner from '../../Component/Banner/Banner';
+   6: import CatsCounter from '../../Component/Alltask/CatsCounter';
+   7  import Dailytask from '../../Component/Alltask/Dailytask';
+
+   9  import Moretask from '../../Component/Alltask/Moretask';
+  10: import Catsandfrens from '../../Component/Alltask/Catsandfrens';
+  11  import { useUser } from '../../context/userContext';
+
+  36          <Banner />
+  37:         <CatsCounter />
+  38          <Dailytask />
+
+  40          <Moretask />
+  41:         <Catsandfrens />
+  42          <Footer/>
+
+src\Pages\Leaderboard\Leaderboard.css:
+  78    
+  79:   .cats {
+  80      color: gray;
