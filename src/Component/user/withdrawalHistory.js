@@ -16,7 +16,6 @@ export default function WithdrawalHistory() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedTx, setExpandedTx] = useState(null);
 
-  // Format date without external dependencies
   const formatDate = (date) => {
     if (!date) return 'N/A';
     const dateObj = date instanceof Date ? date : new Date(date);
@@ -30,12 +29,11 @@ export default function WithdrawalHistory() {
     const minutes = dateObj.getMinutes().toString().padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12; // Convert 0 to 12
+    hours = hours ? hours : 12;
     
     return `${month} ${day}, ${year} ${hours}:${minutes} ${ampm}`;
   };
 
-  // Fetch and format withdrawals
   useEffect(() => {
     const loadData = async () => {
       setRefreshing(true);
@@ -68,40 +66,28 @@ export default function WithdrawalHistory() {
 
   const statusConfig = {
     'completed': {
-      color: 'text-[#10B981]',
-      bgColor: 'bg-[#ECFDF5]',
-      borderColor: 'border-[#D1FAE5]',
-      icon: <FiCheckCircle className="text-[#10B981]" />
+      color: 'text-green-600',
+      icon: <FiCheckCircle className="text-green-600" />
     },
     'approved': {
-      color: 'text-[#10B981]',
-      bgColor: 'bg-[#ECFDF5]',
-      borderColor: 'border-[#D1FAE5]',
-      icon: <FiCheckCircle className="text-[#10B981]" />
+      color: 'text-green-600',
+      icon: <FiCheckCircle className="text-green-600" />
     },
     'pending': {
-      color: 'text-[#F59E0B]',
-      bgColor: 'bg-[#FFFBEB]',
-      borderColor: 'border-[#FEF3C7]',
-      icon: <FiClock className="text-[#F59E0B]" />
+      color: 'text-yellow-500',
+      icon: <FiClock className="text-yellow-500" />
     },
     'failed': {
-      color: 'text-[#EF4444]',
-      bgColor: 'bg-[#FEF2F2]',
-      borderColor: 'border-[#FEE2E2]',
-      icon: <FiXCircle className="text-[#EF4444]" />
+      color: 'text-red-500',
+      icon: <FiXCircle className="text-red-500" />
     },
     'rejected': {
-      color: 'text-[#EF4444]',
-      bgColor: 'bg-[#FEF2F2]',
-      borderColor: 'border-[#FEE2E2]',
-      icon: <FiXCircle className="text-[#EF4444]" />
+      color: 'text-red-500',
+      icon: <FiXCircle className="text-red-500" />
     },
     'processing': {
-      color: 'text-[#3B82F6]',
-      bgColor: 'bg-[#EFF6FF]',
-      borderColor: 'border-[#DBEAFE]',
-      icon: <FiRefreshCw className="text-[#3B82F6] animate-spin" />
+      color: 'text-blue-500',
+      icon: <FiRefreshCw className="text-blue-500 animate-spin" />
     }
   };
 
@@ -117,10 +103,10 @@ export default function WithdrawalHistory() {
 
   if (loading && !refreshing) {
     return (
-      <div className="bg-white rounded-[16px] shadow-md p-6">
+      <div className="p-6">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-20 bg-[#F3F4F6] rounded-[12px]"></div>
+            <div key={i} className="h-20 bg-gray-100 rounded-lg"></div>
           ))}
         </div>
       </div>
@@ -129,39 +115,37 @@ export default function WithdrawalHistory() {
 
   return (
     <div className="max-w-3xl mx-auto p-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#111827]">Withdrawal History</h1>
-          <p className="text-[#6B7280] mt-1">Track all your withdrawal requests</p>
+          <h1 className="text-2xl font-semibold text-gray-800">Withdrawal History</h1>
+          <p className="text-gray-500">Track all your withdrawal requests</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {adsBalance > 0 && (
-            <div className="bg-[#EEF2FF] px-4 py-2 rounded-[12px] border border-[#E0E7FF]">
-              <p className="text-sm text-[#4F46E5] font-medium">Available Balance</p>
-              <p className="font-bold text-[#4338CA]">${adsBalance.toFixed(3)}</p>
+            <div className="bg-blue-50 px-3 py-1.5 rounded-lg">
+              <p className="text-sm text-blue-600">Available Balance</p>
+              <p className="font-medium text-blue-700">${adsBalance.toFixed(3)}</p>
             </div>
           )}
           <button 
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-2.5 bg-white rounded-[12px] shadow-sm hover:bg-[#F9FAFB] transition-colors border border-[#E5E7EB]"
+            className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <FiRefreshCw className={`text-[#4B5563] ${refreshing ? 'animate-spin' : ''}`} />
+            <FiRefreshCw className={`text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Withdrawals List */}
       {formattedWithdrawals.length === 0 ? (
-        <div className="bg-white rounded-[16px] shadow-sm p-8 text-center border border-[#F3F4F6]">
-          <FiDollarSign className="mx-auto text-[#D1D5DB] text-5xl mb-4" />
-          <h3 className="text-lg font-medium text-[#6B7280] mb-1">No withdrawal history yet</h3>
-          <p className="text-[#9CA3AF]">Your withdrawal requests will appear here</p>
+        <div className="text-center py-12">
+          <FiDollarSign className="mx-auto text-gray-300 text-4xl mb-3" />
+          <h3 className="text-lg text-gray-500 mb-1">No withdrawal history yet</h3>
+          <p className="text-gray-400">Your withdrawal requests will appear here</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {formattedWithdrawals.map((withdrawal) => {
             const status = withdrawal.status;
             const statusInfo = statusConfig[status] || statusConfig.pending;
@@ -174,75 +158,74 @@ export default function WithdrawalHistory() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white rounded-[12px] shadow-sm overflow-hidden border border-[#F3F4F6]"
+                className="bg-white rounded-lg overflow-hidden border border-gray-100"
               >
                 <div 
-                  className="p-5 cursor-pointer hover:bg-[#F9FAFB] transition-colors"
+                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => toggleExpand(withdrawal.id)}
                 >
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-[12px] ${statusInfo.bgColor} ${statusInfo.borderColor} border`}>
-                        <FiDollarSign className={`text-xl ${statusInfo.color}`} />
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-gray-50">
+                        <FiDollarSign className={`text-lg ${statusInfo.color}`} />
                       </div>
                       <div>
                         <div className="flex items-center">
-                          <p className="font-bold text-[#111827]">
+                          <p className="font-medium text-gray-800">
                             ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
                           </p>
                           {isAdsWithdrawal && (
-                            <span className="ml-2 text-xs px-2 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full font-medium">
+                            <span className="ml-2 text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
                               ADS
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-[#6B7280] mt-1">
+                        <p className="text-sm text-gray-500">
                           {withdrawal.formattedDate}
                         </p>
                       </div>
                     </div>
-                    <div className={`flex items-center px-4 py-2 rounded-[12px] text-sm font-medium ${statusInfo.bgColor} ${statusInfo.color} ${statusInfo.borderColor} border`}>
+                    <div className={`flex items-center px-3 py-1.5 rounded-lg text-sm ${statusInfo.color}`}>
                       {statusInfo.icon}
-                      <span className="ml-2 capitalize">{status}</span>
+                      <span className="ml-1.5 capitalize">{status}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded Details */}
                 {isExpanded && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     transition={{ duration: 0.2 }}
-                    className="px-5 pb-5"
+                    className="px-4 pb-4"
                   >
-                    <div className="border-t border-[#E5E7EB] pt-4 space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">Network:</span>
-                        <span className="font-medium text-[#111827]">{withdrawal.network || 'N/A'}</span>
+                    <div className="border-t pt-3 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Network:</span>
+                        <span className="text-gray-800">{withdrawal.network || 'N/A'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">Wallet Address:</span>
-                        <span className="font-medium text-[#111827] text-right max-w-xs break-all">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Wallet Address:</span>
+                        <span className="text-gray-800 text-right max-w-xs break-all">
                           {withdrawal.walletAddress || 'N/A'}
                         </span>
                       </div>
                       {withdrawal.txId && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#6B7280]">Transaction:</span>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500">Transaction:</span>
                           <a
                             href={`https://etherscan.io/tx/${withdrawal.txId}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#4F46E5] hover:text-[#4338CA] text-sm flex items-center font-medium"
+                            className="text-blue-600 hover:text-blue-800 flex items-center"
                           >
-                            View on Etherscan <FiExternalLink className="ml-1.5" />
+                            View on Etherscan <FiExternalLink className="ml-1" />
                           </a>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-[#6B7280]">Fee:</span>
-                        <span className="font-medium text-[#111827]">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Fee:</span>
+                        <span className="text-gray-800">
                           ${withdrawal.fee?.toFixed(3) || '0.000'}
                         </span>
                       </div>
