@@ -3,7 +3,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firestore';
 import { berryTheme } from '../../Theme';
 import styled from 'styled-components';
-import { FaSave, FaSync, FaCoins, FaDollarSign, FaAd, FaClock } from 'react-icons/fa';
+import { FaSave, FaSync, FaCoins, FaAd } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -176,7 +176,7 @@ const StatLabel = styled.div`
   color: ${berryTheme.colors.textSecondary};
 `;
 
-const AdminAdTask = () => {
+const AdminAdsSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -417,4 +417,4 @@ const AdminAdTask = () => {
   );
 };
 
-export default AdminAdTask;
+export default AdminAdsSettings;
