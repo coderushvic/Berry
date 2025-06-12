@@ -180,7 +180,6 @@ const AdminAdsSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // Configuration state
   const [config, setConfig] = useState({
     pointsBonus: 1000,
     dollarBonus: 10.001,
@@ -197,7 +196,6 @@ const AdminAdsSettings = () => {
     ]
   });
 
-  // Stats state
   const [stats, setStats] = useState({
     totalAdsWatched: 0,
     totalRewardsPaid: 0,
@@ -205,7 +203,6 @@ const AdminAdsSettings = () => {
     activeUsers: 0
   });
 
-  // Load configuration from Firestore
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -216,8 +213,6 @@ const AdminAdsSettings = () => {
           setConfig(docSnap.data());
         }
         
-        // TODO: Load stats from your database
-        // This is just placeholder data
         setStats({
           totalAdsWatched: 12453,
           totalRewardsPaid: 124530,
@@ -269,7 +264,7 @@ const AdminAdsSettings = () => {
   if (loading) {
     return (
       <AdminContainer>
-        <Header>Loading AdTask Configuration...</Header>
+        <Header>Loading Ad Configuration...</Header>
       </AdminContainer>
     );
   }
@@ -279,10 +274,9 @@ const AdminAdsSettings = () => {
       <ToastContainer position="bottom-right" />
       
       <Header>
-        <FaAd /> AdTask Management
+        <FaAd /> Ad Management
       </Header>
       
-      {/* Rewards Configuration */}
       <Section>
         <SectionTitle>
           <FaCoins /> Rewards Configuration
@@ -330,7 +324,6 @@ const AdminAdsSettings = () => {
         </FormGroup>
       </Section>
       
-      {/* Ad Providers */}
       <Section>
         <SectionTitle>
           <FaAd /> Ad Providers
@@ -380,7 +373,6 @@ const AdminAdsSettings = () => {
         ))}
       </Section>
       
-      {/* Statistics */}
       <Section>
         <SectionTitle>
           <FaSync /> Statistics
@@ -409,7 +401,6 @@ const AdminAdsSettings = () => {
         </StatsContainer>
       </Section>
       
-      {/* Save Button */}
       <Button onClick={saveConfig} disabled={saving}>
         <FaSave /> {saving ? 'Saving...' : 'Save Configuration'}
       </Button>
