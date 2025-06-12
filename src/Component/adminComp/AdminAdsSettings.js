@@ -285,7 +285,7 @@ const AdminAdsSettings = () => {
       {/* Rewards Configuration */}
       <Section>
         <SectionTitle>
-          <FaCoins /> Rewards Configuration
+          <FaCoins /> Rewards Configurations
         </SectionTitle>
         
         <FormGroup>
