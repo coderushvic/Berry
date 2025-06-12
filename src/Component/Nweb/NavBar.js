@@ -68,7 +68,7 @@ const NavBar = () => {
       icon: <FaUserFriends />, 
       label: 'Referrals', 
       path: '/Referrals',
-      active: isActive('/referrals') 
+      active: isActive('/Referrals') 
     },
     { 
       icon: <FaCoins />, 
