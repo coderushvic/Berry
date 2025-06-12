@@ -38,6 +38,7 @@ import ProfilePage from './Component/Nweb/ProfilePage';
 import VideoWatchPage from './Component/Nweb/VideoWatchPage';
 import AdsPage from './Component/Nweb/AdsPage';
 import AdminAdsSettings from './Component/adminComp/AdminAdsSettings';
+import DailyReward from './Component/Nweb/DailyReward';
 
 const router = createBrowserRouter([
   {
@@ -76,6 +77,10 @@ const router = createBrowserRouter([
       {
         path: "/AdsPage",
         element: <AdsPage />
+      },
+       {
+        path: "/DailyReward",
+        element: <DailyReward />
       },
       {
         path: "/leaderboard",
