@@ -2,6 +2,7 @@ import { useUser } from '../../context/userContext';
 import { FiDollarSign, FiClock, FiCheckCircle, FiXCircle, FiRefreshCw, FiExternalLink } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
@@ -66,28 +67,22 @@ export default function WithdrawalHistory() {
 
   const statusConfig = {
     'completed': {
-      color: 'text-green-600',
-      icon: <FiCheckCircle className="text-green-600" />
+      icon: <FiCheckCircle className={styles.completed} />
     },
     'approved': {
-      color: 'text-green-600',
-      icon: <FiCheckCircle className="text-green-600" />
+      icon: <FiCheckCircle className={styles.completed} />
     },
     'pending': {
-      color: 'text-yellow-500',
-      icon: <FiClock className="text-yellow-500" />
+      icon: <FiClock className={styles.pending} />
     },
     'failed': {
-      color: 'text-red-500',
-      icon: <FiXCircle className="text-red-500" />
+      icon: <FiXCircle className={styles.failed} />
     },
     'rejected': {
-      color: 'text-red-500',
-      icon: <FiXCircle className="text-red-500" />
+      icon: <FiXCircle className={styles.failed} />
     },
     'processing': {
-      color: 'text-blue-500',
-      icon: <FiRefreshCw className="text-blue-500 animate-spin" />
+      icon: <FiRefreshCw className={`${styles.processing} ${styles.skeletonPulse}`} />
     }
   };
 
@@ -103,10 +98,10 @@ export default function WithdrawalHistory() {
 
   if (loading && !refreshing) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
+      <div className={styles.container}>
+        <div className={styles.skeletonPulse}>
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-20 bg-gray-100 rounded-lg"></div>
+            <div key={i} className={styles.skeletonItem}></div>
           ))}
         </div>
       </div>
@@ -114,38 +109,38 @@ export default function WithdrawalHistory() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div className={styles.container}>
+      <div className={styles.header}>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Withdrawal History</h1>
-          <p className="text-gray-500">Track all your withdrawal requests</p>
+          <h1 className={styles.title}>Withdrawal History</h1>
+          <p className={styles.subtitle}>Track all your withdrawal requests</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className={styles.amountContainer}>
           {adsBalance > 0 && (
-            <div className="bg-blue-50 px-3 py-1.5 rounded-lg">
-              <p className="text-sm text-blue-600">Available Balance</p>
-              <p className="font-medium text-blue-700">${adsBalance.toFixed(3)}</p>
+            <div className={styles.balanceCard}>
+              <p className={styles.balanceLabel}>Available Balance</p>
+              <p className={styles.balanceValue}>${adsBalance.toFixed(3)}</p>
             </div>
           )}
           <button 
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-2 rounded-lg hover:bg-gray-50 transition-colors"
+            className={styles.refreshButton}
           >
-            <FiRefreshCw className={`text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
+            <FiRefreshCw className={`${refreshing ? styles.skeletonPulse : ''}`} />
           </button>
         </div>
       </div>
 
       {formattedWithdrawals.length === 0 ? (
-        <div className="text-center py-12">
-          <FiDollarSign className="mx-auto text-gray-300 text-4xl mb-3" />
-          <h3 className="text-lg text-gray-500 mb-1">No withdrawal history yet</h3>
-          <p className="text-gray-400">Your withdrawal requests will appear here</p>
+        <div className={styles.emptyState}>
+          <FiDollarSign className={styles.emptyIcon} />
+          <h3 className={styles.emptyTitle}>No withdrawal history yet</h3>
+          <p className={styles.emptyDescription}>Your withdrawal requests will appear here</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className={styles.withdrawalList}>
           {formattedWithdrawals.map((withdrawal) => {
             const status = withdrawal.status;
             const statusInfo = statusConfig[status] || statusConfig.pending;
@@ -158,37 +153,35 @@ export default function WithdrawalHistory() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white rounded-lg overflow-hidden border border-gray-100"
+                className={styles.withdrawalCard}
               >
                 <div 
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={styles.withdrawalHeader}
                   onClick={() => toggleExpand(withdrawal.id)}
                 >
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-gray-50">
-                        <FiDollarSign className={`text-lg ${statusInfo.color}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center">
-                          <p className="font-medium text-gray-800">
-                            ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
-                          </p>
-                          {isAdsWithdrawal && (
-                            <span className="ml-2 text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
-                              ADS
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-500">
-                          {withdrawal.formattedDate}
+                  <div className={styles.amountContainer}>
+                    <div className={`${styles.statusIcon} ${styles[status]}`}>
+                      <FiDollarSign className={styles[status]} />
+                    </div>
+                    <div>
+                      <div className={styles.amountContainer}>
+                        <p className={styles.detailValue}>
+                          ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
                         </p>
+                        {isAdsWithdrawal && (
+                          <span className={styles.adsBadge}>
+                            ADS
+                          </span>
+                        )}
                       </div>
+                      <p className={styles.subtitle}>
+                        {withdrawal.formattedDate}
+                      </p>
                     </div>
-                    <div className={`flex items-center px-3 py-1.5 rounded-lg text-sm ${statusInfo.color}`}>
-                      {statusInfo.icon}
-                      <span className="ml-1.5 capitalize">{status}</span>
-                    </div>
+                  </div>
+                  <div className={`${styles.statusBadge} ${styles[status]}`}>
+                    {statusInfo.icon}
+                    <span className="ml-2 capitalize">{status}</span>
                   </div>
                 </div>
 
@@ -197,38 +190,36 @@ export default function WithdrawalHistory() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     transition={{ duration: 0.2 }}
-                    className="px-4 pb-4"
+                    className={styles.detailsContainer}
                   >
-                    <div className="border-t pt-3 space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Network:</span>
-                        <span className="text-gray-800">{withdrawal.network || 'N/A'}</span>
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Network:</span>
+                      <span className={styles.detailValue}>{withdrawal.network || 'N/A'}</span>
+                    </div>
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Wallet Address:</span>
+                      <span className={styles.detailValue}>
+                        {withdrawal.walletAddress || 'N/A'}
+                      </span>
+                    </div>
+                    {withdrawal.txId && (
+                      <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Transaction:</span>
+                        <a
+                          href={`https://etherscan.io/tx/${withdrawal.txId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.externalLink}
+                        >
+                          View on Etherscan <FiExternalLink className="ml-1.5" />
+                        </a>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Wallet Address:</span>
-                        <span className="text-gray-800 text-right max-w-xs break-all">
-                          {withdrawal.walletAddress || 'N/A'}
-                        </span>
-                      </div>
-                      {withdrawal.txId && (
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-500">Transaction:</span>
-                          <a
-                            href={`https://etherscan.io/tx/${withdrawal.txId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 flex items-center"
-                          >
-                            View on Etherscan <FiExternalLink className="ml-1" />
-                          </a>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Fee:</span>
-                        <span className="text-gray-800">
-                          ${withdrawal.fee?.toFixed(3) || '0.000'}
-                        </span>
-                      </div>
+                    )}
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Fee:</span>
+                      <span className={styles.detailValue}>
+                        ${withdrawal.fee?.toFixed(3) || '0.000'}
+                      </span>
                     </div>
                   </motion.div>
                 )}

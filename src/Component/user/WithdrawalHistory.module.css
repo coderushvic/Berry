@@ -1,0 +1,242 @@
+.container {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .header {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.title {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.subtitle {
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.balanceCard {
+  background-color: #eef2ff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e0e7ff;
+}
+
+.balanceLabel {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.balanceValue {
+  font-weight: 700;
+  color: #4338ca;
+}
+
+.refreshButton {
+  padding: 0.625rem;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  transition-property: background-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.refreshButton:hover {
+  background-color: #f9fafb;
+}
+
+.emptyState {
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+  text-align: center;
+  border: 1px solid #f3f4f6;
+}
+
+.emptyIcon {
+  margin-left: auto;
+  margin-right: auto;
+  color: #d1d5db;
+  font-size: 3rem;
+  line-height: 3rem;
+  margin-bottom: 1rem;
+}
+
+.emptyTitle {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.emptyDescription {
+  color: #9ca3af;
+}
+
+.withdrawalCard {
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid #f3f4f6;
+}
+
+.withdrawalHeader {
+  padding: 1.25rem;
+  cursor: pointer;
+  transition-property: background-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.withdrawalHeader:hover {
+  background-color: #f9fafb;
+}
+
+.amountContainer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.statusIcon {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border-width: 1px;
+}
+
+.adsBadge {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.25rem 0.5rem;
+  background-color: #eef2ff;
+  color: #4f46e5;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.statusBadge {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  border-width: 1px;
+}
+
+.detailsContainer {
+  padding: 1.25rem;
+  padding-top: 1rem;
+  border-top-width: 1px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.detailLabel {
+  color: #6b7280;
+}
+
+.detailValue {
+  font-weight: 500;
+  color: #111827;
+}
+
+.externalLink {
+  color: #4f46e5;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.externalLink:hover {
+  color: #3730a3;
+}
+
+/* Status colors */
+.completed {
+  color: #10b981;
+  background-color: #ecfdf5;
+  border-color: #d1fae5;
+}
+
+.approved {
+  color: #10b981;
+  background-color: #ecfdf5;
+  border-color: #d1fae5;
+}
+
+.pending {
+  color: #f59e0b;
+  background-color: #fffbeb;
+  border-color: #fef3c7;
+}
+
+.failed {
+  color: #ef4444;
+  background-color: #fef2f2;
+  border-color: #fee2e2;
+}
+
+.rejected {
+  color: #ef4444;
+  background-color: #fef2f2;
+  border-color: #fee2e2;
+}
+
+.processing {
+  color: #3b82f6;
+  background-color: #eff6ff;
+  border-color: #dbeafe;
+}
+
+/* Animation for skeleton loading */
+.skeletonPulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeletonItem {
+  height: 5rem;
+  background-color: #f3f4f6;
+  border-radius: 0.75rem;
+}
