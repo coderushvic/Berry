@@ -59,15 +59,16 @@ export const UserProvider = ({ children }) => {
   const [adsWithdrawals, setAdsWithdrawals] = useState([]);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
 
-  // New states for second AdWatch system
-  const [secondAdsWatched, setSecondAdsWatched] = useState(0);
-  const [secondLastAdTime, setSecondLastAdTime] = useState(null);
+  // New states for video watch reward system
+  const [dollarBalance2, setDollarBalance2] = useState(0);
+  const [videoWatched, setVideoWatched] = useState(0);
+  const [lastVideoTime, setLastVideoTime] = useState(null);
 
   const CACHE_KEY = 'topUsers';
   const CACHE_DURATION = 10 * 60 * 1000;
 
-  // New function to handle watching ads in the second system
-  const watchSecondAd = useCallback(async (rewardAmount) => {
+  // Function to handle watching videos in the second reward system
+  const watchVideo = useCallback(async (rewardAmount) => {
     if (!id) return;
 
     try {
@@ -82,29 +83,30 @@ export const UserProvider = ({ children }) => {
 
         const userData = userDoc.data();
         
-        // Update both the second ad stats and main ads balance
+        // Update video watch stats and dollarBalance2
         transaction.update(userRef, {
-          secondAdsWatched: (userData.secondAdsWatched || 0) + 1,
-          secondLastAdTime: now,
-          adsBalance: (userData.adsBalance || 0) + rewardAmount,
-          adsWatched: (userData.adsWatched || 0) + 1,
-          lastAdTime: now
+          videoWatched: (userData.videoWatched || 0) + 1,
+          lastVideoTime: now,
+          dollarBalance2: (userData.dollarBalance2 || 0) + rewardAmount,
         });
       });
 
       // Update local state
-      setSecondAdsWatched(prev => prev + 1);
-      setSecondLastAdTime(new Date());
-      setAdsBalance(prev => prev + rewardAmount);
-      setAdsWatched(prev => prev + 1);
-      setLastAdTime(new Date());
+      setVideoWatched(prev => prev + 1);
+      setLastVideoTime(new Date());
+      setDollarBalance2(prev => prev + rewardAmount);
       
-      return { success: true, message: "Ad watched successfully" };
+      return { success: true, message: "Video watched successfully" };
     } catch (error) {
-      console.error("Error watching second ad:", error);
+      console.error("Error watching video:", error);
       return { success: false, message: error.message };
     }
   }, [id]);
+
+  // Combined balance calculation
+  const getTotalBalance = useCallback(() => {
+    return (balance || 0) + (adsBalance || 0) + (dollarBalance2 || 0);
+  }, [balance, adsBalance, dollarBalance2]);
 
   const fetchTopUsers = useCallback(async () => {
     const cachedData = localStorage.getItem(CACHE_KEY);
@@ -281,9 +283,10 @@ export const UserProvider = ({ children }) => {
         setAdsWatched(userData.adsWatched || 0);
         setLastAdTime(userData.lastAdTime?.toDate() || null);
         
-        // New: Set second ad watch data
-        setSecondAdsWatched(userData.secondAdsWatched || 0);
-        setSecondLastAdTime(userData.secondLastAdTime?.toDate() || null);
+        // Set video watch reward data
+        setDollarBalance2(userData.dollarBalance2 || 0);
+        setVideoWatched(userData.videoWatched || 0);
+        setLastVideoTime(userData.lastVideoTime?.toDate() || null);
 
         const topUsersData = await fetchTopUsers();
         setLeaderBoard(topUsersData);
@@ -401,9 +404,10 @@ export const UserProvider = ({ children }) => {
           balance: 0,
           adsBalance: 0,
           adsWatched: 0,
-          secondAdsWatched: 0, // New: Initialize second ad watch counter
           lastAdTime: null,
-          secondLastAdTime: null, // New: Initialize second ad last watch time
+          dollarBalance2: 0, // Initialize video reward balance
+          videoWatched: 0, // Initialize video watch counter
+          lastVideoTime: null, // Initialize last video watch time
           lastActive: Timestamp.now(),
           refereeId: referrerId || null,
           referrals: [],
@@ -528,17 +532,19 @@ export const UserProvider = ({ children }) => {
       adsBalance, setAdsBalance,
       adsWatched, setAdsWatched,
       lastAdTime, setLastAdTime,
+      // Video watch reward system
+      dollarBalance2, setDollarBalance2,
+      videoWatched, setVideoWatched,
+      lastVideoTime, setLastVideoTime,
+      watchVideo,
+      getTotalBalance,
       // Withdrawal related state and functions
       allWithdrawals,
       adsWithdrawals,
       isProcessingWithdrawal,
       fetchWithdrawals,
       updateWithdrawalStatus,
-      exportApprovedWithdrawals,
-      // New second AdWatch system
-      secondAdsWatched,
-      secondLastAdTime,
-      watchSecondAd
+      exportApprovedWithdrawals
     }}>
       {children}
     </UserContext.Provider>
