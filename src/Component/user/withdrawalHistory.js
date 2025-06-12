@@ -1,257 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useUser } from '../../context/userContext';
 import { FiDollarSign, FiClock, FiCheckCircle, FiXCircle, FiRefreshCw, FiExternalLink } from 'react-icons/fi';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import styled, { keyframes } from 'styled-components';
-import { berryTheme } from '../../Theme';
-
-// Animations
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-`;
-
-// Styled Components
-const Container = styled.div`
-  max-width: 800px;
-  margin: 0 auto;
-  padding: ${berryTheme.spacing.medium};
-`;
-
-const Header = styled.div`
-  display: flex;
-  flex-direction: column;
-  margin-bottom: ${berryTheme.spacing.large};
-  gap: ${berryTheme.spacing.small};
-
-  @media (min-width: ${berryTheme.breakpoints.tablet}) {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-`;
-
-const Title = styled.h1`
-  color: ${berryTheme.colors.primary};
-  font-size: 1.5rem;
-  margin: 0;
-`;
-
-const Subtitle = styled.p`
-  color: ${berryTheme.colors.textDark};
-  margin: ${berryTheme.spacing.xsmall} 0 0;
-`;
-
-const BalanceBadge = styled.div`
-  background: ${berryTheme.colors.indigo50};
-  padding: ${berryTheme.spacing.small} ${berryTheme.spacing.medium};
-  border-radius: 12px;
-  border: 1px solid ${berryTheme.colors.indigo100};
-`;
-
-const BalanceLabel = styled.p`
-  color: ${berryTheme.colors.indigo600};
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin: 0;
-`;
-
-const BalanceValue = styled.p`
-  color: ${berryTheme.colors.indigo700};
-  font-weight: 700;
-  margin: 0;
-`;
-
-const RefreshButton = styled.button`
-  background: white;
-  padding: ${berryTheme.spacing.small};
-  border-radius: 12px;
-  border: 1px solid ${berryTheme.colors.grey200};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: ${berryTheme.colors.grey50};
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-`;
-
-const LoadingContainer = styled.div`
-  background: white;
-  border-radius: 16px;
-  padding: ${berryTheme.spacing.large};
-  box-shadow: ${berryTheme.shadows.small};
-`;
-
-const LoadingItem = styled.div`
-  height: 80px;
-  background: ${berryTheme.colors.grey100};
-  border-radius: 12px;
-  animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-`;
-
-const EmptyState = styled.div`
-  background: white;
-  border-radius: 16px;
-  padding: ${berryTheme.spacing.large};
-  box-shadow: ${berryTheme.shadows.small};
-  border: 1px solid ${berryTheme.colors.grey100};
-  text-align: center;
-`;
-
-const EmptyIcon = styled(FiDollarSign)`
-  color: ${berryTheme.colors.grey300};
-  font-size: 3rem;
-  margin-bottom: ${berryTheme.spacing.medium};
-`;
-
-const EmptyTitle = styled.h3`
-  color: ${berryTheme.colors.grey500};
-  font-size: 1.125rem;
-  font-weight: 500;
-  margin-bottom: ${berryTheme.spacing.xsmall};
-`;
-
-const EmptyText = styled.p`
-  color: ${berryTheme.colors.grey400};
-  margin: 0;
-`;
-
-const WithdrawalList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${berryTheme.spacing.small};
-`;
-
-const WithdrawalItem = styled(motion.div)`
-  background: white;
-  border-radius: 16px;
-  box-shadow: ${berryTheme.shadows.small};
-  border: 1px solid ${berryTheme.colors.grey100};
-  overflow: hidden;
-`;
-
-const WithdrawalHeader = styled.div`
-  padding: ${berryTheme.spacing.medium};
-  cursor: pointer;
-  transition: background 0.2s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  &:hover {
-    background: ${berryTheme.colors.grey50};
-  }
-`;
-
-const WithdrawalInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${berryTheme.spacing.medium};
-`;
-
-const IconContainer = styled.div`
-  padding: ${berryTheme.spacing.small};
-  border-radius: 12px;
-  border: 1px solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const AmountContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const Amount = styled.span`
-  font-weight: 700;
-  color: ${berryTheme.colors.textDark};
-  display: flex;
-  align-items: center;
-  gap: ${berryTheme.spacing.small};
-`;
-
-const DateText = styled.span`
-  font-size: 0.875rem;
-  color: ${berryTheme.colors.grey500};
-  margin-top: ${berryTheme.spacing.xsmall};
-`;
-
-const AdsBadge = styled.span`
-  font-size: 0.75rem;
-  padding: ${berryTheme.spacing.xsmall} ${berryTheme.spacing.small};
-  background: ${berryTheme.colors.indigo50};
-  color: ${berryTheme.colors.indigo600};
-  border-radius: 9999px;
-  font-weight: 500;
-`;
-
-const StatusBadge = styled.div`
-  padding: ${berryTheme.spacing.small} ${berryTheme.spacing.medium};
-  border-radius: 12px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: ${berryTheme.spacing.small};
-  border: 1px solid;
-`;
-
-const DetailsContainer = styled(motion.div)`
-  padding: 0 ${berryTheme.spacing.medium} ${berryTheme.spacing.medium};
-`;
-
-const DetailsContent = styled.div`
-  border-top: 1px solid ${berryTheme.colors.grey200};
-  padding-top: ${berryTheme.spacing.medium};
-  display: flex;
-  flex-direction: column;
-  gap: ${berryTheme.spacing.medium};
-`;
-
-const DetailRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-`;
-
-const DetailLabel = styled.span`
-  color: ${berryTheme.colors.grey500};
-`;
-
-const DetailValue = styled.span`
-  color: ${berryTheme.colors.textDark};
-  font-weight: 500;
-  max-width: 70%;
-  text-align: right;
-  word-break: break-all;
-`;
-
-const EtherscanLink = styled.a`
-  color: ${berryTheme.colors.indigo600};
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: ${berryTheme.spacing.xsmall};
-  transition: color 0.2s ease;
-
-  &:hover {
-    color: ${berryTheme.colors.indigo800};
-  }
-`;
 
 export default function WithdrawalHistory() {
   const { 
@@ -266,6 +16,7 @@ export default function WithdrawalHistory() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedTx, setExpandedTx] = useState(null);
 
+  // Format date without external dependencies
   const formatDate = (date) => {
     if (!date) return 'N/A';
     const dateObj = date instanceof Date ? date : new Date(date);
@@ -279,11 +30,12 @@ export default function WithdrawalHistory() {
     const minutes = dateObj.getMinutes().toString().padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12;
+    hours = hours ? hours : 12; // Convert 0 to 12
     
     return `${month} ${day}, ${year} ${hours}:${minutes} ${ampm}`;
   };
 
+  // Fetch and format withdrawals
   useEffect(() => {
     const loadData = async () => {
       setRefreshing(true);
@@ -316,40 +68,40 @@ export default function WithdrawalHistory() {
 
   const statusConfig = {
     'completed': {
-      color: berryTheme.colors.green500,
-      bgColor: berryTheme.colors.green50,
-      borderColor: berryTheme.colors.green100,
-      icon: <FiCheckCircle />
+      color: 'text-[#10B981]',
+      bgColor: 'bg-[#ECFDF5]',
+      borderColor: 'border-[#D1FAE5]',
+      icon: <FiCheckCircle className="text-[#10B981]" />
     },
     'approved': {
-      color: berryTheme.colors.green500,
-      bgColor: berryTheme.colors.green50,
-      borderColor: berryTheme.colors.green100,
-      icon: <FiCheckCircle />
+      color: 'text-[#10B981]',
+      bgColor: 'bg-[#ECFDF5]',
+      borderColor: 'border-[#D1FAE5]',
+      icon: <FiCheckCircle className="text-[#10B981]" />
     },
     'pending': {
-      color: berryTheme.colors.amber500,
-      bgColor: berryTheme.colors.amber50,
-      borderColor: berryTheme.colors.amber100,
-      icon: <FiClock />
+      color: 'text-[#F59E0B]',
+      bgColor: 'bg-[#FFFBEB]',
+      borderColor: 'border-[#FEF3C7]',
+      icon: <FiClock className="text-[#F59E0B]" />
     },
     'failed': {
-      color: berryTheme.colors.red500,
-      bgColor: berryTheme.colors.red50,
-      borderColor: berryTheme.colors.red100,
-      icon: <FiXCircle />
+      color: 'text-[#EF4444]',
+      bgColor: 'bg-[#FEF2F2]',
+      borderColor: 'border-[#FEE2E2]',
+      icon: <FiXCircle className="text-[#EF4444]" />
     },
     'rejected': {
-      color: berryTheme.colors.red500,
-      bgColor: berryTheme.colors.red50,
-      borderColor: berryTheme.colors.red100,
-      icon: <FiXCircle />
+      color: 'text-[#EF4444]',
+      bgColor: 'bg-[#FEF2F2]',
+      borderColor: 'border-[#FEE2E2]',
+      icon: <FiXCircle className="text-[#EF4444]" />
     },
     'processing': {
-      color: berryTheme.colors.blue500,
-      bgColor: berryTheme.colors.blue50,
-      borderColor: berryTheme.colors.blue100,
-      icon: <FiRefreshCw className="animate-spin" />
+      color: 'text-[#3B82F6]',
+      bgColor: 'bg-[#EFF6FF]',
+      borderColor: 'border-[#DBEAFE]',
+      icon: <FiRefreshCw className="text-[#3B82F6] animate-spin" />
     }
   };
 
@@ -365,51 +117,51 @@ export default function WithdrawalHistory() {
 
   if (loading && !refreshing) {
     return (
-      <LoadingContainer>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: berryTheme.spacing.small }}>
+      <div className="bg-white rounded-[16px] shadow-md p-6">
+        <div className="animate-pulse space-y-4">
           {[1, 2, 3].map(i => (
-            <LoadingItem key={i} />
+            <div key={i} className="h-20 bg-[#F3F4F6] rounded-[12px]"></div>
           ))}
         </div>
-      </LoadingContainer>
+      </div>
     );
   }
 
   return (
-    <Container>
-      <Header>
+    <div className="max-w-3xl mx-auto p-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <Title>Withdrawal History</Title>
-          <Subtitle>Track all your withdrawal requests</Subtitle>
+          <h1 className="text-2xl font-bold text-[#111827]">Withdrawal History</h1>
+          <p className="text-[#6B7280] mt-1">Track all your withdrawal requests</p>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: berryTheme.spacing.medium }}>
+        <div className="flex items-center gap-4">
           {adsBalance > 0 && (
-            <BalanceBadge>
-              <BalanceLabel>Available Balance</BalanceLabel>
-              <BalanceValue>${adsBalance.toFixed(3)}</BalanceValue>
-            </BalanceBadge>
+            <div className="bg-[#EEF2FF] px-4 py-2 rounded-[12px] border border-[#E0E7FF]">
+              <p className="text-sm text-[#4F46E5] font-medium">Available Balance</p>
+              <p className="font-bold text-[#4338CA]">${adsBalance.toFixed(3)}</p>
+            </div>
           )}
-          <RefreshButton 
+          <button 
             onClick={handleRefresh}
             disabled={refreshing}
+            className="p-2.5 bg-white rounded-[12px] shadow-sm hover:bg-[#F9FAFB] transition-colors border border-[#E5E7EB]"
           >
-            <FiRefreshCw style={{ 
-              color: berryTheme.colors.grey600,
-              animation: refreshing ? 'spin 1s linear infinite' : 'none'
-            }} />
-          </RefreshButton>
+            <FiRefreshCw className={`text-[#4B5563] ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
-      </Header>
+      </div>
 
+      {/* Withdrawals List */}
       {formattedWithdrawals.length === 0 ? (
-        <EmptyState>
-          <EmptyIcon />
-          <EmptyTitle>No withdrawal history yet</EmptyTitle>
-          <EmptyText>Your withdrawal requests will appear here</EmptyText>
-        </EmptyState>
+        <div className="bg-white rounded-[16px] shadow-sm p-8 text-center border border-[#F3F4F6]">
+          <FiDollarSign className="mx-auto text-[#D1D5DB] text-5xl mb-4" />
+          <h3 className="text-lg font-medium text-[#6B7280] mb-1">No withdrawal history yet</h3>
+          <p className="text-[#9CA3AF]">Your withdrawal requests will appear here</p>
+        </div>
       ) : (
-        <WithdrawalList>
+        <div className="space-y-4">
           {formattedWithdrawals.map((withdrawal) => {
             const status = withdrawal.status;
             const statusInfo = statusConfig[status] || statusConfig.pending;
@@ -417,79 +169,91 @@ export default function WithdrawalHistory() {
             const isExpanded = expandedTx === withdrawal.id;
 
             return (
-              <WithdrawalItem 
+              <motion.div 
                 key={withdrawal.id || withdrawal.timestamp}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
+                className="bg-white rounded-[12px] shadow-sm overflow-hidden border border-[#F3F4F6]"
               >
-                <WithdrawalHeader onClick={() => toggleExpand(withdrawal.id)}>
-                  <WithdrawalInfo>
-                    <IconContainer style={{
-                      backgroundColor: statusInfo.bgColor,
-                      borderColor: statusInfo.borderColor
-                    }}>
-                      <FiDollarSign style={{ color: statusInfo.color }} />
-                    </IconContainer>
-                    <AmountContainer>
-                      <Amount>
-                        ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
-                        {isAdsWithdrawal && <AdsBadge>ADS</AdsBadge>}
-                      </Amount>
-                      <DateText>{withdrawal.formattedDate}</DateText>
-                    </AmountContainer>
-                  </WithdrawalInfo>
-                  <StatusBadge style={{
-                    backgroundColor: statusInfo.bgColor,
-                    borderColor: statusInfo.borderColor,
-                    color: statusInfo.color
-                  }}>
-                    {React.cloneElement(statusInfo.icon, { style: { color: statusInfo.color } })}
-                    <span style={{ textTransform: 'capitalize' }}>{status}</span>
-                  </StatusBadge>
-                </WithdrawalHeader>
+                <div 
+                  className="p-5 cursor-pointer hover:bg-[#F9FAFB] transition-colors"
+                  onClick={() => toggleExpand(withdrawal.id)}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-[12px] ${statusInfo.bgColor} ${statusInfo.borderColor} border`}>
+                        <FiDollarSign className={`text-xl ${statusInfo.color}`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <p className="font-bold text-[#111827]">
+                            ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
+                          </p>
+                          {isAdsWithdrawal && (
+                            <span className="ml-2 text-xs px-2 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full font-medium">
+                              ADS
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-[#6B7280] mt-1">
+                          {withdrawal.formattedDate}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`flex items-center px-4 py-2 rounded-[12px] text-sm font-medium ${statusInfo.bgColor} ${statusInfo.color} ${statusInfo.borderColor} border`}>
+                      {statusInfo.icon}
+                      <span className="ml-2 capitalize">{status}</span>
+                    </div>
+                  </div>
+                </div>
 
+                {/* Expanded Details */}
                 {isExpanded && (
-                  <DetailsContainer
+                  <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     transition={{ duration: 0.2 }}
+                    className="px-5 pb-5"
                   >
-                    <DetailsContent>
-                      <DetailRow>
-                        <DetailLabel>Network:</DetailLabel>
-                        <DetailValue>{withdrawal.network || 'N/A'}</DetailValue>
-                      </DetailRow>
-                      <DetailRow>
-                        <DetailLabel>Wallet Address:</DetailLabel>
-                        <DetailValue>{withdrawal.walletAddress || 'N/A'}</DetailValue>
-                      </DetailRow>
+                    <div className="border-t border-[#E5E7EB] pt-4 space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-[#6B7280]">Network:</span>
+                        <span className="font-medium text-[#111827]">{withdrawal.network || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#6B7280]">Wallet Address:</span>
+                        <span className="font-medium text-[#111827] text-right max-w-xs break-all">
+                          {withdrawal.walletAddress || 'N/A'}
+                        </span>
+                      </div>
                       {withdrawal.txId && (
-                        <DetailRow>
-                          <DetailLabel>Transaction:</DetailLabel>
-                          <DetailValue>
-                            <EtherscanLink
-                              href={`https://etherscan.io/tx/${withdrawal.txId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              View on Etherscan <FiExternalLink />
-                            </EtherscanLink>
-                          </DetailValue>
-                        </DetailRow>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[#6B7280]">Transaction:</span>
+                          <a
+                            href={`https://etherscan.io/tx/${withdrawal.txId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#4F46E5] hover:text-[#4338CA] text-sm flex items-center font-medium"
+                          >
+                            View on Etherscan <FiExternalLink className="ml-1.5" />
+                          </a>
+                        </div>
                       )}
-                      <DetailRow>
-                        <DetailLabel>Fee:</DetailLabel>
-                        <DetailValue>${withdrawal.fee?.toFixed(3) || '0.000'}</DetailValue>
-                      </DetailRow>
-                    </DetailsContent>
-                  </DetailsContainer>
+                      <div className="flex justify-between">
+                        <span className="text-[#6B7280]">Fee:</span>
+                        <span className="font-medium text-[#111827]">
+                          ${withdrawal.fee?.toFixed(3) || '0.000'}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
                 )}
-              </WithdrawalItem>
+              </motion.div>
             );
           })}
-        </WithdrawalList>
+        </div>
       )}
-    </Container>
+    </div>
   );
 }
