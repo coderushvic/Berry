@@ -81,6 +81,29 @@ export const UserProvider = ({ children }) => {
   const [allWithdrawals, setAllWithdrawals] = useState([]);
   const [adsWithdrawals, setAdsWithdrawals] = useState([]);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
+  const [isPremium, setIsPremium] = useState(false);
+  
+  // New ad-related states
+  const [adsConfig, setAdsConfig] = useState({
+    pointsBonus: 1000,
+    dollarBonus: 10.001,
+    dailyLimit: 50,
+    premiumDailyLimit: 100,
+    cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
+    ads: [{
+      id: "default_ad",
+      scriptSrc: "//whephiwums.com/sdk.js",
+      zoneId: "8693006",
+      sdkVar: "show_8693006",
+      active: true
+    }]
+  });
+  const [adWatchedToday, setAdWatchedToday] = useState(0);
+  const [lastAdTimestamp, setLastAdTimestamp] = useState(null);
+  const [adCooldowns, setAdCooldowns] = useState({});
+  const [adLimits, setAdLimits] = useState({});
+  const [adRewards, setAdRewards] = useState([]);
+  const [adProviders, setAdProviders] = useState([]);
 
   const CACHE_KEY = 'topUsers';
   const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -89,6 +112,90 @@ export const UserProvider = ({ children }) => {
   const getTotalBalance = useCallback(() => {
     return (balance || 0) + (adsBalance || 0) + (dollarBalance2 || 0);
   }, [balance, adsBalance, dollarBalance2]);
+
+  // Ad management functions
+  const updateAdsConfig = useCallback(async (newConfig) => {
+    try {
+      await updateDoc(doc(db, 'adminConfig', 'adsSettings'), newConfig);
+      setAdsConfig(newConfig);
+      return true;
+    } catch (error) {
+      console.error("Error updating ads config:", error);
+      return false;
+    }
+  }, []);
+
+  const recordAdWatch = useCallback(async (adId) => {
+    if (!id) throw new Error('User not authenticated');
+    
+    const now = Date.now();
+    const userRef = doc(db, 'telegramUsers', id);
+    
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User does not exist");
+        
+        const userData = userDoc.data();
+        const today = new Date().toISOString().split('T')[0];
+        const adWatchesToday = userData.adWatches?.[today] || 0;
+        const dailyLimit = userData.isPremium ? 
+          adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
+        
+        if (adWatchesToday >= dailyLimit) {
+          throw new Error("Daily ad limit reached");
+        }
+        
+        // Update ad watch count
+        const updates = {
+          [`adWatches.${today}`]: increment(1),
+          lastAdTimestamp: now,
+          [`adCooldowns.${adId}`]: now + adsConfig.cooldown
+        };
+        
+        transaction.update(userRef, updates);
+      });
+      
+      // Update local state
+      setAdWatchedToday(prev => prev + 1);
+      setLastAdTimestamp(now);
+      setAdCooldowns(prev => ({
+        ...prev,
+        [adId]: now + adsConfig.cooldown
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error("Error recording ad watch:", error);
+      throw error;
+    }
+  }, [id, adsConfig]);
+
+  const getAdStatus = useCallback((adId) => {
+    const now = Date.now();
+    const cooldownEnd = adCooldowns[adId] || 0;
+    const remaining = Math.max(0, cooldownEnd - now);
+    
+    return {
+      canWatch: remaining === 0,
+      remainingTime: remaining,
+      dailyLimit: isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit,
+      watchedToday: adWatchedToday,
+      pointsReward: adsConfig.pointsBonus,
+      dollarReward: adsConfig.dollarBonus
+    };
+  }, [adCooldowns, adWatchedToday, adsConfig, isPremium]);
+
+  const resetDailyAdLimits = useCallback(() => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    
+    // Reset at midnight
+    if (hours === 0 && minutes === 0) {
+      setAdWatchedToday(0);
+    }
+  }, []);
 
   // Unified reward adding function with default case
   const addRewards = async (amount, type = 'main') => {
@@ -336,6 +443,7 @@ export const UserProvider = ({ children }) => {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const today = new Date().toISOString().split('T')[0];
         
         // Set all balance-related states
         setBalance(userData.balance || 0);
@@ -345,6 +453,12 @@ export const UserProvider = ({ children }) => {
         setVideoWatched(userData.videoWatched || 0);
         setLastAdTime(userData.lastAdTime?.toDate() || null);
         setLastVideoTime(userData.lastVideoTime?.toDate() || null);
+
+        // Set ad-related states
+        setAdWatchedToday(userData.adWatches?.[today] || 0);
+        setLastAdTimestamp(userData.lastAdTimestamp || null);
+        setAdCooldowns(userData.adCooldowns || {});
+        setIsPremium(userData.isPremium || false);
 
         // Set other user data
         setUsername(userData.username || '');
@@ -381,6 +495,12 @@ export const UserProvider = ({ children }) => {
         setUserAdvertTasks(userData.advertTasks || []);
         setReferrals(userData.referrals || []);
         setProcessedReferrals(userData.processedReferrals || []);
+
+        // Fetch ads configuration
+        const adsConfigDoc = await getDoc(doc(db, 'adminConfig', 'adsSettings'));
+        if (adsConfigDoc.exists()) {
+          setAdsConfig(adsConfigDoc.data());
+        }
 
         // Fetch leaderboard
         const topUsersData = await fetchTopUsers();
@@ -491,6 +611,9 @@ export const UserProvider = ({ children }) => {
           welcomeBonus: welcomeBonus,
           refBonus: 0,
           streak: 0,
+          isPremium: false,
+          adWatches: {},
+          adCooldowns: {}
         };
 
         await setDoc(userRef, userData);
@@ -584,6 +707,12 @@ export const UserProvider = ({ children }) => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Daily reset for ad limits
+  useEffect(() => {
+    const interval = setInterval(resetDailyAdLimits, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [resetDailyAdLimits]);
+
   return (
     <UserContext.Provider value={{
       // All state values
@@ -638,6 +767,14 @@ export const UserProvider = ({ children }) => {
       allWithdrawals,
       adsWithdrawals,
       isProcessingWithdrawal,
+      isPremium,
+      adsConfig,
+      adWatchedToday,
+      lastAdTimestamp,
+      adCooldowns,
+      adLimits,
+      adRewards,
+      adProviders,
 
       // All state setters
       setBalance, 
@@ -691,6 +828,14 @@ export const UserProvider = ({ children }) => {
       setAllWithdrawals,
       setAdsWithdrawals,
       setIsProcessingWithdrawal,
+      setIsPremium,
+      setAdsConfig,
+      setAdWatchedToday,
+      setLastAdTimestamp,
+      setAdCooldowns,
+      setAdLimits,
+      setAdRewards,
+      setAdProviders,
 
       // Components
       YoutubeTasks,
@@ -702,7 +847,10 @@ export const UserProvider = ({ children }) => {
       getTotalBalance,
       fetchWithdrawals,
       updateWithdrawalStatus,
-      exportApprovedWithdrawals
+      exportApprovedWithdrawals,
+      updateAdsConfig,
+      recordAdWatch,
+      getAdStatus
     }}>
       {children}
     </UserContext.Provider>
