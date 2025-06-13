@@ -85,7 +85,7 @@ export const UserProvider = ({ children }) => {
   
   // New ad-related states
   const [adsConfig, setAdsConfig] = useState({
-    pointsBonus: 1000,
+    pointsBonus: 0,
     dollarBonus: 10.001,
     dailyLimit: 50,
     premiumDailyLimit: 100,
@@ -320,7 +320,7 @@ export const UserProvider = ({ children }) => {
       }
 
       const firstDigit = parseInt(userId.toString()[0]);
-      const welcomeBonus = firstDigit * 1000;
+      const welcomeBonus = firstDigit * 1;
       const refBonus = welcomeBonus * 0.2;
 
       await updateDoc(referrerRef, {
