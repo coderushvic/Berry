@@ -83,9 +83,9 @@ export const UserProvider = ({ children }) => {
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
   const [isPremium, setIsPremium] = useState(false);
   
-  // New ad-related states
+  // Ad tracking states
   const [adsConfig, setAdsConfig] = useState({
-    pointsBonus: 0,
+    pointsBonus: 1000,
     dollarBonus: 10.001,
     dailyLimit: 50,
     premiumDailyLimit: 100,
@@ -98,12 +98,8 @@ export const UserProvider = ({ children }) => {
       active: true
     }]
   });
-  const [adWatchedToday, setAdWatchedToday] = useState(0);
-  const [lastAdTimestamp, setLastAdTimestamp] = useState(null);
+  const [adWatches, setAdWatches] = useState({});
   const [adCooldowns, setAdCooldowns] = useState({});
-  const [adLimits, setAdLimits] = useState({});
-  const [adRewards, setAdRewards] = useState([]);
-  const [adProviders, setAdProviders] = useState([]);
 
   const CACHE_KEY = 'topUsers';
   const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -129,6 +125,7 @@ export const UserProvider = ({ children }) => {
     if (!id) throw new Error('User not authenticated');
     
     const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
     const userRef = doc(db, 'telegramUsers', id);
     
     try {
@@ -137,7 +134,6 @@ export const UserProvider = ({ children }) => {
         if (!userDoc.exists()) throw new Error("User does not exist");
         
         const userData = userDoc.data();
-        const today = new Date().toISOString().split('T')[0];
         const adWatchesToday = userData.adWatches?.[today] || 0;
         const dailyLimit = userData.isPremium ? 
           adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
@@ -150,19 +146,23 @@ export const UserProvider = ({ children }) => {
         const updates = {
           [`adWatches.${today}`]: increment(1),
           lastAdTimestamp: now,
-          [`adCooldowns.${adId}`]: now + adsConfig.cooldown
+          [`adCooldowns.${adId}`]: now + adsConfig.cooldown,
+          adsWatched: increment(1)
         };
         
         transaction.update(userRef, updates);
       });
       
       // Update local state
-      setAdWatchedToday(prev => prev + 1);
-      setLastAdTimestamp(now);
+      setAdWatches(prev => ({
+        ...prev,
+        [today]: (prev[today] || 0) + 1
+      }));
       setAdCooldowns(prev => ({
         ...prev,
         [adId]: now + adsConfig.cooldown
       }));
+      setAdsWatched(prev => prev + 1);
       
       return true;
     } catch (error) {
@@ -173,6 +173,7 @@ export const UserProvider = ({ children }) => {
 
   const getAdStatus = useCallback((adId) => {
     const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
     const cooldownEnd = adCooldowns[adId] || 0;
     const remaining = Math.max(0, cooldownEnd - now);
     
@@ -180,20 +181,32 @@ export const UserProvider = ({ children }) => {
       canWatch: remaining === 0,
       remainingTime: remaining,
       dailyLimit: isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit,
-      watchedToday: adWatchedToday,
+      watchedToday: adWatches[today] || 0,
       pointsReward: adsConfig.pointsBonus,
-      dollarReward: adsConfig.dollarBonus
+      dollarReward: adsConfig.dollarBonus,
+      lastWatch: adCooldowns[adId] || null
     };
-  }, [adCooldowns, adWatchedToday, adsConfig, isPremium]);
+  }, [adCooldowns, adWatches, adsConfig, isPremium]);
 
   const resetDailyAdLimits = useCallback(() => {
     const now = new Date();
     const hours = now.getHours();
     const minutes = now.getMinutes();
+    const today = now.toISOString().split('T')[0];
     
     // Reset at midnight
     if (hours === 0 && minutes === 0) {
-      setAdWatchedToday(0);
+      setAdWatches(prev => {
+        const newWatches = {...prev};
+        if (!newWatches[today]) {
+          Object.keys(newWatches).forEach(date => {
+            if (date !== today) {
+              delete newWatches[date];
+            }
+          });
+        }
+        return newWatches;
+      });
     }
   }, []);
 
@@ -320,7 +333,7 @@ export const UserProvider = ({ children }) => {
       }
 
       const firstDigit = parseInt(userId.toString()[0]);
-      const welcomeBonus = firstDigit * 1;
+      const welcomeBonus = firstDigit * 1000;
       const refBonus = welcomeBonus * 0.2;
 
       await updateDoc(referrerRef, {
@@ -442,26 +455,25 @@ export const UserProvider = ({ children }) => {
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Set all balance-related states
-        setBalance(userData.balance || 0);
-        setAdsBalance(userData.adsBalance || 0);
-        setDollarBalance2(userData.dollarBalance2 || 0);
-        setAdsWatched(userData.adsWatched || 0);
-        setVideoWatched(userData.videoWatched || 0);
-        setLastAdTime(userData.lastAdTime?.toDate() || null);
-        setLastVideoTime(userData.lastVideoTime?.toDate() || null);
+  const userData = userDoc.data();
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Set all balance-related states
+  setBalance(userData.balance || 0);
+  setAdsBalance(userData.adsBalance || 0);
+  setDollarBalance2(userData.dollarBalance2 || 0);
+  setAdsWatched(userData.adsWatched || 0);
+  setVideoWatched(userData.videoWatched || 0);
+  setLastAdTime(userData.lastAdTime?.toDate() || null);
+  setLastVideoTime(userData.lastVideoTime?.toDate() || null);
 
-        // Set ad-related states
-        setAdWatchedToday(userData.adWatches?.[today] || 0);
-        setLastAdTimestamp(userData.lastAdTimestamp || null);
-        setAdCooldowns(userData.adCooldowns || {});
-        setIsPremium(userData.isPremium || false);
+  // Set ad-related states using the today variable
+  setAdWatches(userData.adWatches || { [today]: 0 });
+  setAdCooldowns(userData.adCooldowns || {});
+  setIsPremium(userData.isPremium || false);
 
-        // Set other user data
-        setUsername(userData.username || '');
+  // Set other user data
+  setUsername(userData.username || '');
         setTonTasks(userData.tonTasks || false);
         setWelcomeBonus(userData.welcomeBonus || 0);
         setTonTransactions(userData.tonTransactions || 0);
@@ -769,12 +781,8 @@ export const UserProvider = ({ children }) => {
       isProcessingWithdrawal,
       isPremium,
       adsConfig,
-      adWatchedToday,
-      lastAdTimestamp,
+      adWatches,
       adCooldowns,
-      adLimits,
-      adRewards,
-      adProviders,
 
       // All state setters
       setBalance, 
@@ -830,12 +838,8 @@ export const UserProvider = ({ children }) => {
       setIsProcessingWithdrawal,
       setIsPremium,
       setAdsConfig,
-      setAdWatchedToday,
-      setLastAdTimestamp,
+      setAdWatches,
       setAdCooldowns,
-      setAdLimits,
-      setAdRewards,
-      setAdProviders,
 
       // Components
       YoutubeTasks,
