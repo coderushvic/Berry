@@ -11,6 +11,7 @@
     "@testing-library/user-event": "^13.5.0",
     "@tonconnect/ui-react": "^2.0.9",
     "@twa-dev/sdk": "^8.0.1",
+    "antd": "^5.26.0",
     "axios": "^1.8.1",
     "chart.js": "^4.4.7",
     "express": "^4.21.1",
