@@ -303,6 +303,7 @@ const defaultConfig = {
   pointsBonus: 0,
   dollarBonus: 10.001,
   dailyLimit: 50,
+  premiumDailyLimit: 100,
   cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
   ads: [{
     id: "default_ad",
@@ -316,16 +317,19 @@ const defaultConfig = {
 const AdTask = () => {
   const {
     id,
+    isPremium,
+    adsConfig = defaultConfig,
+    recordAdWatch,
+    getAdStatus,
     setBalance,
     setTaskPoints,
+    setAdsBalance,
     completedDailyTasks,
     setCompletedDailyTasks,
     adsWatched,
     setAdsWatched,
     lastAdTime,
-    setLastAdTime,
-    setAdsBalance,
-    isPremium
+    setLastAdTime
   } = useUser();
 
   const [adWatched, setAdWatched] = useState(false);
@@ -336,45 +340,57 @@ const AdTask = () => {
   const [adError, setAdError] = useState(null);
   const [showCooldownPopup, setShowCooldownPopup] = useState(false);
   const [cooldownMessage, setCooldownMessage] = useState("");
-  const [adsConfig, setAdsConfig] = useState(null);
+  const [localAdsConfig, setLocalAdsConfig] = useState(adsConfig);
 
   // Memoized functions and values
   const generateTaskId = useCallback(() => `adTask_${new Date().getTime()}`, []);
   const [taskId, setTaskId] = useState(generateTaskId());
 
-  // Combined config from admin settings and defaults
-  const task = useMemo(() => ({
-    pointsBonus: adsConfig?.pointsBonus ?? defaultConfig.pointsBonus,
-    dollarBonus: adsConfig?.dollarBonus ?? defaultConfig.dollarBonus,
-    dailyLimit: adsConfig?.dailyLimit ?? defaultConfig.dailyLimit,
-    cooldown: adsConfig?.cooldown ?? defaultConfig.cooldown
-  }), [adsConfig]);
+  // Active ad configuration
+  const activeAd = useMemo(() => 
+    localAdsConfig.ads.find(ad => ad.active) || localAdsConfig.ads[0],
+    [localAdsConfig]
+  );
+
+  // Get current ad status - now properly used
+  const adStatus = useMemo(() => {
+    const status = getAdStatus(activeAd.id);
+    // Use status for debugging or conditional logic
+    if (status && status.error) {
+      console.warn('Ad status error:', status.error);
+    }
+    return status;
+  }, [getAdStatus, activeAd.id]);
 
   // Calculate progress percentage
   const progressPercentage = useMemo(() => {
-    return Math.min(100, (adsWatched / (task.dailyLimit || 1)) * 100);
-  }, [adsWatched, task.dailyLimit]);
+    const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
+    return Math.min(100, (adsWatched / dailyLimit) * 100);
+  }, [adsWatched, localAdsConfig, isPremium]);
 
-  // Load ads configuration from Firestore
+  // Load ads configuration from Firestore if not provided by context
   useEffect(() => {
     const loadAdsConfig = async () => {
       try {
         const configDoc = await getDoc(doc(db, "adminConfig", "adsSettings"));
-        setAdsConfig(configDoc.exists() ? configDoc.data() : defaultConfig);
+        setLocalAdsConfig(configDoc.exists() ? { ...defaultConfig, ...configDoc.data() } : defaultConfig);
       } catch (error) {
         console.error("Error loading ads config:", error);
-        setAdsConfig(defaultConfig);
+        setLocalAdsConfig(defaultConfig);
       }
     };
 
-    loadAdsConfig();
-  }, []);
+    if (adsConfig === defaultConfig) {
+      loadAdsConfig();
+    } else {
+      setLocalAdsConfig(adsConfig);
+    }
+  }, [adsConfig]);
 
   // Load ad script based on config
   useEffect(() => {
-    if (!adsConfig?.ads) return;
+    if (!activeAd) return;
 
-    const activeAd = adsConfig.ads.find(ad => ad.active) || defaultConfig.ads[0];
     const existingScript = document.querySelector(`script[data-zone="${activeAd.zoneId}"]`);
     if (existingScript) return;
 
@@ -396,7 +412,7 @@ const AdTask = () => {
         document.body.removeChild(tag);
       }
     };
-  }, [adsConfig?.ads]);
+  }, [activeAd]);
 
   const showCooldownNotification = useCallback((message) => {
     setCooldownMessage(message);
@@ -410,6 +426,15 @@ const AdTask = () => {
     setAdsWatched(prev => prev + 1);
     setShowAdCooldown(5);
     
+    // Now properly using recordAdWatch
+    if (typeof recordAdWatch === 'function') {
+      recordAdWatch({
+        adId: activeAd.id,
+        timestamp: Date.now(),
+        status: 'completed'
+      });
+    }
+    
     const countdown = setInterval(() => {
       setShowAdCooldown((prev) => {
         if (prev <= 1) {
@@ -419,20 +444,21 @@ const AdTask = () => {
         return prev - 1;
       });
     }, 1000);
-  }, [setLastAdTime, setAdsWatched]);
+  }, [setLastAdTime, setAdsWatched, recordAdWatch, activeAd.id]);
 
   const showAd = useCallback(async () => {
     const now = Date.now();
+    const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
 
     // Check daily limit
-    if (adsWatched >= task.dailyLimit) {
-      showCooldownNotification(`Daily limit reached (${task.dailyLimit} ads). Try again tomorrow.`);
+    if (adsWatched >= dailyLimit) {
+      showCooldownNotification(`Daily limit reached (${dailyLimit} ads). Try again tomorrow.`);
       return;
     }
 
     // Check cooldown
-    if (lastAdTime && now - lastAdTime < task.cooldown) {
-      const remainingTime = task.cooldown - (now - lastAdTime);
+    if (lastAdTime && now - lastAdTime < localAdsConfig.cooldown) {
+      const remainingTime = localAdsConfig.cooldown - (now - lastAdTime);
       const waitMinutes = Math.ceil(remainingTime / 60000);
       showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
       return;
@@ -450,7 +476,6 @@ const AdTask = () => {
         return;
       }
       
-      const activeAd = adsConfig?.ads?.find(ad => ad.active) || defaultConfig.ads[0];
       if (!window[activeAd.sdkVar]) {
         throw new Error("Ad provider not loaded yet");
       }
@@ -463,7 +488,7 @@ const AdTask = () => {
     } finally {
       setIsAdLoading(false);
     }
-  }, [adsWatched, task, lastAdTime, showAdCooldown, adsConfig?.ads, handleAdCompletion, showCooldownNotification]);
+  }, [adsWatched, lastAdTime, showAdCooldown, localAdsConfig, isPremium, activeAd, handleAdCompletion, showCooldownNotification]);
 
   const claimReward = useCallback(async () => {
     if (completedDailyTasks.includes(taskId)) {
@@ -481,15 +506,15 @@ const AdTask = () => {
     try {
       const userDocRef = doc(db, "telegramUsers", id);
       await updateDoc(userDocRef, {
-        balance: increment(task.pointsBonus),
+        balance: increment(localAdsConfig.pointsBonus),
         dailyTasksCompleted: arrayUnion(taskId),
-        taskPoints: increment(task.pointsBonus),
-        adsBalance: increment(task.dollarBonus),
+        taskPoints: increment(localAdsConfig.pointsBonus),
+        adsBalance: increment(localAdsConfig.dollarBonus),
       });
 
-      setBalance(prev => prev + task.pointsBonus);
-      setTaskPoints(prev => prev + task.pointsBonus);
-      setAdsBalance(prev => +(prev + task.dollarBonus).toFixed(6));
+      setBalance(prev => prev + localAdsConfig.pointsBonus);
+      setTaskPoints(prev => prev + localAdsConfig.pointsBonus);
+      setAdsBalance(prev => +(prev + localAdsConfig.dollarBonus).toFixed(6));
       setCompletedDailyTasks(prev => [...prev, taskId]);
 
       setAdWatched(false);
@@ -502,7 +527,9 @@ const AdTask = () => {
     } finally {
       setClaiming(false);
     }
-  }, [adWatched, completedDailyTasks, taskId, id, task, setBalance, setTaskPoints, setAdsBalance, setCompletedDailyTasks, showCooldownNotification, generateTaskId]);
+  }, [adWatched, completedDailyTasks, taskId, id, localAdsConfig, setBalance, 
+      setTaskPoints, setAdsBalance, setCompletedDailyTasks, showCooldownNotification, 
+      generateTaskId]);
 
   return (
     <TaskContainer>
@@ -524,6 +551,16 @@ const AdTask = () => {
           <TaskTitle>Watch Ads & Earn Rewards</TaskTitle>
         </TaskHeader>
         
+        {/* Added ad status display */}
+        {adStatus && adStatus.message && (
+          <ErrorText
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <IoSparkles /> Ad Status: {adStatus.message}
+          </ErrorText>
+        )}
+        
         <TaskDescription>
           Watch short video ads and earn NEWCATS tokens and USD rewards. 
           {isPremium ? " Enjoy unlimited ads with your Premium status!" : " Complete your daily limit for maximum earnings."}
@@ -536,7 +573,7 @@ const AdTask = () => {
             $shadowColor="rgba(227, 11, 92, 0.1)"
             whileHover={{ scale: 1.05 }}
           >
-            <FaCoins size={16} /> +{task.pointsBonus} NEWCATS
+            <FaCoins size={16} /> +{localAdsConfig.pointsBonus} NEWCATS
           </RewardBadge>
           <RewardBadge
             $bgColor={berryTheme.colors.successLight}
@@ -544,7 +581,7 @@ const AdTask = () => {
             $shadowColor="rgba(46, 204, 113, 0.1)"
             whileHover={{ scale: 1.05 }}
           >
-            <FaGem size={16} /> ${task.dollarBonus.toFixed(3)} USD
+            <FaGem size={16} /> ${localAdsConfig.dollarBonus.toFixed(3)} USD
           </RewardBadge>
         </RewardBadges>
         
@@ -559,7 +596,7 @@ const AdTask = () => {
         
         <TaskStats>
           <span>
-            <IoTimeOutline /> {adsWatched}/{task.dailyLimit} ads today
+            <IoTimeOutline /> {adsWatched}/{isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit} ads today
           </span>
           <span>
             {Math.round(progressPercentage)}% completed
