@@ -1,5 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, getDocs, collection, orderBy, where, query, limit, runTransaction, Timestamp } from 'firebase/firestore';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  arrayUnion, 
+  getDocs, 
+  collection, 
+  orderBy, 
+  where, 
+  query, 
+  limit, 
+  runTransaction, 
+  Timestamp,
+  increment
+} from 'firebase/firestore';
 import { db } from '../firebase/firestore';
 import YoutubeTasks from '../Component/Alltask/YoutubeTasks';
 import * as XLSX from 'xlsx';
@@ -9,7 +24,10 @@ const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
 
 export const UserProvider = ({ children }) => {
+  // State declarations
   const [balance, setBalance] = useState(0);
+  const [adsBalance, setAdsBalance] = useState(0);
+  const [dollarBalance2, setDollarBalance2] = useState(0);
   const [id, setId] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingTwo, setLoadingTwo] = useState(true);
@@ -37,7 +55,11 @@ export const UserProvider = ({ children }) => {
   const [tonTasks, setTonTasks] = useState(false);
   const [openInfoThree, setOpenInfoThree] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [selectedExchange, setSelectedExchange] = useState({ id: 'selectex', icon: '/exchange.svg', name: 'Select exchange' });
+  const [selectedExchange, setSelectedExchange] = useState({ 
+    id: 'selectex', 
+    icon: '/exchange.svg', 
+    name: 'Select exchange' 
+  });
   const [youtubeTasks, setYoutubeTasks] = useState([]);
   const [completedYoutubeTasks, setCompletedYoutubeTasks] = useState([]);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
@@ -52,100 +74,172 @@ export const UserProvider = ({ children }) => {
   const [showStartOverModal, setShowStartOverModal] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [streak, setStreak] = useState(0);
-  const [adsBalance, setAdsBalance] = useState(0);
   const [adsWatched, setAdsWatched] = useState(0);
   const [lastAdTime, setLastAdTime] = useState(null);
+  const [videoWatched, setVideoWatched] = useState(0);
+  const [lastVideoTime, setLastVideoTime] = useState(null);
   const [allWithdrawals, setAllWithdrawals] = useState([]);
   const [adsWithdrawals, setAdsWithdrawals] = useState([]);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
 
-  // New states for video watch reward system
-  const [dollarBalance2, setDollarBalance2] = useState(0);
-  const [videoWatched, setVideoWatched] = useState(0);
-  const [lastVideoTime, setLastVideoTime] = useState(null);
-
   const CACHE_KEY = 'topUsers';
-  const CACHE_DURATION = 10 * 60 * 1000;
-
-  // Function to handle watching videos in the second reward system
-  const watchVideo = useCallback(async (rewardAmount) => {
-    if (!id) return;
-
-    try {
-      const userRef = doc(db, 'telegramUsers', id);
-      const now = Timestamp.now();
-      
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User document does not exist!");
-        }
-
-        const userData = userDoc.data();
-        
-        // Update video watch stats and dollarBalance2
-        transaction.update(userRef, {
-          videoWatched: (userData.videoWatched || 0) + 1,
-          lastVideoTime: now,
-          dollarBalance2: (userData.dollarBalance2 || 0) + rewardAmount,
-        });
-      });
-
-      // Update local state
-      setVideoWatched(prev => prev + 1);
-      setLastVideoTime(new Date());
-      setDollarBalance2(prev => prev + rewardAmount);
-      
-      return { success: true, message: "Video watched successfully" };
-    } catch (error) {
-      console.error("Error watching video:", error);
-      return { success: false, message: error.message };
-    }
-  }, [id]);
+  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
   // Combined balance calculation
   const getTotalBalance = useCallback(() => {
     return (balance || 0) + (adsBalance || 0) + (dollarBalance2 || 0);
   }, [balance, adsBalance, dollarBalance2]);
 
-  const fetchTopUsers = useCallback(async () => {
-    const cachedData = localStorage.getItem(CACHE_KEY);
-    const cachedTimestamp = localStorage.getItem(`${CACHE_KEY}_timestamp`);
-    const now = new Date().getTime();
+  // Unified reward adding function with default case
+  const addRewards = async (amount, type = 'main') => {
+    if (!id) throw new Error('User not authenticated');
+    
+    try {
+      const userRef = doc(db, 'telegramUsers', id);
+      
+      const updateData = {};
+      const stateUpdates = {};
+      
+      switch (type) {
+        case 'main':
+          updateData.balance = increment(amount);
+          stateUpdates.setBalance = amount;
+          break;
+        case 'ads':
+          updateData.adsBalance = increment(amount);
+          updateData.adsWatched = increment(1);
+          updateData.lastAdTime = Timestamp.now();
+          stateUpdates.setAdsBalance = amount;
+          stateUpdates.setAdsWatched = 1;
+          stateUpdates.setLastAdTime = Date.now();
+          break;
+        case 'video':
+          updateData.dollarBalance2 = increment(amount);
+          updateData.videoWatched = increment(1);
+          updateData.lastVideoTime = Timestamp.now();
+          stateUpdates.setDollarBalance2 = amount;
+          stateUpdates.setVideoWatched = 1;
+          stateUpdates.setLastVideoTime = Date.now();
+          break;
+        default:
+          throw new Error(`Invalid reward type: ${type}. Must be 'main', 'ads', or 'video'`);
+      }
+      
+      await updateDoc(userRef, updateData);
+      
+      // Update local state
+      Object.entries(stateUpdates).forEach(([setter, value]) => {
+        const setterFn = {
+          setBalance,
+          setAdsBalance,
+          setDollarBalance2,
+          setAdsWatched,
+          setVideoWatched,
+          setLastAdTime,
+          setLastVideoTime
+        }[setter];
+        
+        if (setterFn) {
+          setterFn(prev => prev + value);
+        }
+      });
 
-    if (cachedData && cachedTimestamp && now - parseInt(cachedTimestamp) < CACHE_DURATION) {
-      console.log('Returning cached top users data');
-      return JSON.parse(cachedData);
+      return { success: true, newBalance: getTotalBalance() };
+    } catch (error) {
+      console.error('Error adding rewards:', error);
+      return { success: false, error: error.message };
     }
+  };
 
-    console.log('Fetching fresh top users data from Firestore');
-    const usersRef = collection(db, 'telegramUsers');
-    const q = query(usersRef, orderBy('balance', 'desc'), limit(100));
-    const querySnapshot = await getDocs(q);
+  // Fetch top users with caching
+  const fetchTopUsers = useCallback(async () => {
+    try {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const cachedTimestamp = localStorage.getItem(`${CACHE_KEY}_timestamp`);
+      const now = new Date().getTime();
 
-    const users = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+      if (cachedData && cachedTimestamp && now - parseInt(cachedTimestamp) < CACHE_DURATION) {
+        return JSON.parse(cachedData);
+      }
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(users));
-    localStorage.setItem(`${CACHE_KEY}_timestamp`, now.toString());
+      const usersRef = collection(db, 'telegramUsers');
+      const q = query(usersRef, orderBy('balance', 'desc'), limit(100));
+      const querySnapshot = await getDocs(q);
 
-    return users;
+      const users = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      localStorage.setItem(CACHE_KEY, JSON.stringify(users));
+      localStorage.setItem(`${CACHE_KEY}_timestamp`, now.toString());
+
+      return users;
+    } catch (error) {
+      console.error('Error fetching top users:', error);
+      throw error;
+    }
   }, [CACHE_DURATION]);
 
+  // Update user's active time
   const updateActiveTime = useCallback(async (userRef) => {
     try {
       await updateDoc(userRef, {
         lastActive: Timestamp.now(),
       });
-      console.log('Active Time Updated');
     } catch (error) {
-      console.error('Error updating Active Time:', error);
+      console.error('Error updating active time:', error);
       setError(error);
     }
   }, []);
 
+  // Handle referral logic
+  const handleReferral = useCallback(async (userId, referrerId, username) => {
+    if (!referrerId) return;
+
+    try {
+      const referrerRef = doc(db, 'telegramUsers', referrerId);
+      const referrerDoc = await getDoc(referrerRef);
+
+      if (!referrerDoc.exists()) {
+        console.error('Referrer does not exist');
+        return;
+      }
+
+      const existingReferral = referrerDoc.data().referrals?.find(ref => ref.userId === userId);
+      if (existingReferral) {
+        console.log('User already referred');
+        return;
+      }
+
+      const firstDigit = parseInt(userId.toString()[0]);
+      const welcomeBonus = firstDigit * 1000;
+      const refBonus = welcomeBonus * 0.2;
+
+      await updateDoc(referrerRef, {
+        referrals: arrayUnion({
+          userId: userId.toString(),
+          username: username,
+          balance: 0,
+          refBonus: refBonus,
+          refBonusStatus: 'claimed',
+          level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
+          hasContributed: false,
+        }),
+        processedReferrals: arrayUnion({
+          userId: userId.toString(),
+          refBonus: refBonus,
+        }),
+        refBonus: increment(refBonus),
+        balance: increment(refBonus),
+      });
+    } catch (error) {
+      console.error('Error handling referral:', error);
+      setError(error);
+    }
+  }, []);
+
+  // Fetch withdrawal history
   const fetchWithdrawals = useCallback(async () => {
     try {
       const [withdrawalsSnapshot, adsWithdrawalsSnapshot] = await Promise.all([
@@ -172,13 +266,14 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
+  // Update withdrawal status
   const updateWithdrawalStatus = useCallback(async (id, status, isAdsWithdrawal = false) => {
     setIsProcessingWithdrawal(prev => ({ ...prev, [id]: true }));
     try {
       const collectionName = isAdsWithdrawal ? 'adsWithdrawalRequests' : 'withdrawalRequests';
       await updateDoc(doc(db, collectionName, id), {
         status,
-        updatedAt: new Date()
+        updatedAt: Timestamp.now()
       });
       
       const updateState = isAdsWithdrawal ? setAdsWithdrawals : setAllWithdrawals;
@@ -193,80 +288,45 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
+  // Export approved withdrawals to Excel
   const exportApprovedWithdrawals = useCallback(() => {
-    const approvedWithdrawals = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w.status === 'approved')
-      .map(w => ({
-        'User ID': w.userId,
-        'Username': w.username,
-        'Full Name': w.fullName,
-        'Wallet Address': w.walletAddress,
-        'Amount (USD)': w.amount?.toFixed(3) || '0.000',
-        'Fee (USD)': w.fee?.toFixed(3) || '0.000',
-        'Total (USD)': w.totalDeducted?.toFixed(3) || '0.000',
-        'Network': w.network,
-        'Exchange': w.exchange,
-        'Balance Type': w.balanceType === 'ads' ? 'ADS' : 'MAIN',
-        'Created At': w.createdAt ? new Date(w.createdAt).toLocaleString() : 'N/A',
-        'Updated At': w.updatedAt ? new Date(w.updatedAt).toLocaleString() : 'N/A',
-        'Status': w.status
-      }));
+    try {
+      const approvedWithdrawals = [...allWithdrawals, ...adsWithdrawals]
+        .filter(w => w.status === 'approved')
+        .map(w => ({
+          'User ID': w.userId,
+          'Username': w.username,
+          'Full Name': w.fullName,
+          'Wallet Address': w.walletAddress,
+          'Amount (USD)': w.amount?.toFixed(3) || '0.000',
+          'Fee (USD)': w.fee?.toFixed(3) || '0.000',
+          'Total (USD)': w.totalDeducted?.toFixed(3) || '0.000',
+          'Network': w.network,
+          'Exchange': w.exchange,
+          'Balance Type': w.balanceType === 'ads' ? 'ADS' : 'MAIN',
+          'Created At': w.createdAt ? new Date(w.createdAt).toLocaleString() : 'N/A',
+          'Updated At': w.updatedAt ? new Date(w.updatedAt).toLocaleString() : 'N/A',
+          'Status': w.status
+        }));
 
-    if (approvedWithdrawals.length === 0) {
-      alert('No approved withdrawals to export');
-      return;
+      if (approvedWithdrawals.length === 0) {
+        alert('No approved withdrawals to export');
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(approvedWithdrawals);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Approved Withdrawals');
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `approved_withdrawals_${dateStr}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting withdrawals:', error);
+      setError(error);
     }
-
-    const worksheet = XLSX.utils.json_to_sheet(approvedWithdrawals);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Approved Withdrawals');
-    
-    const dateStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(workbook, `approved_withdrawals_${dateStr}.xlsx`);
   }, [allWithdrawals, adsWithdrawals]);
 
-  const handleReferral = async (userId, referrerId, username) => {
-    if (!referrerId) return;
-
-    const referrerRef = doc(db, 'telegramUsers', referrerId);
-    const referrerDoc = await getDoc(referrerRef);
-
-    if (!referrerDoc.exists()) {
-      console.error('Referrer does not exist');
-      return;
-    }
-
-    const existingReferral = referrerDoc.data().referrals?.find(ref => ref.userId === userId);
-    if (existingReferral) {
-      console.log('User already referred');
-      return;
-    }
-
-    const firstDigit = parseInt(userId.toString()[0]);
-    const welcomeBonus = firstDigit * 1000;
-    const refBonus = welcomeBonus * 0.2;
-
-    await updateDoc(referrerRef, {
-      referrals: arrayUnion({
-        userId: userId.toString(),
-        username: username,
-        balance: 0,
-        refBonus: refBonus,
-        refBonusStatus: 'claimed',
-        level: { id: 1, name: "Bronze", imgUrl: "/bronze.webp" },
-        hasContributed: false,
-      }),
-      processedReferrals: arrayUnion({
-        userId: userId.toString(),
-        refBonus: refBonus,
-      }),
-      refBonus: referrerDoc.data().refBonus + refBonus,
-      balance: referrerDoc.data().balance + refBonus,
-    });
-
-    console.log('Referral added successfully, and refBonus issued');
-  };
-
+  // Fetch user data from Firestore
   const fetchData = useCallback(async (userId) => {
     if (!userId) return;
 
@@ -276,114 +336,127 @@ export const UserProvider = ({ children }) => {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        const userBalance = userData.balance;
-
-        setBalance(userBalance);
-        setAdsBalance(userData.adsBalance || 0);
-        setAdsWatched(userData.adsWatched || 0);
-        setLastAdTime(userData.lastAdTime?.toDate() || null);
         
-        // Set video watch reward data
+        // Set all balance-related states
+        setBalance(userData.balance || 0);
+        setAdsBalance(userData.adsBalance || 0);
         setDollarBalance2(userData.dollarBalance2 || 0);
+        setAdsWatched(userData.adsWatched || 0);
         setVideoWatched(userData.videoWatched || 0);
+        setLastAdTime(userData.lastAdTime?.toDate() || null);
         setLastVideoTime(userData.lastVideoTime?.toDate() || null);
 
-        const topUsersData = await fetchTopUsers();
-        setLeaderBoard(topUsersData);
-
-        const usersAboveQuery = query(
-          collection(db, 'telegramUsers'),
-          where('balance', '>', userBalance)
-        );
-
-        const querySnapshot = await getDocs(usersAboveQuery);
-        const activeUserRank = querySnapshot.size + 1;
-        setActiveUserRank(activeUserRank);
-
-        setLastCheckIn(userData.lastCheckIn?.toDate() || null);
-        setCheckInDays(userData.checkInDays || []);
-        setCheckinRewards(userData.checkinRewards);
-        setUsername(userData.username);
-        setTonTasks(userData.tonTasks);
-        setWelcomeBonus(userData.welcomeBonus);
-        setTonTransactions(userData.tonTransactions);
-        setSelectedExchange(userData.selectedExchange);
-        setWalletAddress(userData.address);
-        setIsAddressSaved(userData.isAddressSaved);
+        // Set other user data
+        setUsername(userData.username || '');
+        setTonTasks(userData.tonTasks || false);
+        setWelcomeBonus(userData.welcomeBonus || 0);
+        setTonTransactions(userData.tonTransactions || 0);
+        setSelectedExchange(userData.selectedExchange || { 
+          id: 'selectex', 
+          icon: '/exchange.svg', 
+          name: 'Select exchange' 
+        });
+        setWalletAddress(userData.address || '');
+        setIsAddressSaved(userData.isAddressSaved || false);
         setCompletedDailyTasks(userData.dailyTasksCompleted || []);
         setCompletedCatTasks(userData.catsAndFriends || []);
-        setTaskPoints(userData.taskPoints);
+        setTaskPoints(userData.taskPoints || 0);
         setCompletedYoutubeTasks(userData.completedYoutubeTasks || []);
-        setFullName(userData.fullName);
-        setId(userData.userId);
+        setFullName(userData.fullName || '');
+        setId(userData.userId || '');
         setStreak(userData.streak || 0);
+        setLastCheckIn(userData.lastCheckIn?.toDate() || null);
+        setCheckInDays(userData.checkInDays || []);
+        setCheckinRewards(userData.checkinRewards || 0);
 
-        const totalReferralBonus = userData.processedReferrals?.reduce((total, referral) => total + (referral.refBonus || 0), 0) || 0;
+        // Referrals
+        const totalReferralBonus = userData.processedReferrals?.reduce(
+          (total, referral) => total + (referral.refBonus || 0), 0
+        ) || 0;
         setRefBonus(totalReferralBonus);
 
+        // User tasks
         setCompletedTasks(userData.tasksCompleted || []);
         setUserManualTasks(userData.manualTasks || []);
         setUserAdvertTasks(userData.advertTasks || []);
         setReferrals(userData.referrals || []);
         setProcessedReferrals(userData.processedReferrals || []);
+
+        // Fetch leaderboard
+        const topUsersData = await fetchTopUsers();
+        setLeaderBoard(topUsersData);
+
+        // Calculate user rank
+        const usersAboveQuery = query(
+          collection(db, 'telegramUsers'),
+          where('balance', '>', userData.balance || 0)
+        );
+        const querySnapshot = await getDocs(usersAboveQuery);
+        setActiveUserRank(querySnapshot.size + 1);
+
+        // Fetch all collections in parallel
+        const fetchCollections = async () => {
+          const [
+            manualTasksSnapshot,
+            advertTasksSnapshot,
+            youtubeTasksSnapshot,
+            tasksSnapshot,
+            dailyTasksSnapshot,
+            adTaskSnapshot
+          ] = await Promise.all([
+            getDocs(collection(db, 'manualTasks')),
+            getDocs(collection(db, 'advertTasks')),
+            getDocs(collection(db, 'youtubeTasks')),
+            getDocs(collection(db, 'tasks')),
+            getDocs(collection(db, 'dailyTasks')),
+            getDocs(collection(db, 'manualTasks')) // Assuming AdTask uses manualTasks collection
+          ]);
+
+          setManualTasks(manualTasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setAdvertTasks(advertTasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setYoutubeTasks(youtubeTasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setTasks(tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setDailyTasks(dailyTasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setAdTask(adTaskSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        };
+
+        await fetchCollections();
+
+        // Get total users count
+        const totalUsersDoc = await getDoc(doc(db, 'data', 'allUsersCount'));
+        if (totalUsersDoc.exists()) {
+          setTotalUsers(totalUsersDoc.data().count || 0);
+        }
+
+        // Update active time
         await updateActiveTime(userRef);
 
-        const manualTasksQuerySnapshot = await getDocs(collection(db, 'manualTasks'));
-        const manualTasksData = manualTasksQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setManualTasks(manualTasksData);
-
-        const advertTasksQuerySnapshot = await getDocs(collection(db, 'advertTasks'));
-        const advertTasksData = advertTasksQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAdvertTasks(advertTasksData);
-
-        const youtubeTasksQuerySnapshot = await getDocs(collection(db, 'youtubeTasks'));
-        const youtubeTasksData = youtubeTasksQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setYoutubeTasks(youtubeTasksData);
-
-        const AdTaskQuerySnapshot = await getDocs(collection(db, 'manualTasks'));
-        const AdTaskData = AdTaskQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAdTask(AdTaskData);
-
-        const tasksQuerySnapshot = await getDocs(collection(db, 'tasks'));
-        const tasksData = tasksQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTasks(tasksData);
-
-        const dailyTasksQuerySnapshot = await getDocs(collection(db, 'dailyTasks'));
-        const dailyTasksData = dailyTasksQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setDailyTasks(dailyTasksData);
-
-        const totalUsersDocRef = doc(db, 'data', 'allUsersCount');
-        const totalUsersDocSnap = await getDoc(totalUsersDocRef);
-
-        if (totalUsersDocSnap.exists()) {
-          const totalUsersData = totalUsersDocSnap.data();
-          setTotalUsers(totalUsersData.count);
-        }
+        // Fetch withdrawal history
+        await fetchWithdrawals();
       }
     } catch (error) {
-      console.error("Error fetching data: ", error);
+      console.error("Error fetching data:", error);
       setError(error);
     }
-  }, [fetchTopUsers, updateActiveTime]);
+  }, [fetchTopUsers, updateActiveTime, fetchWithdrawals]);
 
+  // Send user data to Firestore
   const sendUserData = useCallback(async () => {
     const queryParams = new URLSearchParams(window.location.search);
     let referrerId = queryParams.get("ref");
-    if (referrerId) {
-      referrerId = referrerId.replace(/\D/g, "");
-    }
+    if (referrerId) referrerId = referrerId.replace(/\D/g, "");
 
     if (telegramUser) {
       const { id: userId, username, first_name: firstName, last_name: lastName } = telegramUser;
       const finalUsername = username || `${firstName}_${userId}`;
-      const fullNamed = `${firstName} ${lastName}`;
+      const fullNamed = `${firstName} ${lastName || ''}`.trim();
 
       try {
         const userRef = doc(db, 'telegramUsers', userId.toString());
         const userDoc = await getDoc(userRef);
 
         if (userDoc.exists()) {
-          fetchData(userId.toString());
+          await fetchData(userId.toString());
           setInitialized(true);
           return;
         }
@@ -395,19 +468,22 @@ export const UserProvider = ({ children }) => {
           userId: userId.toString(),
           username: finalUsername,
           firstName: firstName,
-          lastName: lastName,
+          lastName: lastName || '',
           fullName: fullNamed,
           selectedExchange: { id: 'selectex', icon: '/exchange.svg', name: 'Choose exchange' },
           tonTransactions: 0,
+          walletConnected: false,
+          initialConnectionDone: false,
+          tonTasks: false,
           taskPoints: 0,
           checkinRewards: 0,
           balance: 0,
           adsBalance: 0,
+          dollarBalance2: 0,
           adsWatched: 0,
+          videoWatched: 0,
           lastAdTime: null,
-          dollarBalance2: 0, // Initialize video reward balance
-          videoWatched: 0, // Initialize video watch counter
-          lastVideoTime: null, // Initialize last video watch time
+          lastVideoTime: null,
           lastActive: Timestamp.now(),
           refereeId: referrerId || null,
           referrals: [],
@@ -420,18 +496,17 @@ export const UserProvider = ({ children }) => {
         await setDoc(userRef, userData);
         setCheckinRewards(0);
 
+        // Update total users count
         const allUsersCountRef = doc(db, 'data', 'allUsersCount');
         await runTransaction(db, async (transaction) => {
           const allUsersCountDoc = await transaction.get(allUsersCountRef);
           if (!allUsersCountDoc.exists()) {
             transaction.set(allUsersCountRef, { count: 1 });
           } else {
-            const newCount = allUsersCountDoc.data().count + 1;
-            transaction.update(allUsersCountRef, { count: newCount });
+            transaction.update(allUsersCountRef, { count: allUsersCountDoc.data().count + 1 });
           }
         });
 
-        await setDoc(userRef, userData);
         setWelcomeBonus(welcomeBonus);
         setId(userId.toString());
 
@@ -440,50 +515,43 @@ export const UserProvider = ({ children }) => {
         }
 
         setInitialized(true);
-        fetchData(userId.toString());
+        await fetchData(userId.toString());
       } catch (error) {
-        console.error('Error saving user in Firestore:', error);
+        console.error('Error saving user:', error);
         setError(error);
       }
     }
-  }, [telegramUser, fetchData]);
+  }, [telegramUser, fetchData, handleReferral]);
 
+  // Check if user has visited before
   useEffect(() => {
-    setChecker(false);
     if (id) {
       const visited = localStorage.getItem('hasVisitedBefore');
-      if ((balance > 0) && visited) {
-        setHasVisitedBefore(true);
-      } else {
-        setChecker(true);
-        localStorage.setItem('hasVisitedBefore', 'true');
-      }
+      setHasVisitedBefore((balance > 0) && !!visited);
+      setChecker(!((balance > 0) && !!visited));
+      if (!visited) localStorage.setItem('hasVisitedBefore', 'true');
     }
   }, [id, balance]);
 
+  // Check last check-in status
   useEffect(() => {
     const checkLastCheckIn = async () => {
       if (!id) return;
 
       try {
-        const userDocRef = doc(db, 'telegramUsers', id);
-        const userDoc = await getDoc(userDocRef);
+        const userDoc = await getDoc(doc(db, 'telegramUsers', id));
         if (userDoc.exists()) {
-          const userData = userDoc.data();
+          const lastCheckInDate = userDoc.data().lastCheckIn?.toDate();
           const now = new Date();
-
-          const lastCheckInTimestamp = userData.lastCheckIn;
-          const lastCheckInDate = lastCheckInTimestamp ? lastCheckInTimestamp.toDate() : null;
 
           if (lastCheckInDate) {
             const lastCheckInLocal = new Date(lastCheckInDate.getTime() + lastCheckInDate.getTimezoneOffset() * 60000);
-            const lastCheckInMidnight = new Date(lastCheckInLocal);
-            lastCheckInMidnight.setHours(0, 0, 0, 0);
+            lastCheckInLocal.setHours(0, 0, 0, 0);
 
             const todayMidnight = new Date(now);
             todayMidnight.setHours(0, 0, 0, 0);
 
-            const daysSinceLastCheckIn = Math.floor((todayMidnight - lastCheckInMidnight) / (1000 * 60 * 60 * 24));
+            const daysSinceLastCheckIn = Math.floor((todayMidnight - lastCheckInLocal) / (1000 * 60 * 60 * 24));
 
             if (daysSinceLastCheckIn === 0) {
               setError('You have already checked in today. Next check-in is tomorrow.');
@@ -497,51 +565,141 @@ export const UserProvider = ({ children }) => {
           }
         }
       } catch (err) {
-        console.error('Error during initial check-in:', err);
-        setError('An error occurred while checking your last check-in.');
+        console.error('Check-in error:', err);
+        setError('Error checking last check-in');
       }
     };
 
     checkLastCheckIn();
-  }, [id, setCheckInDays, setError]);
+  }, [id]);
 
+  // Initialize user data
   useEffect(() => {
     sendUserData();
   }, [sendUserData]);
 
+  // Set initial loading state
   useEffect(() => {
-    setTimeout(() => {
-      setLoading(false);
-    }, 3500);
+    const timer = setTimeout(() => setLoading(false), 3500);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
     <UserContext.Provider value={{
-      balance, setBalance, totalUsers, completedYoutubeTasks, completedDailyTasks, lastCheckIn, setLastCheckIn, 
-      completedCatTasks, setCompletedCatTasks, setCompletedDailyTasks, dailyTasks, setDailyTasks, openInfoThree, 
-      welcomeBonus, setWelcomeBonus, setOpenInfoThree, youtubeTasks, setYoutubeTasks, YoutubeTasks, 
-      setCompletedYoutubeTasks, fullName, selectedExchange, setSelectedExchange, leaderBoard, tonTasks, setTonTasks, 
-      username, tonTransactions, setTonTransactions, setUsername, activeUserRank, setActiveUserRank, setLeaderBoard, 
-      loadingTwo, setLoadingTwo, taskPoints, setTaskPoints, error, setError, checker, setChecker, userAdvertTasks, 
-      setUserAdvertTasks, advertTasks, setAdvertTasks, setFullName, walletAddress, setWalletAddress, isAddressSaved, 
-      setIsAddressSaved, loading, setLoading, id, setId, sendUserData, refBonus, setRefBonus, manualTasks, AdTask, 
-      setManualTasks, setAdTask, userManualTasks, setUserManualTasks, checkinRewards, setCheckinRewards, tasks, 
-      setTasks, completedTasks, setCompletedTasks, referrals, processedReferrals, setProcessedReferrals, initialized, 
-      setInitialized, checkInDays, setCheckInDays, hasVisitedBefore, setHasVisitedBefore,
-      showStartOverModal, setShowStartOverModal, showClaimModal, setShowClaimModal, handleReferral, streak, setStreak,
-      adsBalance, setAdsBalance,
-      adsWatched, setAdsWatched,
-      lastAdTime, setLastAdTime,
-      // Video watch reward system
-      dollarBalance2, setDollarBalance2,
-      videoWatched, setVideoWatched,
-      lastVideoTime, setLastVideoTime,
-      watchVideo,
-      getTotalBalance,
-      // Withdrawal related state and functions
+      // All state values
+      balance, 
+      adsBalance,
+      dollarBalance2,
+      id, 
+      loading, 
+      loadingTwo, 
+      refBonus, 
+      manualTasks, 
+      advertTasks,
+      userAdvertTasks, 
+      userManualTasks, 
+      tasks, 
+      completedTasks, 
+      referrals,
+      processedReferrals, 
+      fullName, 
+      username, 
+      walletAddress, 
+      isAddressSaved,
+      checker, 
+      taskPoints, 
+      lastCheckIn, 
+      error, 
+      leaderBoard, 
+      activeUserRank,
+      tonTransactions, 
+      tonTasks, 
+      openInfoThree, 
+      initialized, 
+      selectedExchange, 
+      youtubeTasks,
+      completedYoutubeTasks, 
+      hasVisitedBefore, 
+      welcomeBonus, 
+      totalUsers,
+      dailyTasks, 
+      completedDailyTasks, 
+      completedCatTasks, 
+      AdTask, 
+      checkInDays,
+      checkinRewards, 
+      showStartOverModal, 
+      showClaimModal, 
+      streak,
+      adsWatched, 
+      lastAdTime,
+      videoWatched,
+      lastVideoTime,
       allWithdrawals,
       adsWithdrawals,
       isProcessingWithdrawal,
+
+      // All state setters
+      setBalance, 
+      setAdsBalance,
+      setDollarBalance2,
+      setId, 
+      setLoading, 
+      setLoadingTwo, 
+      setRefBonus, 
+      setManualTasks,
+      setAdvertTasks, 
+      setUserAdvertTasks, 
+      setUserManualTasks, 
+      setTasks,
+      setCompletedTasks, 
+      setReferrals, 
+      setProcessedReferrals, 
+      setFullName,
+      setUsername, 
+      setWalletAddress, 
+      setIsAddressSaved, 
+      setChecker, 
+      setTaskPoints,
+      setLastCheckIn, 
+      setError, 
+      setLeaderBoard, 
+      setActiveUserRank, 
+      setTonTransactions,
+      setTonTasks, 
+      setOpenInfoThree,
+      setInitialized, 
+      setSelectedExchange, 
+      setYoutubeTasks, 
+      setCompletedYoutubeTasks,
+      setHasVisitedBefore, 
+      setWelcomeBonus, 
+      setTotalUsers, 
+      setDailyTasks,
+      setCompletedDailyTasks, 
+      setCompletedCatTasks, 
+      setAdTask, 
+      setCheckInDays,
+      setCheckinRewards, 
+      setShowStartOverModal, 
+      setShowClaimModal, 
+      setStreak,
+      setAdsWatched,
+      setLastAdTime,
+      setVideoWatched,
+      setLastVideoTime,
+      setAllWithdrawals,
+      setAdsWithdrawals,
+      setIsProcessingWithdrawal,
+
+      // Components
+      YoutubeTasks,
+
+      // Functions
+      sendUserData, 
+      handleReferral, 
+      addRewards,
+      getTotalBalance,
       fetchWithdrawals,
       updateWithdrawalStatus,
       exportApprovedWithdrawals
