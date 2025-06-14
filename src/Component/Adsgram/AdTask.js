@@ -6,54 +6,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import { berryTheme } from '../../Theme';
 import styled, { keyframes } from 'styled-components';
 
-// Animations
-const float = keyframes`
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-// Styled components (unchanged)
+// Styled Components
 const TaskContainer = styled.div`
-  margin-bottom: ${berryTheme.spacing.large};
+  position: relative;
   width: 100%;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  perspective: 1000px;
+  max-width: 500px;
+  margin: 0 auto;
+`;
+
+const glow = keyframes`
+  0% { box-shadow: 0 0 5px rgba(227, 11, 92, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(227, 11, 92, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(227, 11, 92, 0.5); }
 `;
 
 const TaskCard = styled(motion.div)`
-  background: linear-gradient(135deg, #ffffff 0%, #f9f9ff 100%);
-  border-radius: 20px;
-  padding: 28px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: ${berryTheme.colors.backgroundLight};
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(5px);
-  transform-style: preserve-3d;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-      to bottom right,
-      rgba(227, 11, 92, 0.05) 0%,
-      rgba(255, 255, 255, 0) 60%
-    );
-    z-index: 0;
-  }
+  border: 1px solid ${berryTheme.colors.border};
 `;
 
 const GlowEffect = styled.div`
@@ -62,68 +36,68 @@ const GlowEffect = styled.div`
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, 
-    ${berryTheme.colors.primary} 0%, 
-    ${berryTheme.colors.secondary} 50%, 
-    ${berryTheme.colors.primary} 100%);
-  background-size: 200% 100%;
-  animation: ${shimmer} 3s linear infinite;
+  background: linear-gradient(90deg, #E30B5C, #FF8A00);
+  animation: ${glow} 2s infinite;
+`;
+
+const PremiumTag = styled.div`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #000;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 1;
 `;
 
 const TaskHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  position: relative;
-  z-index: 1;
+  gap: 10px;
+  margin-bottom: 15px;
+`;
+
+const SparkleIcon = styled(IoSparkles)`
+  color: ${berryTheme.colors.primary};
 `;
 
 const TaskTitle = styled.h3`
   margin: 0;
-  font-size: 1.4rem;
-  color: ${berryTheme.colors.primaryDark};
-  font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  font-size: 18px;
+  font-weight: 600;
+  color: ${berryTheme.colors.text};
 `;
 
 const TaskDescription = styled.p`
+  margin: 0 0 20px 0;
+  font-size: 14px;
   color: ${berryTheme.colors.textSecondary};
-  margin-bottom: 24px;
-  line-height: 1.6;
-  font-size: 0.95rem;
-  position: relative;
-  z-index: 1;
+  line-height: 1.5;
 `;
 
 const RewardBadges = styled.div`
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
+  gap: 10px;
+  margin-bottom: 20px;
 `;
 
 const RewardBadge = styled(motion.div)`
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${props => props.$textColor || berryTheme.colors.textDark};
-  padding: 10px 16px;
+  gap: 6px;
+  background: ${props => props.$bgColor};
+  color: ${props => props.$textColor};
+  padding: 8px 12px;
   border-radius: 12px;
-  background: ${props => props.$bgColor || berryTheme.colors.grey100};
-  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(0,0,0,0.05)'};
-  transition: all 0.3s ease;
-  cursor: default;
-  
-  &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 16px ${props => props.$shadowColor || 'rgba(0,0,0,0.1)'};
-  }
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px ${props => props.$shadowColor};
 `;
 
 const ProgressContainer = styled.div`
@@ -131,169 +105,106 @@ const ProgressContainer = styled.div`
   height: 8px;
   background: ${berryTheme.colors.grey100};
   border-radius: 4px;
-  margin-bottom: 24px;
   overflow: hidden;
-  position: relative;
-  z-index: 1;
+  margin-bottom: 10px;
 `;
 
 const ProgressBar = styled(motion.div)`
   height: 100%;
+  background: linear-gradient(90deg, #E30B5C, #FF8A00);
   border-radius: 4px;
-  background: linear-gradient(90deg, 
-    ${berryTheme.colors.primary} 0%, 
-    ${berryTheme.colors.secondary} 100%);
   width: ${props => props.$progress}%;
 `;
 
 const TaskStats = styled.div`
-  font-size: 0.9rem;
-  color: ${berryTheme.colors.textMuted};
-  margin-bottom: 24px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  position: relative;
-  z-index: 1;
-`;
-
-const ErrorText = styled(motion.div)`
-  font-size: 0.9rem;
-  color: ${berryTheme.colors.error};
+  font-size: 12px;
+  color: ${berryTheme.colors.textSecondary};
   margin-bottom: 20px;
-  padding: 12px;
-  background: rgba(255, 0, 0, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid ${berryTheme.colors.error};
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
 `;
 
 const ActionButtons = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
+  display: flex;
+  gap: 10px;
 `;
 
 const ActionButton = styled(motion.button)`
-  background: ${props => props.$bgColor || berryTheme.colors.primary};
-  color: ${props => props.$textColor || 'white'};
-  border: none;
-  border-radius: 14px;
-  padding: 16px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.2)'};
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  background: ${props => props.$bgColor};
+  color: ${props => props.$textColor || 'white'};
+  box-shadow: 0 2px 10px ${props => props.$shadowColor};
+  transition: all 0.2s ease;
   
-  &:hover:not(:disabled) {
-    background: ${props => props.$hoverColor || berryTheme.colors.primaryDark};
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.3)'};
+  &:hover {
+    background: ${props => !props.disabled && props.$hoverColor};
+    transform: ${props => !props.disabled && 'translateY(-2px)'};
   }
-
-  &:disabled {
-    background: ${berryTheme.colors.grey200};
-    color: ${berryTheme.colors.textMuted};
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent
-    );
-    transition: all 0.5s ease;
-  }
-
-  &:hover:not(:disabled)::before {
-    left: 100%;
+  
+  &:active {
+    transform: ${props => !props.disabled && 'translateY(0)'};
   }
 `;
 
-const Spinner = styled.span`
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 3px solid currentColor;
+const spin = keyframes`
+  to { transform: rotate(360deg); }
+`;
+
+const Spinner = styled.div`
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  border-top-color: white;
+  animation: ${spin} 1s ease-in-out infinite;
 `;
 
-const SparkleIcon = styled(IoSparkles)`
-  color: gold;
-  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
-  animation: ${float} 3s ease-in-out infinite;
+const ErrorText = styled(motion.div)`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: ${berryTheme.colors.error};
+  font-size: 12px;
+  margin-bottom: 15px;
 `;
 
-const Notification = styled(motion.div)`
+const Notification = styled.div`
   position: fixed;
-  top: 1.5rem;
+  top: 20px;
   left: 0;
   right: 0;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 0 1rem;
   z-index: 1000;
-  pointer-events: none;
 `;
 
 const NotificationContent = styled(motion.div)`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
   background: ${props => props.$bgColor};
   color: ${props => props.$textColor};
-  border-radius: 14px;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  font-weight: 600;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-`;
-
-const PremiumTag = styled.div`
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: linear-gradient(135deg, #ffd700 0%, #ffcc00 100%);
-  color: #8a6d00;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
-  z-index: 2;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  font-weight: 500;
 `;
 
 const AdTask = () => {
@@ -315,7 +226,6 @@ const AdTask = () => {
     },
     recordAdWatch,
     getAdStats,
-    claimAdReward,
     setBalance,
     setTaskPoints,
     setAdsBalance
@@ -338,18 +248,18 @@ const AdTask = () => {
   );
 
   // Get current ad stats
-  const adStats = useMemo(() => getAdStats(activeAd.id), [getAdStats, activeAd.id]);
+  const adStats = useMemo(() => getAdStats(), [getAdStats]);
 
   // Update cooldown timer
   useEffect(() => {
     const updateCooldown = () => {
-      if (!adStats.lastWatch) {
+      if (!adStats.lastAdTime) {
         setCooldownRemaining(0);
         return;
       }
       
       const now = Date.now();
-      const timePassed = now - adStats.lastWatch;
+      const timePassed = now - adStats.lastAdTime.getTime();
       const remaining = Math.max(0, Math.ceil((adsConfig.cooldown - timePassed) / 1000));
       setCooldownRemaining(remaining);
     };
@@ -358,7 +268,7 @@ const AdTask = () => {
     updateCooldown(); // Initial update
 
     return () => clearInterval(timer);
-  }, [adStats.lastWatch, adsConfig.cooldown]);
+  }, [adStats.lastAdTime, adsConfig.cooldown]);
 
   // Load ad script and check when ready
   useEffect(() => {
@@ -410,20 +320,25 @@ const AdTask = () => {
     
     try {
       // Check if user can watch ad
-      if (!adStats.canWatch) {
-        if (adStats.watchedToday >= adStats.dailyLimit) {
-          showCooldownNotification(`Daily limit reached (${adStats.dailyLimit} ads). Try again tomorrow.`);
-        } else {
-          const waitMinutes = Math.ceil(adStats.remainingTime / 60000);
-          showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
-        }
+      if (adStats.dailyAdsWatched >= adStats.dailyLimit) {
+        showCooldownNotification(`Daily limit reached (${adStats.dailyLimit} ads). Try again tomorrow.`);
+        return;
+      }
+
+      if (adStats.lastAdTime && (Date.now() - adStats.lastAdTime.getTime()) < adsConfig.cooldown) {
+        const waitMinutes = Math.ceil((adsConfig.cooldown - (Date.now() - adStats.lastAdTime.getTime())) / 60000);
+        showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
         return;
       }
       
       // In development, simulate ad watching
       if (process.env.NODE_ENV === 'development') {
         await new Promise(resolve => setTimeout(resolve, 2000));
-        await recordAdWatch(activeAd);
+        await recordAdWatch({
+          adId: activeAd.id,
+          pointsEarned: adsConfig.pointsBonus,
+          dollarsEarned: adsConfig.dollarBonus
+        });
         setAdWatched(true);
         return;
       }
@@ -434,7 +349,11 @@ const AdTask = () => {
       }
       
       await window[activeAd.sdkVar]();
-      await recordAdWatch(activeAd);
+      await recordAdWatch({
+        adId: activeAd.id,
+        pointsEarned: adsConfig.pointsBonus,
+        dollarsEarned: adsConfig.dollarBonus
+      });
       setAdWatched(true);
       
     } catch (error) {
@@ -443,7 +362,7 @@ const AdTask = () => {
     } finally {
       setIsAdLoading(false);
     }
-  }, [isAdLoading, adReady, adStats, showCooldownNotification, recordAdWatch, activeAd]);
+  }, [isAdLoading, adReady, adStats, showCooldownNotification, recordAdWatch, activeAd, adsConfig]);
 
   const claimReward = useCallback(async () => {
     if (!adWatched || claiming) return;
@@ -451,14 +370,12 @@ const AdTask = () => {
     setClaiming(true);
     
     try {
-      // First claim through context
-      await claimAdReward();
-      
-      // Then update local state for immediate UI feedback
+      // Update balances in local state for immediate feedback
       setBalance(prev => prev + adsConfig.pointsBonus);
       setTaskPoints(prev => prev + adsConfig.pointsBonus);
       setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
       
+      // Show success message
       setAdWatched(false);
       setCongrats(true);
       setTimeout(() => setCongrats(false), 4000);
@@ -472,7 +389,6 @@ const AdTask = () => {
   }, [
     adWatched, 
     claiming, 
-    claimAdReward, 
     showCooldownNotification, 
     adsConfig,
     setBalance,
@@ -482,13 +398,15 @@ const AdTask = () => {
 
   // Calculate progress percentage
   const progressPercentage = useMemo(() => {
-    return Math.min(100, (adStats.watchedToday / adStats.dailyLimit) * 100);
+    return Math.min(100, (adStats.dailyAdsWatched / adStats.dailyLimit) * 100);
   }, [adStats]);
 
   // Determine if watch button should be disabled
   const isWatchButtonDisabled = useMemo(() => {
-    return !adStats.canWatch || isAdLoading || !adReady;
-  }, [adStats.canWatch, isAdLoading, adReady]);
+    return isAdLoading || !adReady || 
+           adStats.dailyAdsWatched >= adStats.dailyLimit || 
+           (adStats.lastAdTime && (Date.now() - adStats.lastAdTime.getTime()) < adsConfig.cooldown);
+  }, [isAdLoading, adReady, adStats, adsConfig.cooldown]);
 
   return (
     <TaskContainer>
@@ -545,7 +463,7 @@ const AdTask = () => {
         
         <TaskStats>
           <span>
-            <IoTimeOutline /> {adStats.watchedToday}/{adStats.dailyLimit} ads today
+            <IoTimeOutline /> {adStats.dailyAdsWatched}/{adStats.dailyLimit} ads today
           </span>
           <span>
             {Math.round(progressPercentage)}% completed
