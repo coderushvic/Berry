@@ -335,7 +335,8 @@ const AdTask = () => {
   const [userAdData, setUserAdData] = useState({
     adsWatchedToday: 0,
     lastAdTimestamp: null,
-    dailyResetDate: null
+    dailyResetDate: null,
+    lastClaimDate: null
   });
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
@@ -345,60 +346,67 @@ const AdTask = () => {
     [localAdsConfig]
   );
 
-  // Load user ad data from Firestore
+  // Load user ad data from Firestore and check daily reset
   useEffect(() => {
-    const loadUserAdData = async () => {
+    const loadUserAdDataAndCheckReset = async () => {
       if (!id) return;
       
       try {
         const userDoc = await getDoc(doc(db, "telegramUsers", id));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          const resetDate = data.dailyResetDate?.toDate() || new Date();
-          resetDate.setHours(0, 0, 0, 0);
+          const now = new Date();
           
+          // Get or initialize daily reset date (start of current day in UTC)
+          let resetDate = data.dailyResetDate?.toDate() || new Date();
+          resetDate.setUTCHours(0, 0, 0, 0);
+          
+          // Check if we need to reset the counter (if current time is after reset date)
+          let adsWatchedToday = data.adsWatchedToday || 0;
+          let needsReset = false;
+          
+          if (now > resetDate) {
+            // Calculate new reset date (start of next day in UTC)
+            const newResetDate = new Date(resetDate);
+            newResetDate.setUTCDate(newResetDate.getUTCDate() + 1);
+            
+            // Update Firestore if we're resetting
+            await updateDoc(doc(db, "telegramUsers", id), {
+              adsWatchedToday: 0,
+              dailyResetDate: newResetDate
+            });
+            
+            resetDate = newResetDate;
+            adsWatchedToday = 0;
+            needsReset = true;
+          }
+          
+          // Update local state
           setUserAdData({
-            adsWatchedToday: data.adsWatchedToday || 0,
+            adsWatchedToday,
             lastAdTimestamp: data.lastAdTimestamp?.toDate() || null,
-            dailyResetDate: resetDate
+            dailyResetDate: resetDate,
+            lastClaimDate: data.lastClaimDate?.toDate() || null
           });
+          
+          if (needsReset) {
+            console.log("Daily ads counter reset");
+          }
         }
       } catch (error) {
         console.error("Error loading user ad data:", error);
       }
     };
 
-    loadUserAdData();
+    loadUserAdDataAndCheckReset();
+    
+    // Set up interval to check for daily reset every minute
+    const resetCheckInterval = setInterval(loadUserAdDataAndCheckReset, 60000);
+    return () => clearInterval(resetCheckInterval);
   }, [id]);
 
-  // Check daily reset and update cooldown timer
+  // Update cooldown timer
   useEffect(() => {
-    const checkDailyReset = async () => {
-      if (!userAdData.dailyResetDate) return;
-      
-      const now = new Date();
-      if (now > userAdData.dailyResetDate) {
-        try {
-          const newResetDate = new Date();
-          newResetDate.setHours(0, 0, 0, 0);
-          newResetDate.setDate(newResetDate.getDate() + 1);
-          
-          await updateDoc(doc(db, "telegramUsers", id), {
-            adsWatchedToday: 0,
-            dailyResetDate: serverTimestamp()
-          });
-          
-          setUserAdData(prev => ({
-            ...prev,
-            adsWatchedToday: 0,
-            dailyResetDate: newResetDate
-          }));
-        } catch (error) {
-          console.error("Error resetting daily ads:", error);
-        }
-      }
-    };
-
     const updateCooldown = () => {
       if (!userAdData.lastAdTimestamp) {
         setCooldownRemaining(0);
@@ -411,12 +419,11 @@ const AdTask = () => {
       setCooldownRemaining(remaining);
     };
 
-    checkDailyReset();
     updateCooldown();
     
     const timer = setInterval(updateCooldown, 1000);
     return () => clearInterval(timer);
-  }, [id, userAdData, localAdsConfig.cooldown]);
+  }, [userAdData.lastAdTimestamp, localAdsConfig.cooldown]);
 
   // Load ads configuration from Firestore if not provided by context
   useEffect(() => {
@@ -464,19 +471,6 @@ const AdTask = () => {
     };
   }, [activeAd]);
 
-  // Get approximate server time
-  const getServerTime = async () => {
-    try {
-      const docRef = doc(db, 'metadata', 'serverTime');
-      await updateDoc(docRef, { timestamp: serverTimestamp() });
-      const docSnap = await getDoc(docRef);
-      return docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
-    } catch (err) {
-      console.error('Error getting server time:', err);
-      return new Date(); // Fallback to client time
-    }
-  };
-
   const showCooldownNotification = useCallback((message) => {
     setCooldownMessage(message);
     setShowCooldownPopup(true);
@@ -484,7 +478,7 @@ const AdTask = () => {
   }, []);
 
   const handleAdCompletion = useCallback(async () => {
-    const now = await getServerTime();
+    const now = new Date();
     
     try {
       await runTransaction(db, async (transaction) => {
@@ -504,20 +498,22 @@ const AdTask = () => {
           throw new Error(`Daily limit reached (${dailyLimit} ads)`);
         }
         
-        // Update ad watch count and timestamp
+        // Update ad watch count and timestamp atomically
         transaction.update(userRef, {
           adsWatchedToday: increment(1),
-          lastAdTimestamp: serverTimestamp()
+          lastAdTimestamp: serverTimestamp(),
+          lastClaimDate: serverTimestamp() // Track when reward was last claimed
         });
         
         return { success: true };
       });
       
-      // Update local state only after successful transaction
+      // Update local state optimistically
       setUserAdData(prev => ({
         ...prev,
         adsWatchedToday: prev.adsWatchedToday + 1,
-        lastAdTimestamp: now
+        lastAdTimestamp: now,
+        lastClaimDate: now
       }));
       setAdWatched(true);
       
@@ -534,7 +530,7 @@ const AdTask = () => {
     setAdError(null);
     
     try {
-      const now = await getServerTime();
+      const now = new Date();
       const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
       
       // Check daily limit
@@ -554,12 +550,14 @@ const AdTask = () => {
         }
       }
       
+      // In development, simulate ad watching
       if (process.env.NODE_ENV === 'development') {
         await new Promise(resolve => setTimeout(resolve, 2000));
         await handleAdCompletion();
         return;
       }
       
+      // In production, show actual ad
       if (!window[activeAd.sdkVar]) {
         throw new Error("Ad provider not loaded yet");
       }
@@ -589,17 +587,26 @@ const AdTask = () => {
           throw new Error("User document doesn't exist");
         }
         
-        // Verify the ad was actually watched
-        const lastAdTime = userDoc.data().lastAdTimestamp?.toDate();
+        const userData = userDoc.data();
+        const lastAdTime = userData.lastAdTimestamp?.toDate();
+        
+        // Verify the ad was actually watched recently
         if (!lastAdTime || (new Date() - lastAdTime) > localAdsConfig.cooldown * 2) {
           throw new Error("No recent ad watch recorded");
         }
         
-        // Update balances
+        // Verify reward hasn't been claimed yet for this ad
+        if (userData.lastClaimDate && 
+            Math.abs(userData.lastClaimDate.toDate() - lastAdTime) < 1000) {
+          throw new Error("Reward already claimed for this ad");
+        }
+        
+        // Update balances and mark as claimed
         transaction.update(userRef, {
           balance: increment(localAdsConfig.pointsBonus),
           taskPoints: increment(localAdsConfig.pointsBonus),
           adsBalance: increment(localAdsConfig.dollarBonus),
+          lastClaimDate: serverTimestamp()
         });
         
         return {
