@@ -204,6 +204,66 @@ export const UserProvider = ({ children }) => {
     }
   }, [id, adsConfig, checkAndResetDailyAds]);
 
+  // Watch video and earn rewards function
+  const watchVideo = useCallback(async (rewardAmount) => {
+    if (!id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const userRef = doc(db, 'telegramUsers', id);
+      
+      // Use a transaction to ensure data consistency
+      const result = await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error("User does not exist");
+        }
+
+        const now = new Date();
+        const lastVideoTime = userDoc.data().lastVideoTime?.toDate();
+        
+        // Check if user has watched a video recently
+        if (lastVideoTime) {
+          const hoursSinceLastWatch = (now - lastVideoTime) / (1000 * 60 * 60);
+          if (hoursSinceLastWatch < 1) {
+            throw new Error(`Please wait ${Math.ceil(60 - (hoursSinceLastWatch * 60))} minutes before watching another video`);
+          }
+        }
+
+        // Calculate points equivalent (assuming 1 dollar = 1000 points)
+        const pointsEarned = rewardAmount * 1000;
+
+        // Update user document
+        transaction.update(userRef, {
+          dollarBalance2: increment(rewardAmount),
+          videoWatched: increment(1),
+          lastVideoTime: serverTimestamp(),
+          balance: increment(pointsEarned),
+          taskPoints: increment(pointsEarned)
+        });
+
+        return { 
+          success: true, 
+          newBalance: (userDoc.data().dollarBalance2 || 0) + rewardAmount,
+          pointsEarned
+        };
+      });
+
+      // Update local state
+      setDollarBalance2(prev => +(prev + rewardAmount).toFixed(3));
+      setVideoWatched(prev => prev + 1);
+      setLastVideoTime(new Date());
+      setBalance(prev => prev + (rewardAmount * 1000));
+      setTaskPoints(prev => prev + (rewardAmount * 1000));
+
+      return result;
+    } catch (error) {
+      console.error('Error in watchVideo:', error);
+      return { success: false, error: error.message };
+    }
+  }, [id]);
+
   // Get current ad watching statistics
   const getAdStats = useCallback(() => {
     const now = new Date();
@@ -873,6 +933,7 @@ export const UserProvider = ({ children }) => {
       sendUserData, 
       handleReferral, 
       addRewards,
+      watchVideo, // Added the new function here
       getTotalBalance,
       fetchWithdrawals,
       updateWithdrawalStatus,
