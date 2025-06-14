@@ -829,7 +829,10 @@ const VideoWatchPage = () => {
     dollarBalance2,
     lastVideoTime,
     id,
-    watchVideo
+    watchVideo,
+    setDollarBalance2,
+    setVideoWatched,
+    setLastVideoTime
   } = useUser();
   
   const [currentVideo, setCurrentVideo] = useState(null);
@@ -957,11 +960,9 @@ const VideoWatchPage = () => {
     }
 
     try {
-      console.log('Attempting to claim reward...');
       const result = await watchVideo(currentVideo.rewardAmount);
       
       if (result?.success) {
-        console.log('Reward claimed successfully:', result);
         setRewardEarned(currentVideo.rewardAmount);
         setClaimedReward(true);
         setShowRewardPopup(false);
@@ -972,9 +973,13 @@ const VideoWatchPage = () => {
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
+
+        // Update local state immediately
+        setDollarBalance2(prev => +(prev + currentVideo.rewardAmount).toFixed(6));
+        setVideoWatched(prev => prev + 1);
+        setLastVideoTime(new Date());
       } else {
         const errorMsg = result?.message || 'Failed to claim reward';
-        console.error('Claim reward error:', errorMsg);
         setError(errorMsg);
       }
     } catch (err) {
@@ -1113,8 +1118,7 @@ const VideoWatchPage = () => {
       
       <Content>
         <BalanceCard>
-          <BalanceLabel>Video Earnings Balance</BalanceLabel>
-          <BalanceAmount>${dollarBalance2.toFixed(2)}</BalanceAmount>
+          <BalanceLabel>Video Earnings</BalanceLabel><BalanceAmount>${dollarBalance2.toFixed(2)}</BalanceAmount>
           {rewardEarned > 0 && (
             <RewardNotification>
               <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
