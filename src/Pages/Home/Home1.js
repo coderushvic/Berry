@@ -118,8 +118,8 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
 const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
   // Calculate total revenue (sum of all balance types)
-  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
-                       parseFloat(taskPoints) + parseFloat(checkinRewards) + totalReferralEarnings;
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) 
+  + parseFloat(checkinRewards) + totalReferralEarnings;
 
   return (
     <AppContainer>
