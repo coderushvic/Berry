@@ -7,10 +7,13 @@ import {
   FaVideo, 
   FaMoneyBillWave,
   FaCopy,
-  FaShareAlt
+  FaShareAlt,
+  FaCalendarDay
 } from 'react-icons/fa';
 import NavBar from './NavBar';
 import { useUser } from '../../context/userContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
 
 // Styled Components
 const AppContainer = styled.div`
@@ -156,21 +159,56 @@ const IconWrapper = styled.span`
   font-size: 1.1rem;
 `;
 
+const ProgressContainer = styled.div`
+  width: 100%;
+  height: 6px;
+  background: ${berryTheme.colors.grey100};
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 0;
+`;
+
+const ProgressBar = styled.div`
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, 
+    ${berryTheme.colors.primary} 0%, 
+    ${berryTheme.colors.secondary} 100%);
+  width: ${props => props.$progress}%;
+  transition: width 0.5s ease;
+`;
+
+const StatRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+`;
+
+const StatItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+`;
+
 const ProfilePage = () => {
   const [copied, setCopied] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [isTelegram, setIsTelegram] = useState(false);
+  const [adsWatchedToday, setAdsWatchedToday] = useState(0);
+  const [totalAdsWatched, setTotalAdsWatched] = useState(0);
   const {
     id = '',
     fullName = '',
     username = '',
-    adsWatched = 0,
     videoWatched = 0,
     processedReferrals = [],
     balance = 0,
     adsBalance = 0,
     dollarBalance2 = 0,
-    walletAddress = ''
+    walletAddress = '',
+    isPremium
   } = useUser();
 
   useEffect(() => {
@@ -182,11 +220,34 @@ const ProfilePage = () => {
         setProfileImage(`${telegramUser.photo_url}?size=large`);
       }
     }
-  }, []);
+
+    // Load ads watched data
+    const loadAdsData = async () => {
+      if (!id) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, "telegramUsers", id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          // Get current ads watched counts
+          setAdsWatchedToday(data.adsWatchedToday || 0);
+          setTotalAdsWatched(data.totalAdsWatched || data.adsWatchedToday || 0);
+        }
+      } catch (error) {
+        console.error("Error loading ads data:", error);
+      }
+    };
+
+    loadAdsData();
+  }, [id]);
 
   // Calculate stats
   const referralCount = processedReferrals?.length || 0;
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2);
+
+  // Calculate daily progress
+  const dailyLimit = isPremium ? 100 : 50;
+  const dailyProgress = Math.min(100, (adsWatchedToday / dailyLimit) * 100);
 
   const copyUserId = () => {
     if (id) {
@@ -312,9 +373,27 @@ const ProfilePage = () => {
         <StatCard $borderColor="#EA5455">
           <StatValue>
             <FaAd />
-            {adsWatched}
+            {totalAdsWatched}
           </StatValue>
-          <StatLabel>Ads Watched</StatLabel>
+          <StatLabel>
+            <StatRow>
+              <StatItem>
+                <FaCalendarDay />
+                <span>Today: {adsWatchedToday}/{dailyLimit}</span>
+              </StatItem>
+              <span>{Math.round(dailyProgress)}%</span>
+            </StatRow>
+            <ProgressContainer>
+              <ProgressBar $progress={dailyProgress} />
+            </ProgressContainer>
+            <StatRow>
+              <StatItem>
+                <FaAd />
+                <span>Total Ads</span>
+              </StatItem>
+              <span>{totalAdsWatched}</span>
+            </StatRow>
+          </StatLabel>
         </StatCard>
 
         <StatCard $borderColor="#00CFE8">
