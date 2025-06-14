@@ -104,7 +104,6 @@ function Home1() {
     balance = 0,
     adsBalance = 0,
     dollarBalance2 = 0,
-    taskPoints = 0,
     checkinRewards = 0,
     refBonus = 0,
     processedReferrals = []
@@ -150,12 +149,6 @@ const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFrom
                 <BreakdownItem>
                   <span>Video Earnings:</span>
                   <span>${dollarBalance2.toFixed(2)}</span>
-                </BreakdownItem>
-              )}
-              {taskPoints > 0 && (
-                <BreakdownItem>
-                  <span>Task Earnings:</span>
-                  <span>${taskPoints.toFixed(2)}</span>
                 </BreakdownItem>
               )}
               {checkinRewards > 0 && (
