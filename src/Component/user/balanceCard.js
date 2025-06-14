@@ -195,7 +195,12 @@ const LoaderContainer = styled.div`
 
 export default function BalanceCard() {
   const { 
-    adsBalance, 
+    balance = 0,
+    adsBalance = 0,
+    dollarBalance2 = 0,
+    checkinRewards = 0,
+    refBonus = 0,
+    processedReferrals = [],
     loading,
     user,
     withdrawalHistory = []
@@ -204,6 +209,18 @@ export default function BalanceCard() {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
+
+  // Calculate total referral earnings
+const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+  const bonus = parseFloat(referral.refBonus) || 0;
+  return total + bonus;
+}, 0);
+  
+  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
+  
+  // Calculate total revenue (sum of all balance types)
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+                     parseFloat(checkinRewards) + totalReferralEarnings;
 
   useEffect(() => {
     if (withdrawalHistory.length > 0) {
@@ -219,7 +236,7 @@ export default function BalanceCard() {
       <CardHeader>
         <CardTitle>
           <FiDollarSign />
-          Ads Balance
+          Total Earnings
         </CardTitle>
         {user?.premium && <PremiumBadge>PRO</PremiumBadge>}
       </CardHeader>
@@ -240,14 +257,14 @@ export default function BalanceCard() {
           >
             <BalanceAmount>
               <CountUp
-                end={adsBalance || 0}
-                decimals={adsBalance < 1 ? 3 : 2}
+                end={totalRevenue || 0}
+                decimals={totalRevenue < 1 ? 3 : 2}
                 prefix="$"
                 duration={0.8}
                 separator=","
               />
             </BalanceAmount>
-            <BalanceLabel>Available for withdrawal</BalanceLabel>
+            <BalanceLabel>Total accumulated earnings</BalanceLabel>
           </BalanceDisplay>
 
           {progress > 0 && (
