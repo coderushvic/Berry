@@ -9,13 +9,29 @@ export default function WithdrawalHistory() {
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
-    adsBalance,
+    balance = 0,
+    adsBalance = 0,
+    dollarBalance2 = 0,
+    checkinRewards = 0,
+    refBonus = 0,
+    processedReferrals = [],
     fetchWithdrawals
   } = useUser();
 
   const [formattedWithdrawals, setFormattedWithdrawals] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedTx, setExpandedTx] = useState(null);
+
+  // Calculate total referral earnings
+  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+    return total + (parseFloat(referral.refBonus) || 0);
+  }, 0);
+  
+  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
+  
+  // Calculate total revenue (sum of all balance types)
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+                     parseFloat(checkinRewards) + totalReferralEarnings;
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -116,11 +132,11 @@ export default function WithdrawalHistory() {
           <p className={styles.subtitle}>Track all your withdrawal requests</p>
         </div>
         
-        <div className={styles.amountContainer}>
-          {adsBalance > 0 && (
+          <div className={styles.amountContainer}>
+          {totalRevenue > 0 && (
             <div className={styles.balanceCard}>
               <p className={styles.balanceLabel}>Available Balance</p>
-              <p className={styles.balanceValue}>${adsBalance.toFixed(3)}</p>
+              <p className={styles.balanceValue}>${totalRevenue.toFixed(3)}</p>
             </div>
           )}
           <button 
