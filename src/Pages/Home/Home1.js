@@ -101,6 +101,7 @@ const BreakdownItem = styled.div`
 
 function Home1() {
   const { 
+    balance = 0,
     adsBalance = 0,
     dollarBalance2 = 0,
     taskPoints = 0,
@@ -109,7 +110,7 @@ function Home1() {
     processedReferrals = []
   } = useUser();
 
-// Calculate total referral earnings from both direct refBonus and processed referrals
+ // Calculate total referral earnings from both direct refBonus and processed referrals
 const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
   return total + (parseFloat(referral.refBonus) || 0);
 }, 0);
@@ -117,7 +118,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
 const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
   // Calculate total revenue (sum of all balance types)
-  const totalRevenue = parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
                        parseFloat(taskPoints) + parseFloat(checkinRewards) + totalReferralEarnings;
 
   return (
@@ -133,6 +134,12 @@ const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFrom
             <BalanceAmount>${totalRevenue.toFixed(2)}</BalanceAmount>
             
             <BalanceBreakdown>
+              {balance > 0 && (
+                <BreakdownItem>
+                  <span>Main Balance:</span>
+                  <span>${balance.toFixed(2)}</span>
+                </BreakdownItem>
+              )}
               {adsBalance > 0 && (
                 <BreakdownItem>
                   <span>Ad Earnings:</span>
