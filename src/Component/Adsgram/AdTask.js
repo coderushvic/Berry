@@ -498,22 +498,18 @@ const AdTask = () => {
           throw new Error(`Daily limit reached (${dailyLimit} ads)`);
         }
         
-        // Update ad watch count and timestamp atomically
+        // Update ad watch count and timestamp
         transaction.update(userRef, {
           adsWatchedToday: increment(1),
-          lastAdTimestamp: serverTimestamp(),
-          lastClaimDate: serverTimestamp() // Track when reward was last claimed
+          lastAdTimestamp: serverTimestamp()
         });
-        
-        return { success: true };
       });
       
       // Update local state optimistically
       setUserAdData(prev => ({
         ...prev,
         adsWatchedToday: prev.adsWatchedToday + 1,
-        lastAdTimestamp: now,
-        lastClaimDate: now
+        lastAdTimestamp: now
       }));
       setAdWatched(true);
       
@@ -522,6 +518,81 @@ const AdTask = () => {
       setAdError(error.message);
     }
   }, [id, isPremium, localAdsConfig]);
+
+  const canClaimReward = useMemo(() => {
+    if (!adWatched) return false;
+    
+    // If we don't have claim data, assume we can claim
+    if (!userAdData.lastClaimDate) return true;
+    
+    // Check if last claim was more than 1 minute ago
+    return (new Date() - userAdData.lastClaimDate) > 60000;
+  }, [adWatched, userAdData.lastClaimDate]);
+
+  const claimReward = useCallback(async () => {
+    if (!adWatched || claiming) return;
+    
+    setClaiming(true);
+    
+    try {
+      const rewardData = await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "telegramUsers", id);
+        const userDoc = await transaction.get(userRef);
+        
+        if (!userDoc.exists()) {
+          throw new Error("User document doesn't exist");
+        }
+        
+        const userData = userDoc.data();
+        const lastAdTime = userData.lastAdTimestamp?.toDate();
+        
+        // Verify the ad was actually watched recently (within cooldown * 3 window)
+        if (!lastAdTime || (new Date() - lastAdTime) > localAdsConfig.cooldown * 3) {
+          throw new Error("No valid ad watch recorded. Please watch an ad first.");
+        }
+        
+        // More lenient claim verification - check if claimed within last minute
+        const lastClaimTime = userData.lastClaimDate?.toDate();
+        if (lastClaimTime && (new Date() - lastClaimTime) < 60000) {
+          throw new Error("Please wait at least 1 minute between claims");
+        }
+        
+        // Update balances and mark as claimed
+        transaction.update(userRef, {
+          balance: increment(localAdsConfig.pointsBonus),
+          taskPoints: increment(localAdsConfig.pointsBonus),
+          adsBalance: increment(localAdsConfig.dollarBonus),
+          lastClaimDate: serverTimestamp()
+        });
+        
+        return {
+          points: localAdsConfig.pointsBonus,
+          dollars: localAdsConfig.dollarBonus
+        };
+      });
+
+      // Update local state
+      setBalance(prev => prev + rewardData.points);
+      setTaskPoints(prev => prev + rewardData.points);
+      setAdsBalance(prev => +(prev + rewardData.dollars).toFixed(6));
+      
+      setUserAdData(prev => ({
+        ...prev,
+        lastClaimDate: new Date()
+      }));
+      
+      setAdWatched(false);
+      setCongrats(true);
+      setTimeout(() => setCongrats(false), 4000);
+      
+    } catch (error) {
+      console.error("Error claiming reward:", error);
+      setAdError(error.message);
+      setTimeout(() => setAdError(null), 5000);
+    } finally {
+      setClaiming(false);
+    }
+  }, [adWatched, claiming, id, localAdsConfig, setBalance, setTaskPoints, setAdsBalance]);
 
   const showAd = useCallback(async () => {
     if (isAdLoading) return;
@@ -572,65 +643,6 @@ const AdTask = () => {
       setIsAdLoading(false);
     }
   }, [isAdLoading, isPremium, localAdsConfig, userAdData, handleAdCompletion, showCooldownNotification, activeAd]);
-
-  const claimReward = useCallback(async () => {
-    if (!adWatched || claiming) return;
-    
-    setClaiming(true);
-    
-    try {
-      const rewardData = await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, "telegramUsers", id);
-        const userDoc = await transaction.get(userRef);
-        
-        if (!userDoc.exists()) {
-          throw new Error("User document doesn't exist");
-        }
-        
-        const userData = userDoc.data();
-        const lastAdTime = userData.lastAdTimestamp?.toDate();
-        
-        // Verify the ad was actually watched recently
-        if (!lastAdTime || (new Date() - lastAdTime) > localAdsConfig.cooldown * 2) {
-          throw new Error("No recent ad watch recorded");
-        }
-        
-        // Verify reward hasn't been claimed yet for this ad
-        if (userData.lastClaimDate && 
-            Math.abs(userData.lastClaimDate.toDate() - lastAdTime) < 1000) {
-          throw new Error("Reward already claimed for this ad");
-        }
-        
-        // Update balances and mark as claimed
-        transaction.update(userRef, {
-          balance: increment(localAdsConfig.pointsBonus),
-          taskPoints: increment(localAdsConfig.pointsBonus),
-          adsBalance: increment(localAdsConfig.dollarBonus),
-          lastClaimDate: serverTimestamp()
-        });
-        
-        return {
-          points: localAdsConfig.pointsBonus,
-          dollars: localAdsConfig.dollarBonus
-        };
-      });
-
-      // Update local state
-      setBalance(prev => prev + rewardData.points);
-      setTaskPoints(prev => prev + rewardData.points);
-      setAdsBalance(prev => +(prev + rewardData.dollars).toFixed(6));
-      
-      setAdWatched(false);
-      setCongrats(true);
-      setTimeout(() => setCongrats(false), 4000);
-      
-    } catch (error) {
-      console.error("Error claiming reward:", error);
-      showCooldownNotification(error.message || "Error claiming reward. Please try again.");
-    } finally {
-      setClaiming(false);
-    }
-  }, [adWatched, claiming, id, localAdsConfig, setBalance, setTaskPoints, setAdsBalance, showCooldownNotification]);
 
   // Calculate progress percentage
   const progressPercentage = useMemo(() => {
@@ -734,11 +746,11 @@ const AdTask = () => {
           
           <ActionButton
             onClick={claimReward}
-            disabled={!adWatched || claiming}
-            $bgColor={adWatched ? berryTheme.colors.success : berryTheme.colors.grey200}
-            $textColor={adWatched ? 'white' : berryTheme.colors.textMuted}
-            $hoverColor={adWatched ? berryTheme.colors.successDark : berryTheme.colors.grey200}
-            $shadowColor={adWatched ? "rgba(46, 204, 113, 0.3)" : "rgba(0,0,0,0.1)"}
+            disabled={!canClaimReward || claiming}
+            $bgColor={canClaimReward ? berryTheme.colors.success : berryTheme.colors.grey200}
+            $textColor={canClaimReward ? 'white' : berryTheme.colors.textMuted}
+            $hoverColor={canClaimReward ? berryTheme.colors.successDark : berryTheme.colors.grey200}
+            $shadowColor={canClaimReward ? "rgba(46, 204, 113, 0.3)" : "rgba(0,0,0,0.1)"}
             whileTap={{ scale: 0.95 }}
           >
             {claiming ? (
