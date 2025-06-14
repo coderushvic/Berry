@@ -1,33 +1,61 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { IoCheckmarkCircleSharp, IoTimeOutline, IoSparkles } from "react-icons/io5";
 import { FaCoins, FaGem, FaCrown } from "react-icons/fa";
+import { doc, updateDoc, increment, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase/firestore";
 import { useUser } from "../../context/userContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { berryTheme } from '../../Theme';
 import styled, { keyframes } from 'styled-components';
 
-// Styled Components
-const TaskContainer = styled.div`
-  position: relative;
-  width: 100%;
-  max-width: 500px;
-  margin: 0 auto;
+// Animations
+const float = keyframes`
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
 `;
 
-const glow = keyframes`
-  0% { box-shadow: 0 0 5px rgba(227, 11, 92, 0.5); }
-  50% { box-shadow: 0 0 20px rgba(227, 11, 92, 0.8); }
-  100% { box-shadow: 0 0 5px rgba(227, 11, 92, 0.5); }
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
+// Styled components
+const TaskContainer = styled.div`
+  margin-bottom: ${berryTheme.spacing.large};
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  perspective: 1000px;
 `;
 
 const TaskCard = styled(motion.div)`
-  background: ${berryTheme.colors.backgroundLight};
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #ffffff 0%, #f9f9ff 100%);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   position: relative;
   overflow: hidden;
-  border: 1px solid ${berryTheme.colors.border};
+  backdrop-filter: blur(5px);
+  transform-style: preserve-3d;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      to bottom right,
+      rgba(227, 11, 92, 0.05) 0%,
+      rgba(255, 255, 255, 0) 60%
+    );
+    z-index: 0;
+  }
 `;
 
 const GlowEffect = styled.div`
@@ -36,68 +64,68 @@ const GlowEffect = styled.div`
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #E30B5C, #FF8A00);
-  animation: ${glow} 2s infinite;
-`;
-
-const PremiumTag = styled.div`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  color: #000;
-  font-size: 10px;
-  font-weight: bold;
-  padding: 4px 8px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  z-index: 1;
+  background: linear-gradient(90deg, 
+    ${berryTheme.colors.primary} 0%, 
+    ${berryTheme.colors.secondary} 50%, 
+    ${berryTheme.colors.primary} 100%);
+  background-size: 200% 100%;
+  animation: ${shimmer} 3s linear infinite;
 `;
 
 const TaskHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 15px;
-`;
-
-const SparkleIcon = styled(IoSparkles)`
-  color: ${berryTheme.colors.primary};
+  gap: 12px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 `;
 
 const TaskTitle = styled.h3`
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: ${berryTheme.colors.text};
+  font-size: 1.4rem;
+  color: ${berryTheme.colors.primaryDark};
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.05);
 `;
 
 const TaskDescription = styled.p`
-  margin: 0 0 20px 0;
-  font-size: 14px;
   color: ${berryTheme.colors.textSecondary};
-  line-height: 1.5;
+  margin-bottom: 24px;
+  line-height: 1.6;
+  font-size: 0.95rem;
+  position: relative;
+  z-index: 1;
 `;
 
 const RewardBadges = styled.div`
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 `;
 
 const RewardBadge = styled(motion.div)`
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: ${props => props.$bgColor};
-  color: ${props => props.$textColor};
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 1rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px ${props => props.$shadowColor};
+  color: ${props => props.$textColor || berryTheme.colors.textDark};
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: ${props => props.$bgColor || berryTheme.colors.grey100};
+  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(0,0,0,0.05)'};
+  transition: all 0.3s ease;
+  cursor: default;
+  
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px ${props => props.$shadowColor || 'rgba(0,0,0,0.1)'};
+  }
 `;
 
 const ProgressContainer = styled.div`
@@ -105,130 +133,195 @@ const ProgressContainer = styled.div`
   height: 8px;
   background: ${berryTheme.colors.grey100};
   border-radius: 4px;
+  margin-bottom: 24px;
   overflow: hidden;
-  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
 `;
 
 const ProgressBar = styled(motion.div)`
   height: 100%;
-  background: linear-gradient(90deg, #E30B5C, #FF8A00);
   border-radius: 4px;
+  background: linear-gradient(90deg, 
+    ${berryTheme.colors.primary} 0%, 
+    ${berryTheme.colors.secondary} 100%);
   width: ${props => props.$progress}%;
 `;
 
 const TaskStats = styled.div`
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: ${berryTheme.colors.textSecondary};
-  margin-bottom: 20px;
-
-  span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  gap: 10px;
-`;
-
-const ActionButton = styled(motion.button)`
-  flex: 1;
+  font-size: 0.9rem;
+  color: ${berryTheme.colors.textMuted};
+  margin-bottom: 24px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  background: ${props => props.$bgColor};
-  color: ${props => props.$textColor || 'white'};
-  box-shadow: 0 2px 10px ${props => props.$shadowColor};
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: ${props => !props.disabled && props.$hoverColor};
-    transform: ${props => !props.disabled && 'translateY(-2px)'};
-  }
-  
-  &:active {
-    transform: ${props => !props.disabled && 'translateY(0)'};
-  }
-`;
-
-const spin = keyframes`
-  to { transform: rotate(360deg); }
-`;
-
-const Spinner = styled.div`
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: white;
-  animation: ${spin} 1s ease-in-out infinite;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
 `;
 
 const ErrorText = styled(motion.div)`
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-size: 0.9rem;
   color: ${berryTheme.colors.error};
-  font-size: 12px;
-  margin-bottom: 15px;
-`;
-
-const Notification = styled.div`
-  position: fixed;
-  top: 20px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const NotificationContent = styled(motion.div)`
+  margin-bottom: 20px;
+  padding: 12px;
+  background: rgba(255, 0, 0, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid ${berryTheme.colors.error};
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
+  position: relative;
+  z-index: 1;
+`;
+
+const ActionButtons = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+`;
+
+const ActionButton = styled(motion.button)`
+  background: ${props => props.$bgColor || berryTheme.colors.primary};
+  color: ${props => props.$textColor || 'white'};
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.2)'};
+  
+  &:hover:not(:disabled) {
+    background: ${props => props.$hoverColor || berryTheme.colors.primaryDark};
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.3)'};
+  }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey200};
+    color: ${berryTheme.colors.textMuted};
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: all 0.5s ease;
+  }
+
+  &:hover:not(:disabled)::before {
+    left: 100%;
+  }
+`;
+
+const Spinner = styled.span`
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const SparkleIcon = styled(IoSparkles)`
+  color: gold;
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+  animation: ${float} 3s ease-in-out infinite;
+`;
+
+const Notification = styled(motion.div)`
+  position: fixed;
+  top: 1.5rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  z-index: 1000;
+  pointer-events: none;
+`;
+
+const NotificationContent = styled(motion.div)`
   background: ${props => props.$bgColor};
   color: ${props => props.$textColor};
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 14px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 `;
+
+const PremiumTag = styled.div`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffcc00 100%);
+  color: #8a6d00;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+  z-index: 2;
+`;
+
+// Default configuration
+const defaultConfig = {
+  pointsBonus: 0,
+  dollarBonus: 10.001,
+  dailyLimit: 50,
+  premiumDailyLimit: 100,
+  cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
+  ads: [{
+    id: "default_ad",
+    scriptSrc: "//whephiwums.com/sdk.js",
+    zoneId: "8693006",
+    sdkVar: "show_8693006",
+    active: true
+  }]
+};
 
 const AdTask = () => {
   const {
+    id,
     isPremium,
-    adsConfig = {
-      pointsBonus: 1000,
-      dollarBonus: 10.001,
-      dailyLimit: 50,
-      premiumDailyLimit: 100,
-      cooldown: 20 * 60 * 1000, // 20 minutes
-      ads: [{
-        id: "default_ad",
-        scriptSrc: "//whephiwums.com/sdk.js",
-        zoneId: "8693006",
-        sdkVar: "show_8693006",
-        active: true
-      }]
-    },
-    recordAdWatch,
-    getAdStats,
+    adsConfig = defaultConfig,
     setBalance,
     setTaskPoints,
-    setAdsBalance
+    setAdsBalance,
   } = useUser();
 
   const [adWatched, setAdWatched] = useState(false);
@@ -238,47 +331,118 @@ const AdTask = () => {
   const [adError, setAdError] = useState(null);
   const [showCooldownPopup, setShowCooldownPopup] = useState(false);
   const [cooldownMessage, setCooldownMessage] = useState("");
+  const [localAdsConfig, setLocalAdsConfig] = useState(adsConfig);
+  const [userAdData, setUserAdData] = useState({
+    adsWatchedToday: 0,
+    lastAdTimestamp: null,
+    dailyResetDate: null
+  });
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  const [adReady, setAdReady] = useState(false);
 
   // Active ad configuration
   const activeAd = useMemo(() => 
-    adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0],
-    [adsConfig]
+    localAdsConfig.ads.find(ad => ad.active) || localAdsConfig.ads[0],
+    [localAdsConfig]
   );
 
-  // Get current ad stats
-  const adStats = useMemo(() => getAdStats(), [getAdStats]);
-
-  // Update cooldown timer
+  // Load user ad data from Firestore
   useEffect(() => {
+    const loadUserAdData = async () => {
+      if (!id) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, "telegramUsers", id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const resetDate = data.dailyResetDate?.toDate() || new Date();
+          resetDate.setHours(0, 0, 0, 0);
+          
+          setUserAdData({
+            adsWatchedToday: data.adsWatchedToday || 0,
+            lastAdTimestamp: data.lastAdTimestamp?.toDate() || null,
+            dailyResetDate: resetDate
+          });
+        }
+      } catch (error) {
+        console.error("Error loading user ad data:", error);
+      }
+    };
+
+    loadUserAdData();
+  }, [id]);
+
+  // Check daily reset and update cooldown timer
+  useEffect(() => {
+    const checkDailyReset = async () => {
+      if (!userAdData.dailyResetDate) return;
+      
+      const now = new Date();
+      if (now > userAdData.dailyResetDate) {
+        try {
+          const newResetDate = new Date();
+          newResetDate.setHours(0, 0, 0, 0);
+          newResetDate.setDate(newResetDate.getDate() + 1);
+          
+          await updateDoc(doc(db, "telegramUsers", id), {
+            adsWatchedToday: 0,
+            dailyResetDate: serverTimestamp()
+          });
+          
+          setUserAdData(prev => ({
+            ...prev,
+            adsWatchedToday: 0,
+            dailyResetDate: newResetDate
+          }));
+        } catch (error) {
+          console.error("Error resetting daily ads:", error);
+        }
+      }
+    };
+
     const updateCooldown = () => {
-      if (!adStats.lastAdTime) {
+      if (!userAdData.lastAdTimestamp) {
         setCooldownRemaining(0);
         return;
       }
       
-      const now = Date.now();
-      const timePassed = now - adStats.lastAdTime.getTime();
-      const remaining = Math.max(0, Math.ceil((adsConfig.cooldown - timePassed) / 1000));
+      const now = new Date();
+      const timePassed = now - userAdData.lastAdTimestamp;
+      const remaining = Math.max(0, Math.ceil((localAdsConfig.cooldown - timePassed) / 1000));
       setCooldownRemaining(remaining);
     };
 
+    checkDailyReset();
+    updateCooldown();
+    
     const timer = setInterval(updateCooldown, 1000);
-    updateCooldown(); // Initial update
-
     return () => clearInterval(timer);
-  }, [adStats.lastAdTime, adsConfig.cooldown]);
+  }, [id, userAdData, localAdsConfig.cooldown]);
 
-  // Load ad script and check when ready
+  // Load ads configuration from Firestore if not provided by context
+  useEffect(() => {
+    const loadAdsConfig = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, "adminConfig", "adsSettings"));
+        setLocalAdsConfig(configDoc.exists() ? { ...defaultConfig, ...configDoc.data() } : defaultConfig);
+      } catch (error) {
+        console.error("Error loading ads config:", error);
+        setLocalAdsConfig(defaultConfig);
+      }
+    };
+
+    if (adsConfig === defaultConfig) {
+      loadAdsConfig();
+    } else {
+      setLocalAdsConfig(adsConfig);
+    }
+  }, [adsConfig]);
+
+  // Load ad script based on config
   useEffect(() => {
     if (!activeAd) return;
 
     const existingScript = document.querySelector(`script[data-zone="${activeAd.zoneId}"]`);
-    if (existingScript) {
-      setAdReady(true);
-      return;
-    }
+    if (existingScript) return;
 
     const tag = document.createElement("script");
     tag.src = activeAd.scriptSrc;
@@ -286,15 +450,9 @@ const AdTask = () => {
     tag.dataset.sdk = activeAd.sdkVar;
     tag.async = true;
     
-    tag.onload = () => {
-      setAdReady(true);
-      setIsAdLoading(false);
-    };
-    
     tag.onerror = () => {
       setAdError("Failed to load ad provider. Please refresh the page.");
       setIsAdLoading(false);
-      setAdReady(false);
     };
     
     document.body.appendChild(tag);
@@ -306,55 +464,108 @@ const AdTask = () => {
     };
   }, [activeAd]);
 
+  // Get approximate server time
+  const getServerTime = async () => {
+    try {
+      const docRef = doc(db, 'metadata', 'serverTime');
+      await updateDoc(docRef, { timestamp: serverTimestamp() });
+      const docSnap = await getDoc(docRef);
+      return docSnap.exists() ? docSnap.data().timestamp.toDate() : new Date();
+    } catch (err) {
+      console.error('Error getting server time:', err);
+      return new Date(); // Fallback to client time
+    }
+  };
+
   const showCooldownNotification = useCallback((message) => {
     setCooldownMessage(message);
     setShowCooldownPopup(true);
     setTimeout(() => setShowCooldownPopup(false), 3000);
   }, []);
 
+  const handleAdCompletion = useCallback(async () => {
+    const now = await getServerTime();
+    
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "telegramUsers", id);
+        const userDoc = await transaction.get(userRef);
+        
+        if (!userDoc.exists()) {
+          throw new Error("User document doesn't exist");
+        }
+        
+        const userData = userDoc.data();
+        const currentAdsWatched = userData.adsWatchedToday || 0;
+        const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
+        
+        // Verify daily limit
+        if (currentAdsWatched >= dailyLimit) {
+          throw new Error(`Daily limit reached (${dailyLimit} ads)`);
+        }
+        
+        // Update ad watch count and timestamp
+        transaction.update(userRef, {
+          adsWatchedToday: increment(1),
+          lastAdTimestamp: serverTimestamp()
+        });
+        
+        return { success: true };
+      });
+      
+      // Update local state only after successful transaction
+      setUserAdData(prev => ({
+        ...prev,
+        adsWatchedToday: prev.adsWatchedToday + 1,
+        lastAdTimestamp: now
+      }));
+      setAdWatched(true);
+      
+    } catch (error) {
+      console.error("Error recording ad completion:", error);
+      setAdError(error.message);
+    }
+  }, [id, isPremium, localAdsConfig]);
+
   const showAd = useCallback(async () => {
-    if (isAdLoading || !adReady) return;
+    if (isAdLoading) return;
     
     setIsAdLoading(true);
     setAdError(null);
     
     try {
-      // Check if user can watch ad
-      if (adStats.dailyAdsWatched >= adStats.dailyLimit) {
-        showCooldownNotification(`Daily limit reached (${adStats.dailyLimit} ads). Try again tomorrow.`);
-        return;
-      }
-
-      if (adStats.lastAdTime && (Date.now() - adStats.lastAdTime.getTime()) < adsConfig.cooldown) {
-        const waitMinutes = Math.ceil((adsConfig.cooldown - (Date.now() - adStats.lastAdTime.getTime())) / 60000);
-        showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
+      const now = await getServerTime();
+      const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
+      
+      // Check daily limit
+      if (userAdData.adsWatchedToday >= dailyLimit) {
+        showCooldownNotification(`Daily limit reached (${dailyLimit} ads). Try again tomorrow.`);
         return;
       }
       
-      // In development, simulate ad watching
+      // Check cooldown
+      if (userAdData.lastAdTimestamp) {
+        const timeSinceLastAd = now - userAdData.lastAdTimestamp;
+        if (timeSinceLastAd < localAdsConfig.cooldown) {
+          const remainingTime = localAdsConfig.cooldown - timeSinceLastAd;
+          const waitMinutes = Math.ceil(remainingTime / 60000);
+          showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
+          return;
+        }
+      }
+      
       if (process.env.NODE_ENV === 'development') {
         await new Promise(resolve => setTimeout(resolve, 2000));
-        await recordAdWatch({
-          adId: activeAd.id,
-          pointsEarned: adsConfig.pointsBonus,
-          dollarsEarned: adsConfig.dollarBonus
-        });
-        setAdWatched(true);
+        await handleAdCompletion();
         return;
       }
       
-      // In production, show actual ad
       if (!window[activeAd.sdkVar]) {
         throw new Error("Ad provider not loaded yet");
       }
       
       await window[activeAd.sdkVar]();
-      await recordAdWatch({
-        adId: activeAd.id,
-        pointsEarned: adsConfig.pointsBonus,
-        dollarsEarned: adsConfig.dollarBonus
-      });
-      setAdWatched(true);
+      await handleAdCompletion();
       
     } catch (error) {
       console.error("Error showing ad:", error);
@@ -362,7 +573,7 @@ const AdTask = () => {
     } finally {
       setIsAdLoading(false);
     }
-  }, [isAdLoading, adReady, adStats, showCooldownNotification, recordAdWatch, activeAd, adsConfig]);
+  }, [isAdLoading, isPremium, localAdsConfig, userAdData, handleAdCompletion, showCooldownNotification, activeAd]);
 
   const claimReward = useCallback(async () => {
     if (!adWatched || claiming) return;
@@ -370,12 +581,38 @@ const AdTask = () => {
     setClaiming(true);
     
     try {
-      // Update balances in local state for immediate feedback
-      setBalance(prev => prev + adsConfig.pointsBonus);
-      setTaskPoints(prev => prev + adsConfig.pointsBonus);
-      setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
+      const rewardData = await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "telegramUsers", id);
+        const userDoc = await transaction.get(userRef);
+        
+        if (!userDoc.exists()) {
+          throw new Error("User document doesn't exist");
+        }
+        
+        // Verify the ad was actually watched
+        const lastAdTime = userDoc.data().lastAdTimestamp?.toDate();
+        if (!lastAdTime || (new Date() - lastAdTime) > localAdsConfig.cooldown * 2) {
+          throw new Error("No recent ad watch recorded");
+        }
+        
+        // Update balances
+        transaction.update(userRef, {
+          balance: increment(localAdsConfig.pointsBonus),
+          taskPoints: increment(localAdsConfig.pointsBonus),
+          adsBalance: increment(localAdsConfig.dollarBonus),
+        });
+        
+        return {
+          points: localAdsConfig.pointsBonus,
+          dollars: localAdsConfig.dollarBonus
+        };
+      });
+
+      // Update local state
+      setBalance(prev => prev + rewardData.points);
+      setTaskPoints(prev => prev + rewardData.points);
+      setAdsBalance(prev => +(prev + rewardData.dollars).toFixed(6));
       
-      // Show success message
       setAdWatched(false);
       setCongrats(true);
       setTimeout(() => setCongrats(false), 4000);
@@ -386,27 +623,13 @@ const AdTask = () => {
     } finally {
       setClaiming(false);
     }
-  }, [
-    adWatched, 
-    claiming, 
-    showCooldownNotification, 
-    adsConfig,
-    setBalance,
-    setTaskPoints,
-    setAdsBalance
-  ]);
+  }, [adWatched, claiming, id, localAdsConfig, setBalance, setTaskPoints, setAdsBalance, showCooldownNotification]);
 
   // Calculate progress percentage
   const progressPercentage = useMemo(() => {
-    return Math.min(100, (adStats.dailyAdsWatched / adStats.dailyLimit) * 100);
-  }, [adStats]);
-
-  // Determine if watch button should be disabled
-  const isWatchButtonDisabled = useMemo(() => {
-    return isAdLoading || !adReady || 
-           adStats.dailyAdsWatched >= adStats.dailyLimit || 
-           (adStats.lastAdTime && (Date.now() - adStats.lastAdTime.getTime()) < adsConfig.cooldown);
-  }, [isAdLoading, adReady, adStats, adsConfig.cooldown]);
+    const dailyLimit = isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit;
+    return Math.min(100, (userAdData.adsWatchedToday / dailyLimit) * 100);
+  }, [userAdData.adsWatchedToday, localAdsConfig, isPremium]);
 
   return (
     <TaskContainer>
@@ -440,7 +663,7 @@ const AdTask = () => {
             $shadowColor="rgba(227, 11, 92, 0.1)"
             whileHover={{ scale: 1.05 }}
           >
-            <FaCoins size={16} /> +{adsConfig.pointsBonus} NEWCATS
+            <FaCoins size={16} /> +{localAdsConfig.pointsBonus} NEWCATS
           </RewardBadge>
           <RewardBadge
             $bgColor={berryTheme.colors.successLight}
@@ -448,7 +671,7 @@ const AdTask = () => {
             $shadowColor="rgba(46, 204, 113, 0.1)"
             whileHover={{ scale: 1.05 }}
           >
-            <FaGem size={16} /> ${adsConfig.dollarBonus.toFixed(3)} USD
+            <FaGem size={16} /> ${localAdsConfig.dollarBonus.toFixed(3)} USD
           </RewardBadge>
         </RewardBadges>
         
@@ -463,7 +686,7 @@ const AdTask = () => {
         
         <TaskStats>
           <span>
-            <IoTimeOutline /> {adStats.dailyAdsWatched}/{adStats.dailyLimit} ads today
+            <IoTimeOutline /> {userAdData.adsWatchedToday}/{isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit} ads today
           </span>
           <span>
             {Math.round(progressPercentage)}% completed
@@ -482,7 +705,7 @@ const AdTask = () => {
         <ActionButtons>
           <ActionButton
             onClick={showAd}
-            disabled={isWatchButtonDisabled}
+            disabled={cooldownRemaining > 0 || isAdLoading || userAdData.adsWatchedToday >= (isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit)}
             $bgColor={berryTheme.colors.primary}
             $hoverColor={berryTheme.colors.primaryDark}
             $shadowColor="rgba(227, 11, 92, 0.3)"
@@ -495,8 +718,6 @@ const AdTask = () => {
               </>
             ) : cooldownRemaining > 0 ? (
               `${cooldownRemaining}s`
-            ) : !adReady ? (
-              "Preparing Ads..."
             ) : (
               <>
                 <IoSparkles /> Show Ad
