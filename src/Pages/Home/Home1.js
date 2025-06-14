@@ -110,12 +110,16 @@ function Home1() {
     processedReferrals = []
   } = useUser();
 
-  // Calculate total referral earnings from both direct refBonus and processed referrals
-  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-    return total + (parseFloat(referral.refBonus) || 0);
-  }, 0);
+// Calculate total referral earnings from both direct refBonus and processed referrals
+const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+  return total + (parseFloat(referral.refBonus) || 0);
+}, 0);
+
+const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
-  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
+  // Calculate total revenue (sum of all balance types)
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+                       parseFloat(taskPoints) + parseFloat(checkinRewards) + totalReferralEarnings;
 
   return (
     <AppContainer>
@@ -126,10 +130,16 @@ function Home1() {
       <Content>
         <StyledBalanceCard>
           <BalanceContent>
-            <BalanceLabel>Available Balance</BalanceLabel>
-            <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+            <BalanceLabel>Total Earnings</BalanceLabel>
+            <BalanceAmount>${totalRevenue.toFixed(2)}</BalanceAmount>
             
             <BalanceBreakdown>
+              {balance > 0 && (
+                <BreakdownItem>
+                  <span>Main Balance:</span>
+                  <span>${balance.toFixed(2)}</span>
+                </BreakdownItem>
+              )}
               {adsBalance > 0 && (
                 <BreakdownItem>
                   <span>Ad Earnings:</span>
