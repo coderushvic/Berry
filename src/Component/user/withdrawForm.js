@@ -335,13 +335,29 @@ const DoneButton = styled.button`
 
 export default function WithdrawForm() {
   const { 
-    adsBalance,
+    balance = 0,
+    adsBalance = 0,
+    dollarBalance2 = 0,
+    checkinRewards = 0,
+    refBonus = 0,
+    processedReferrals = [],
     id,
     username,
     fullName,
     loading,
     setAdsBalance,
   } = useUser();
+
+  // Calculate total referral earnings
+const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+  const bonus = parseFloat(referral.refBonus) || 0;
+  return total + bonus;
+}, 0);
+  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
+  
+  // Calculate total revenue (sum of all balance types)
+  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+                     parseFloat(checkinRewards) + totalReferralEarnings;
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -395,12 +411,12 @@ export default function WithdrawForm() {
     const amountNum = parseFloat(formData.amount);
     if (isNaN(amountNum)) return setError('Please enter a valid amount');
     if (amountNum < MIN_WITHDRAWAL) return setError(`Minimum withdrawal is $${MIN_WITHDRAWAL}`);
-    if (totalAmount > adsBalance) return setError(`Insufficient balance (including fee)`);
+    if (totalAmount > adsBalance) return setError(`You can only withdraw from your ads balance ($${adsBalance.toFixed(2)} available)`);
     if (!formData.walletAddress) return setError('Please enter your wallet address');
     if (!formData.network) return setError('Please select a network');
 
     try {
-      // Update user balance
+      // Update user balance (still only deduct from adsBalance)
       const userRef = doc(db, 'telegramUsers', id);
       await updateDoc(userRef, {
         adsBalance: adsBalance - totalAmount
@@ -472,11 +488,14 @@ export default function WithdrawForm() {
       </PageHeader>
 
       <MainContent>
-
         <FormCard>
           <BalanceCard>
             <div>
-              <BalanceLabel>Available Balance</BalanceLabel>
+              <BalanceLabel>Total Earnings</BalanceLabel>
+              <BalanceAmount>${totalRevenue.toFixed(3)}</BalanceAmount>
+            </div>
+            <div>
+              <BalanceLabel>Available for Withdrawal</BalanceLabel>
               <BalanceAmount>${adsBalance.toFixed(3)}</BalanceAmount>
             </div>
             <FiInfo size={20} color={berryTheme.colors.primary} />
@@ -510,7 +529,7 @@ export default function WithdrawForm() {
               )}
               {formData.amount && totalAmount > adsBalance && (
                 <p style={{ color: berryTheme.colors.error, fontSize: '0.75rem', marginTop: '4px' }}>
-                  Insufficient balance (including fee)
+                  You can only withdraw from your ads balance (${adsBalance.toFixed(2)} available)
                 </p>
               )}
             </FormGroup>
