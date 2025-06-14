@@ -491,12 +491,8 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
         <FormCard>
           <BalanceCard>
             <div>
-              <BalanceLabel>Total Earnings</BalanceLabel>
-              <BalanceAmount>${totalRevenue.toFixed(3)}</BalanceAmount>
-            </div>
-            <div>
               <BalanceLabel>Available for Withdrawal</BalanceLabel>
-              <BalanceAmount>${adsBalance.toFixed(3)}</BalanceAmount>
+              <BalanceAmount>${totalRevenue.toFixed(3)}</BalanceAmount>
             </div>
             <FiInfo size={20} color={berryTheme.colors.primary} />
           </BalanceCard>
