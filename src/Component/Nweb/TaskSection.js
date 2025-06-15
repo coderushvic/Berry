@@ -125,15 +125,14 @@ function TaskSection() {
     isPremium 
   } = useUser();
 
-  // Calculate remaining ads with all safeguards
+  // Calculate remaining ads using userAdData.adsWatchedToday exactly like AdTask
   const { remainingAds, dailyLimit } = useMemo(() => {
     if (loading || !userData) return { remainingAds: null, dailyLimit: null };
     
-    const today = new Date().toISOString().split('T')[0];
-    // Check both dailyAdsWatched (date-based) and adsWatchedToday (count) for maximum accuracy
-    const dailyWatched = userData.dailyAdsWatched?.[today] ?? userData.adsWatchedToday ?? 0;
+    // Use adsWatchedToday directly from userData as in AdTask component
+    const adsWatchedToday = userData.adsWatchedToday || 0;
     const limit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-    const remaining = Math.max(0, limit - dailyWatched);
+    const remaining = Math.max(0, limit - adsWatchedToday);
     
     return { 
       remainingAds: remaining, 
@@ -204,7 +203,7 @@ function TaskSection() {
           >
             {task.showBadge && (
               <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
-                {task.badgeCount} {/* Always showing exact count */}
+                {task.badgeCount} {/* Showing exact remaining count */}
               </AdsBadge>
             )}
             <TaskIconWrapper $iconColor={task.iconColor}>
