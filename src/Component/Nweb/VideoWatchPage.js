@@ -3,9 +3,6 @@ import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
 import NavBar from './NavBar';
-import { useUser } from "../../context/userContext";
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firestore';
 
 // Animations
 const fadeIn = keyframes`
@@ -520,16 +517,12 @@ const VideoWatchPage = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
-  
-  const { user, dollarBalance2, setDollarBalance2 } = useUser();
+  const [balance, setBalance] = useState(0);
+
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
-  const hasQualifiedRef = useRef(hasQualified);
-
-  // Update ref when hasQualified changes
-  useEffect(() => {
-    hasQualifiedRef.current = hasQualified;
-  }, [hasQualified]);
+  const hasQualifiedRef = useRef();
+  hasQualifiedRef.current = hasQualified;
 
   // Mock videos data
   const mockVideos = useMemo(() => [
@@ -549,35 +542,48 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Combined balance update function
-  const updateBalance = async (amount) => {
-    const newBalance = (dollarBalance2 || 0) + amount;
-    
-    // Optimistic UI update
-    setDollarBalance2(newBalance);
-    
-    // Sync with Firebase
-    if (user?.uid) {
-      try {
-        await updateDoc(doc(db, "users", user.uid), {
-          dollarBalance2: newBalance
-        });
-      } catch (error) {
-        console.error("Failed to update balance:", error);
-        // Revert on error
-        setDollarBalance2(dollarBalance2);
-        return false;
-      }
-    }
-    return true;
+  // Simulate API call to claim reward
+  const claimReward = async (amount) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ success: true });
+      }, 500);
+    });
   };
+
+  // Watch video and earn reward function
+  const watchVideo = async (amount) => {
+    try {
+      const result = await claimReward(amount);
+      if (result?.success) {
+        setBalance(prev => {
+          const newBalance = prev + amount;
+          localStorage.setItem('videoBalance', newBalance.toString());
+          return newBalance;
+        });
+        return { success: true };
+      }
+      throw new Error(result?.error || 'Failed to claim reward');
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Load balance from localStorage on mount
+  useEffect(() => {
+    const savedBalance = localStorage.getItem('videoBalance');
+    if (savedBalance) {
+      setBalance(parseFloat(savedBalance));
+    }
+  }, []);
 
   // Load initial video
   useEffect(() => {
-    if (mockVideos.length > 0 && !currentVideo) {
+    if (mockVideos.length > 0) {
       setCurrentVideo(mockVideos[0]);
     }
-  }, [mockVideos, currentVideo]);
+  }, [mockVideos]);
 
   // Timer logic
   useEffect(() => {
@@ -594,10 +600,12 @@ const VideoWatchPage = () => {
       setWatchedTime(prev => {
         const newTime = prev + 1;
         
+        // Check if qualified for reward (15 seconds)
         if (newTime >= 15 && !hasQualifiedRef.current) {
           setHasQualified(true);
         }
 
+        // Check if video ended
         if (newTime >= currentVideo.duration) {
           clearInterval(timerRef.current);
           setVideoEnded(true);
@@ -617,16 +625,20 @@ const VideoWatchPage = () => {
     
     if (!hasQualified || hasClaimed) return;
 
-    const success = await updateBalance(1.00);
-    
-    if (success) {
-      setRewardEarned(1.00);
-      setHasClaimed(true);
-      setShowConfetti(true);
+    try {
+      const result = await watchVideo(1.00);
       
-      confettiTimeoutRef.current = setTimeout(() => {
-        setShowConfetti(false);
-      }, 5000);
+      if (result?.success) {
+        setRewardEarned(1.00);
+        setHasClaimed(true);
+        setShowConfetti(true);
+        
+        confettiTimeoutRef.current = setTimeout(() => {
+          setShowConfetti(false);
+        }, 5000);
+      }
+    } catch (err) {
+      console.error('Error claiming reward:', err);
     }
   };
 
@@ -725,7 +737,7 @@ const VideoWatchPage = () => {
       <Content>
         <BalanceCard>
           <BalanceLabel>Video Earnings Balance</BalanceLabel>
-          <BalanceAmount>${(dollarBalance2 || 0).toFixed(2)}</BalanceAmount>
+          <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
           {rewardEarned > 0 && (
             <RewardNotification>
               <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
