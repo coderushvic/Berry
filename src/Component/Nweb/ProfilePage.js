@@ -205,8 +205,8 @@ const ProfilePage = () => {
     dollarBalance2 = 0,
     walletAddress = '',
     isPremium,
-    adsWatched,
-    dailyAdsWatched,
+    adHistory,
+    adsWatchedToday,
     adsConfig
   } = useUser();
 
@@ -223,7 +223,7 @@ const ProfilePage = () => {
   const referralCount = processedReferrals?.length || 0;
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2);
   const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-  const dailyProgress = Math.min(100, (dailyAdsWatched / dailyLimit) * 100);
+  const dailyProgress = Math.min(100, (adsWatchedToday / dailyLimit) * 100);
 
   const copyUserId = () => {
     if (id) {
@@ -349,13 +349,13 @@ const ProfilePage = () => {
         <StatCard $borderColor="#EA5455">
           <StatValue>
             <FaAd />
-            {adsWatched}
+            {adHistory}
           </StatValue>
           <StatLabel>
             <StatRow>
               <StatItem>
                 <FaCalendarDay />
-                <span>Today: {dailyAdsWatched}/{dailyLimit}</span>
+                <span>Today: {adHistory}/{adsWatchedToday}</span>
               </StatItem>
               <span>{Math.round(dailyProgress)}%</span>
             </StatRow>
@@ -367,7 +367,7 @@ const ProfilePage = () => {
                 <FaAd />
                 <span>Total Ads</span>
               </StatItem>
-              <span>{adsWatched}</span>
+              <span>{adHistory}</span>
             </StatRow>
           </StatLabel>
         </StatCard>
