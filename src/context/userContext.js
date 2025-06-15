@@ -1,20 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  arrayUnion, 
-  getDocs, 
-  collection, 
-  orderBy, 
-  where, 
-  query, 
-  limit, 
-  runTransaction, 
-  Timestamp,
-  increment,
-  serverTimestamp
+  doc, getDoc, setDoc, updateDoc, arrayUnion, 
+  getDocs, collection, orderBy, where, query, 
+  limit, runTransaction, Timestamp, increment, serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase/firestore';
 import YoutubeTasks from '../Component/Alltask/YoutubeTasks';
@@ -26,9 +14,9 @@ export const useUser = () => useContext(UserContext);
 
 export const UserProvider = ({ children }) => {
   // State declarations
-  const [balance, setBalance] = useState(0);
-  const [adsBalance, setAdsBalance] = useState(0);
-  const [dollarBalance2, setDollarBalance2] = useState(0);
+  const [balance, setBalance] = useState(0); // Points (internal)
+  const [adsBalance, setAdsBalance] = useState(0); // Dollars
+  const [dollarBalance2, setDollarBalance2] = useState(0); // Dollars
   const [id, setId] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingTwo, setLoadingTwo] = useState(true);
@@ -86,13 +74,13 @@ export const UserProvider = ({ children }) => {
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
   const [isPremium, setIsPremium] = useState(false);
   
-  // Ad tracking configuration
+  // Ad tracking configuration (updated for 1:1 ratio)
   const [adsConfig, setAdsConfig] = useState({
-    pointsBonus: 1000,
-    dollarBonus: 10.001,
+    pointsBonus: 1,       // 1 point
+    dollarBonus: 1,       // $1
     dailyLimit: 50,
     premiumDailyLimit: 100,
-    cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
+    cooldown: 20 * 60 * 1000,
     ads: [{
       id: "default_ad",
       scriptSrc: "//whephiwums.com/sdk.js",
@@ -103,12 +91,22 @@ export const UserProvider = ({ children }) => {
   });
 
   const CACHE_KEY = 'topUsers';
-  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+  const CACHE_DURATION = 10 * 60 * 1000;
 
-  // Combined balance calculation
-  const getTotalBalance = useCallback(() => {
-    return (balance || 0) + (adsBalance || 0) + (dollarBalance2 || 0);
+  // Get display balance (dollars only)
+  const getDisplayBalance = useCallback(() => {
+    return {
+      total: ((balance / 1000) + adsBalance + dollarBalance2).toFixed(2),
+      available: dollarBalance2.toFixed(2),
+      ads: adsBalance.toFixed(2),
+      points: balance // Internal points
+    };
   }, [balance, adsBalance, dollarBalance2]);
+
+  // Combined balance calculation (dollars only)
+  const getTotalBalance = useCallback(() => {
+    return parseFloat(getDisplayBalance().total);
+  }, [getDisplayBalance]);
 
   // Ad management functions
   const updateAdsConfig = useCallback(async (newConfig) => {
@@ -138,15 +136,13 @@ export const UserProvider = ({ children }) => {
     return false;
   }, [lastAdTimestamp]);
 
-  // Record an ad watch with timestamp tracking
+  // Record an ad watch - maintains both systems
   const recordAdWatch = useCallback(async (adData) => {
     if (!id) throw new Error('User not authenticated');
     
-    // Check if we need to reset daily count
     checkAndResetDailyAds();
     
     const now = new Date();
-    const todayKey = now.toISOString().split('T')[0]; // eslint-disable-line no-unused-vars
     const userRef = doc(db, 'telegramUsers', id);
     
     try {
@@ -163,39 +159,34 @@ export const UserProvider = ({ children }) => {
           throw new Error("Daily ad limit reached");
         }
         
-        // Prepare the new ad history entry
         const newAdEntry = {
           adId: adData.adId,
           timestamp: serverTimestamp(),
-          pointsEarned: adsConfig.pointsBonus,
           dollarsEarned: adsConfig.dollarBonus
         };
         
-        // Update user document
         transaction.update(userRef, {
           adsWatched: increment(1),
           dailyAdsWatched: increment(1),
           lastAdTimestamp: serverTimestamp(),
           adHistory: arrayUnion(newAdEntry),
           adsBalance: increment(adsConfig.dollarBonus),
-          balance: increment(adsConfig.pointsBonus),
-          taskPoints: increment(adsConfig.pointsBonus)
+          balance: increment(adsConfig.dollarBonus * 1000), // Convert $ to points
+          dollarBalance2: increment(adsConfig.dollarBonus)
         });
       });
       
-      // Update local state
       setAdsWatched(prev => prev + 1);
       setDailyAdsWatched(prev => prev + 1);
       setLastAdTimestamp(now);
       setAdHistory(prev => [...prev, {
         adId: adData.adId,
         timestamp: now,
-        pointsEarned: adsConfig.pointsBonus,
         dollarsEarned: adsConfig.dollarBonus
       }]);
       setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
-      setBalance(prev => prev + adsConfig.pointsBonus);
-      setTaskPoints(prev => prev + adsConfig.pointsBonus);
+      setBalance(prev => prev + (adsConfig.dollarBonus * 1000));
+      setDollarBalance2(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
       
       return true;
     } catch (error) {
@@ -204,26 +195,20 @@ export const UserProvider = ({ children }) => {
     }
   }, [id, adsConfig, checkAndResetDailyAds]);
 
-  // Watch video and earn rewards function
+  // Watch video - maintains both systems
   const watchVideo = useCallback(async (rewardAmount) => {
-    if (!id) {
-      throw new Error('User not authenticated');
-    }
+    if (!id) throw new Error('User not authenticated');
 
     try {
       const userRef = doc(db, 'telegramUsers', id);
       
-      // Use a transaction to ensure data consistency
       const result = await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User does not exist");
-        }
+        if (!userDoc.exists()) throw new Error("User does not exist");
 
         const now = new Date();
         const lastVideoTime = userDoc.data().lastVideoTime?.toDate();
         
-        // Check if user has watched a video recently
         if (lastVideoTime) {
           const hoursSinceLastWatch = (now - lastVideoTime) / (1000 * 60 * 60);
           if (hoursSinceLastWatch < 1) {
@@ -231,31 +216,23 @@ export const UserProvider = ({ children }) => {
           }
         }
 
-        // Calculate points equivalent (assuming 1 dollar = 1000 points)
-        const pointsEarned = rewardAmount * 1000;
-
-        // Update user document
         transaction.update(userRef, {
           dollarBalance2: increment(rewardAmount),
           videoWatched: increment(1),
           lastVideoTime: serverTimestamp(),
-          balance: increment(pointsEarned),
-          taskPoints: increment(pointsEarned)
+          balance: increment(rewardAmount * 1000) // Convert $ to points
         });
 
         return { 
           success: true, 
-          newBalance: (userDoc.data().dollarBalance2 || 0) + rewardAmount,
-          pointsEarned
+          newBalance: (userDoc.data().dollarBalance2 || 0) + rewardAmount
         };
       });
 
-      // Update local state
       setDollarBalance2(prev => +(prev + rewardAmount).toFixed(3));
       setVideoWatched(prev => prev + 1);
       setLastVideoTime(new Date());
       setBalance(prev => prev + (rewardAmount * 1000));
-      setTaskPoints(prev => prev + (rewardAmount * 1000));
 
       return result;
     } catch (error) {
@@ -264,7 +241,7 @@ export const UserProvider = ({ children }) => {
     }
   }, [id]);
 
-  // Get current ad watching statistics
+  // Get ad statistics
   const getAdStats = useCallback(() => {
     const now = new Date();
     const today = new Date(
@@ -273,7 +250,6 @@ export const UserProvider = ({ children }) => {
       now.getDate()
     );
     
-    // Filter today's ads from history
     const todaysAds = adHistory.filter(ad => 
       ad.timestamp?.toDate ? ad.timestamp.toDate() >= today : new Date(ad.timestamp) >= today
     );
@@ -290,7 +266,7 @@ export const UserProvider = ({ children }) => {
     };
   }, [adsWatched, dailyAdsWatched, lastAdTimestamp, adHistory, isPremium, adsConfig]);
 
-  // Unified reward adding function with default case
+  // Unified reward adding - maintains both systems
   const addRewards = async (amount, type = 'main') => {
     if (!id) throw new Error('User not authenticated');
     
@@ -302,8 +278,10 @@ export const UserProvider = ({ children }) => {
       
       switch (type) {
         case 'main':
-          updateData.balance = increment(amount);
-          stateUpdates.setBalance = amount;
+          updateData.balance = increment(amount * 1000); // Convert $ to points
+          updateData.dollarBalance2 = increment(amount);
+          stateUpdates.setBalance = amount * 1000;
+          stateUpdates.setDollarBalance2 = amount;
           break;
         case 'ads':
           updateData.adsBalance = increment(amount);
@@ -315,24 +293,25 @@ export const UserProvider = ({ children }) => {
           break;
         case 'video':
           updateData.dollarBalance2 = increment(amount);
+          updateData.balance = increment(amount * 1000); // Convert $ to points
           updateData.videoWatched = increment(1);
           updateData.lastVideoTime = Timestamp.now();
           stateUpdates.setDollarBalance2 = amount;
+          stateUpdates.setBalance = amount * 1000;
           stateUpdates.setVideoWatched = 1;
           stateUpdates.setLastVideoTime = Date.now();
           break;
         default:
-          throw new Error(`Invalid reward type: ${type}. Must be 'main', 'ads', or 'video'`);
+          throw new Error(`Invalid reward type: ${type}`);
       }
       
       await updateDoc(userRef, updateData);
       
-      // Update local state
       Object.entries(stateUpdates).forEach(([setter, value]) => {
         const setterFn = {
           setBalance,
-          setAdsBalance,
           setDollarBalance2,
+          setAdsBalance,
           setAdsWatched,
           setVideoWatched,
           setLastAdTimestamp,
@@ -393,7 +372,7 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
-  // Handle referral logic
+  // Handle referral - maintains both systems
   const handleReferral = useCallback(async (userId, referrerId, username) => {
     if (!referrerId) return;
 
@@ -431,13 +410,20 @@ export const UserProvider = ({ children }) => {
           refBonus: refBonus,
         }),
         refBonus: increment(refBonus),
-        balance: increment(refBonus),
+        balance: increment(refBonus * 1000), // Convert $ to points
+        dollarBalance2: increment(refBonus)
       });
+
+      if (referrerId === id) {
+        setBalance(prev => prev + (refBonus * 1000));
+        setDollarBalance2(prev => +(prev + refBonus).toFixed(6));
+        setRefBonus(prev => prev + refBonus);
+      }
     } catch (error) {
       console.error('Error handling referral:', error);
       setError(error);
     }
-  }, []);
+  }, [id]);
 
   // Fetch withdrawal history
   const fetchWithdrawals = useCallback(async () => {
@@ -536,7 +522,6 @@ export const UserProvider = ({ children }) => {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        const today = new Date().toISOString().split('T')[0]; // eslint-disable-line no-unused-vars
         
         // Set all balance-related states
         setBalance(userData.balance || 0);
@@ -621,7 +606,7 @@ export const UserProvider = ({ children }) => {
             getDocs(collection(db, 'youtubeTasks')),
             getDocs(collection(db, 'tasks')),
             getDocs(collection(db, 'dailyTasks')),
-            getDocs(collection(db, 'manualTasks')) // Assuming AdTask uses manualTasks collection
+            getDocs(collection(db, 'manualTasks'))
           ]);
 
           setManualTasks(manualTasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -805,17 +790,18 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       checkAndResetDailyAds();
-    }, 60000); // Check every minute
+    }, 60000);
     
     return () => clearInterval(interval);
   }, [checkAndResetDailyAds]);
 
   return (
     <UserContext.Provider value={{
-      // All state values
-      balance, 
+      // State values
+      balance: getTotalBalance(), // Primary balance in dollars
+      balanceDetails: getDisplayBalance(), // Detailed breakdown
+      rawBalance: balance, // Internal points (avoid in UI)
       adsBalance,
-      dollarBalance2,
       id, 
       loading, 
       loadingTwo, 
@@ -869,7 +855,7 @@ export const UserProvider = ({ children }) => {
       isPremium,
       adsConfig,
 
-      // All state setters
+      // State setters
       setBalance, 
       setAdsBalance,
       setDollarBalance2,
@@ -930,11 +916,12 @@ export const UserProvider = ({ children }) => {
       YoutubeTasks,
 
       // Functions
+      getDisplayBalance,
+      getTotalBalance,
       sendUserData, 
       handleReferral, 
       addRewards,
-      watchVideo, // Added the new function here
-      getTotalBalance,
+      watchVideo,
       fetchWithdrawals,
       updateWithdrawalStatus,
       exportApprovedWithdrawals,
