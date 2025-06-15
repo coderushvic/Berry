@@ -12,10 +12,7 @@ import {
 } from 'react-icons/fa';
 import NavBar from './NavBar';
 import { useUser } from '../../context/userContext';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firestore';
 
-// Styled Components
 const AppContainer = styled.div`
   font-family: ${berryTheme.fonts.main};
   background: ${berryTheme.colors.backgroundGradient};
@@ -196,8 +193,7 @@ const ProfilePage = () => {
   const [copied, setCopied] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [isTelegram, setIsTelegram] = useState(false);
-  const [adsWatchedToday, setAdsWatchedToday] = useState(0);
-  const [totalAdsWatched, setTotalAdsWatched] = useState(0);
+  
   const {
     id = '',
     fullName = '',
@@ -208,11 +204,13 @@ const ProfilePage = () => {
     adsBalance = 0,
     dollarBalance2 = 0,
     walletAddress = '',
-    isPremium
+    isPremium,
+    adsWatched,
+    dailyAdsWatched,
+    adsConfig
   } = useUser();
 
   useEffect(() => {
-    // Check if running in Telegram WebApp
     if (window.Telegram?.WebApp?.initDataUnsafe) {
       setIsTelegram(true);
       const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
@@ -220,34 +218,12 @@ const ProfilePage = () => {
         setProfileImage(`${telegramUser.photo_url}?size=large`);
       }
     }
+  }, []);
 
-    // Load ads watched data
-    const loadAdsData = async () => {
-      if (!id) return;
-      
-      try {
-        const userDoc = await getDoc(doc(db, "telegramUsers", id));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          // Get current ads watched counts
-          setAdsWatchedToday(data.adsWatchedToday || 0);
-          setTotalAdsWatched(data.totalAdsWatched || data.adsWatchedToday || 0);
-        }
-      } catch (error) {
-        console.error("Error loading ads data:", error);
-      }
-    };
-
-    loadAdsData();
-  }, [id]);
-
-  // Calculate stats
   const referralCount = processedReferrals?.length || 0;
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2);
-
-  // Calculate daily progress
-  const dailyLimit = isPremium ? 100 : 50;
-  const dailyProgress = Math.min(100, (adsWatchedToday / dailyLimit) * 100);
+  const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
+  const dailyProgress = Math.min(100, (dailyAdsWatched / dailyLimit) * 100);
 
   const copyUserId = () => {
     if (id) {
@@ -373,13 +349,13 @@ const ProfilePage = () => {
         <StatCard $borderColor="#EA5455">
           <StatValue>
             <FaAd />
-            {totalAdsWatched}
+            {adsWatched}
           </StatValue>
           <StatLabel>
             <StatRow>
               <StatItem>
                 <FaCalendarDay />
-                <span>Today: {adsWatchedToday}/{dailyLimit}</span>
+                <span>Today: {dailyAdsWatched}/{dailyLimit}</span>
               </StatItem>
               <span>{Math.round(dailyProgress)}%</span>
             </StatRow>
@@ -391,7 +367,7 @@ const ProfilePage = () => {
                 <FaAd />
                 <span>Total Ads</span>
               </StatItem>
-              <span>{totalAdsWatched}</span>
+              <span>{adsWatched}</span>
             </StatRow>
           </StatLabel>
         </StatCard>
