@@ -828,7 +828,7 @@ const VideoWatchPage = () => {
     watchVideo
   } = useUser();
   
-  // Local state for video management
+  // State management
   const [currentVideo, setCurrentVideo] = useState(null);
   const [availableVideos, setAvailableVideos] = useState([]);
   const [watchedTime, setWatchedTime] = useState(0);
@@ -837,7 +837,7 @@ const VideoWatchPage = () => {
   const [rewardEarned, setRewardEarned] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('16/9');
@@ -854,34 +854,35 @@ const VideoWatchPage = () => {
   const controlsTimeoutRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
 
-  const fetchVideos = useCallback(async () => {
-    // Define mockVideos inside the callback
-    const mockVideos = [
-      {
-        id: 'vid_1',
-        youtubeId: 'dQw4w9WgXcQ',
-        title: 'Premium Video Content',
-        minWatchTime: 15,
-        fullDuration: 30,
-        rewardAmount: 1.00,
-        thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-      },
-      {
-        id: 'vid_2',
-        youtubeId: 'JGwWNGJdvx8',
-        title: 'Special Bonus Content',
-        minWatchTime: 15,
-        fullDuration: 45,
-        rewardAmount: 1.50,
-        thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
-      }
-    ];
-
-    if (process.env.NODE_ENV === 'development') {
-      return mockVideos.filter(video => !watchedVideos.includes(video.id));
+  // Stable mock videos data
+  const mockVideos = React.useMemo(() => [
+    {
+      id: 'vid_1',
+      youtubeId: 'dQw4w9WgXcQ',
+      title: 'Premium Video Content',
+      minWatchTime: 15,
+      fullDuration: 30,
+      rewardAmount: 1.00,
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+    },
+    {
+      id: 'vid_2',
+      youtubeId: 'JGwWNGJdvx8',
+      title: 'Special Bonus Content',
+      minWatchTime: 15,
+      fullDuration: 45,
+      rewardAmount: 1.50,
+      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
     }
+  ], []);
 
+  // Fetch videos
+  const fetchVideos = useCallback(async () => {
     try {
+      if (process.env.NODE_ENV === 'development') {
+        return mockVideos.filter(video => !watchedVideos.includes(video.id));
+      }
+
       const response = await fetch('/api/videos');
       if (!response.ok) throw new Error('Failed to fetch videos');
       const videos = await response.json();
@@ -890,8 +891,9 @@ const VideoWatchPage = () => {
       console.error('Error fetching videos:', err);
       return mockVideos.filter(video => !watchedVideos.includes(video.id));
     }
-  }, [watchedVideos]); // Now only depends on watchedVideos
+  }, [watchedVideos, mockVideos]);
 
+  // Load initial videos
   useEffect(() => {
     const loadVideos = async () => {
       try {
@@ -903,17 +905,15 @@ const VideoWatchPage = () => {
           const firstVideo = videos[0];
           setCurrentVideo(firstVideo);
           
-          // Check if user has progress on this video
           if (videoProgress[firstVideo.id]) {
             setWatchedTime(videoProgress[firstVideo.id] * firstVideo.fullDuration);
           }
         } else {
           setError('No more videos available at this time');
         }
-        
-        setIsLoading(false);
       } catch (err) {
         setError(err.message || 'Failed to load videos');
+      } finally {
         setIsLoading(false);
       }
     };
@@ -921,6 +921,7 @@ const VideoWatchPage = () => {
     loadVideos();
   }, [fetchVideos, videoProgress]);
 
+  // Handle video end
   useEffect(() => {
     if (videoEnded && availableVideos.length > 0) {
       const timer = setTimeout(() => {
@@ -931,14 +932,18 @@ const VideoWatchPage = () => {
     }
   }, [videoEnded, availableVideos]);
 
-  const startTimer = () => {
+  // Video timer logic
+  const startTimer = useCallback(() => {
+    if (!currentVideo) return;
+
+    // Check if user can watch another video
     if (lastVideoTime) {
       const now = new Date();
       const lastWatchTime = new Date(lastVideoTime);
-      const hoursSinceLastWatch = (now - lastWatchTime) / (1000 * 60 * 60);
+      const minutesSinceLastWatch = (now - lastWatchTime) / (1000 * 60);
       
-      if (hoursSinceLastWatch < 1) {
-        setError(`Please wait ${Math.ceil(60 - (hoursSinceLastWatch * 60))} minutes before watching another video`);
+      if (minutesSinceLastWatch < 1) {
+        setError(`Please wait ${Math.ceil(60 - minutesSinceLastWatch)} minutes before watching another video`);
         setIsVideoPlaying(false);
         return;
       }
@@ -954,21 +959,23 @@ const VideoWatchPage = () => {
         const newTime = prev + 1;
         const minDuration = currentVideo.fullDuration || 20;
         
-        // Track progress in local state
         setVideoProgress(prev => ({
           ...prev,
           [currentVideo.id]: newTime / minDuration
         }));
 
-        if (newTime >= 10 && !showControls) {
+        // Show controls after 5 seconds
+        if (newTime >= 5 && !showControls) {
           setShowControls(true);
         }
 
+        // Check if user qualified for reward
         if (newTime >= currentVideo.minWatchTime && !hasQualified && !claimedReward) {
           setHasQualified(true);
-          showRewardNotification();
+          setShowRewardPopup(true);
         }
 
+        // Check if video ended
         if (newTime >= minDuration) {
           clearInterval(timerRef.current);
           setVideoEnded(true);
@@ -978,66 +985,53 @@ const VideoWatchPage = () => {
         return newTime;
       });
     }, 1000);
-  };
 
-  const showRewardNotification = () => {
-    setShowRewardPopup(true);
-  };
+    return () => clearInterval(timerRef.current);
+  }, [currentVideo, showControls, hasQualified, claimedReward, lastVideoTime]);
 
-  const claimReward = async () => {
+  // Claim reward handler
+  const claimReward = useCallback(async () => {
     if (!id || !currentVideo || claimedReward) return;
 
     try {
-      console.log('Attempting to claim reward...');
+      setShowRewardPopup(false);
       const result = await watchVideo(currentVideo.rewardAmount);
       
       if (result?.success) {
-        console.log('Reward claimed successfully:', result);
         setRewardEarned(currentVideo.rewardAmount);
         setClaimedReward(true);
-        setShowRewardPopup(false);
         setWatchedVideos(prev => [...prev, currentVideo.id]);
         
-        // Keep video playing after claiming
-        setIsVideoPlaying(true);
-        
+        // Show confetti celebration
         setShowConfetti(true);
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
       } else {
-        const errorMsg = result?.error || result?.message || 'Failed to claim reward';
-        console.error('Claim reward error:', errorMsg);
-        setError(errorMsg);
-        setShowRewardPopup(false);
+        throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (err) {
-      console.error('Error in claimReward:', err);
+      console.error('Claim reward error:', err);
       setError(err.message || 'Failed to claim reward');
-      setShowRewardPopup(false);
     }
-  };
+  }, [id, currentVideo, claimedReward, watchVideo]);
 
-  const handleConfettiClose = () => {
-    setShowConfetti(false);
-    clearTimeout(confettiTimeoutRef.current);
-  };
+  // Next video handler
+  const handleNextVideo = useCallback(() => {
+    if (availableVideos.length <= 1) {
+      setError('No more videos available at this time');
+      return;
+    }
 
-  const handleLike = () => setHasLiked(true);
-  const handleDislike = () => setHasLiked(false);
-
-  const handleNextVideo = () => {
     setShowNextVideoPrompt(false);
     setWatchedTime(0);
     setHasQualified(false);
     setHasLiked(null);
     setRewardEarned(0);
-    setShowControls(false);
-    setShowRewardPopup(false);
-    setVideoEnded(false);
     setClaimedReward(false);
+    setVideoEnded(false);
     setIsVideoPlaying(true);
-    
+
     const remainingVideos = availableVideos.filter(v => v.id !== currentVideo.id);
     setAvailableVideos(remainingVideos);
     
@@ -1045,41 +1039,29 @@ const VideoWatchPage = () => {
       const nextVideo = remainingVideos[0];
       setCurrentVideo(nextVideo);
       
-      // Check if user has progress on the next video
       if (videoProgress[nextVideo.id]) {
         setWatchedTime(videoProgress[nextVideo.id] * nextVideo.fullDuration);
       }
     }
-  };
+  }, [availableVideos, currentVideo, videoProgress]);
 
-  const handleDeclineNextVideo = () => {
-    setShowNextVideoPrompt(false);
-  };
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(timerRef.current);
+      clearTimeout(controlsTimeoutRef.current);
+      clearTimeout(confettiTimeoutRef.current);
+    };
+  }, []);
 
+  // UI event handlers
+  const togglePlayPause = () => setIsVideoPlaying(prev => !prev);
+  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+  const toggleAspectRatio = () => setAspectRatio(prev => prev === '16/9' ? '9/16' : '16/9');
   const handleMouseMove = () => {
     setShowControls(true);
     clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      videoRef.current?.requestFullscreen?.().catch(err => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const toggleAspectRatio = () => {
-    setAspectRatio(prev => prev === '16/9' ? '9/16' : '16/9');
-  };
-
-  const togglePlayPause = () => {
-    setIsVideoPlaying(prev => !prev);
   };
 
   if (isLoading) return <LoadingState />;
@@ -1091,16 +1073,18 @@ const VideoWatchPage = () => {
 
   return (
     <Container onMouseMove={handleMouseMove}>
+      {/* Confetti Celebration */}
       {showConfetti && (
         <ConfettiOverlay>
           <Confetti src="/celebrating.gif" alt="Confetti celebration" />
           <RewardMessage>
             <FaDollarSign /> +{currentVideo.rewardAmount.toFixed(2)} Added to Your Balance!
           </RewardMessage>
-          <OkButton onClick={handleConfettiClose}>OK</OkButton>
+          <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
       )}
 
+      {/* Reward Popup */}
       {showRewardPopup && canClaimReward && (
         <RewardPopup onClick={() => setShowRewardPopup(false)}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
@@ -1122,6 +1106,7 @@ const VideoWatchPage = () => {
         </RewardPopup>
       )}
 
+      {/* Next Video Prompt */}
       {showNextVideoPrompt && (
         <NextVideoPrompt>
           <PromptContent>
@@ -1133,7 +1118,7 @@ const VideoWatchPage = () => {
               <PromptButton $accept onClick={handleNextVideo}>
                 Yes, Continue Watching
               </PromptButton>
-              <PromptButton onClick={handleDeclineNextVideo}>
+              <PromptButton onClick={() => setShowNextVideoPrompt(false)}>
                 No Thanks
               </PromptButton>
             </PromptButtons>
@@ -1141,6 +1126,7 @@ const VideoWatchPage = () => {
         </NextVideoPrompt>
       )}
 
+      {/* No Videos Available */}
       {availableVideos.length === 0 && !isLoading && (
         <NoVideosOverlay>
           <NoVideosContent>
@@ -1156,6 +1142,7 @@ const VideoWatchPage = () => {
         </NoVideosOverlay>
       )}
 
+      {/* Main Content */}
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
         <LogoText>berry</LogoText>
@@ -1226,10 +1213,10 @@ const VideoWatchPage = () => {
                 
                 {watchedTime >= 10 && (
                   <FeedbackButtons>
-                    <LikeButton onClick={handleLike} $active={hasLiked === true}>
+                    <LikeButton onClick={() => setHasLiked(true)} $active={hasLiked === true}>
                       <FaThumbsUp />
                     </LikeButton>
-                    <DislikeButton onClick={handleDislike} $active={hasLiked === false}>
+                    <DislikeButton onClick={() => setHasLiked(false)} $active={hasLiked === false}>
                       <FaThumbsDown />
                     </DislikeButton>
                   </FeedbackButtons>
