@@ -523,6 +523,8 @@ const VideoWatchPage = () => {
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
+  const hasQualifiedRef = useRef();
+  hasQualifiedRef.current = hasQualified;
 
   // Memoized videos data
   const mockVideos = useMemo(() => [
@@ -541,10 +543,6 @@ const VideoWatchPage = () => {
       thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
     }
   ], []);
-
-  // Track hasQualified with ref to avoid stale closure
-  const hasQualifiedRef = useRef();
-  hasQualifiedRef.current = hasQualified;
 
   // Load initial video
   useEffect(() => {
@@ -587,19 +585,20 @@ const VideoWatchPage = () => {
     return () => clearInterval(timerRef.current);
   }, [currentVideo]);
 
-  // Claim reward function
-  const handleClaimReward = async () => {
+  // Claim reward function - fixed version
+  const handleClaimReward = async (e) => {
+    e.stopPropagation();
+    
     if (!hasQualified || hasClaimed) return;
 
     try {
-      const result = await watchVideo(1.00); // $1 reward
+      const result = await watchVideo(1.00);
       
       if (result?.success) {
         setRewardEarned(1.00);
         setHasClaimed(true);
         setShowConfetti(true);
         
-        // Hide confetti after 5 seconds
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
@@ -663,12 +662,15 @@ const VideoWatchPage = () => {
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Reward Available!</PopupTitle>
             <PopupText>
-              Congratulations! You've watched <strong>15 seconds</strong> and earned <strong>$1.00</strong>.
+              You've watched <strong>15 seconds</strong> and earned <strong>$1.00</strong>!
               <br /><br />
-              Click below to claim your reward and continue watching.
+              Click the button below to claim your reward.
             </PopupText>
-            <ClaimButton onClick={handleClaimReward}>
-              Claim Your $1.00 Reward
+            <ClaimButton 
+              onClick={handleClaimReward}
+              disabled={hasClaimed}
+            >
+              {hasClaimed ? 'Reward Claimed' : 'Claim $1.00 Reward'}
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
