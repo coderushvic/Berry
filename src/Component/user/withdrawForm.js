@@ -349,15 +349,16 @@ export default function WithdrawForm() {
   } = useUser();
 
   // Calculate total referral earnings
-const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-  const bonus = parseFloat(referral.refBonus) || 0;
-  return total + bonus;
-}, 0);
+  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+    const bonus = parseFloat(referral.refBonus) || 0;
+    return total + bonus;
+  }, 0);
+  
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
   // Calculate total revenue (sum of all balance types)
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
-                     parseFloat(checkinRewards) + totalReferralEarnings;
+                       parseFloat(checkinRewards) + totalReferralEarnings;
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -492,7 +493,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
           <BalanceCard>
             <div>
               <BalanceLabel>Available for Withdrawal</BalanceLabel>
-              <BalanceAmount>${totalRevenue.toFixed(3)}</BalanceAmount>
+              <BalanceAmount>${adsBalance.toFixed(3)}</BalanceAmount>
             </div>
             <FiInfo size={20} color={berryTheme.colors.primary} />
           </BalanceCard>
@@ -542,6 +543,10 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
               <FeeRow>
                 <span style={{ fontWeight: '600' }}>Total:</span>
                 <span style={{ fontWeight: '700' }}>${totalAmount.toFixed(3)}</span>
+              </FeeRow>
+              <FeeRow>
+                <span style={{ fontWeight: '600' }}>Remaining Balance:</span>
+                <span style={{ fontWeight: '700' }}>${(adsBalance - totalAmount).toFixed(3)}</span>
               </FeeRow>
             </FeeBreakdown>
 
