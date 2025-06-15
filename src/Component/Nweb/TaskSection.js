@@ -1,9 +1,16 @@
 import React, { useMemo } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaGem, FaGamepad, FaAd } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/userContext';
+
+// Blinking animation
+const blink = keyframes`
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+`;
 
 const Section = styled.section`
   margin-bottom: ${berryTheme.spacing.large};
@@ -93,18 +100,11 @@ const AdsBadge = styled.div`
   position: absolute;
   top: 8px;
   right: 8px;
-  background: ${berryTheme.colors.primary};
-  color: white;
-  font-size: 0.7rem;
-  font-weight: bold;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 4px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  background: #ff0000;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: ${blink} 1s infinite;
 `;
 
 const LoadingMessage = styled.div`
@@ -125,19 +125,12 @@ function TaskSection() {
     isPremium 
   } = useUser();
 
-  // Calculate remaining ads using userAdData.adsWatchedToday exactly like AdTask
-  const { remainingAds, dailyLimit } = useMemo(() => {
-    if (loading || !userData) return { remainingAds: null, dailyLimit: null };
-    
-    // Use adsWatchedToday directly from userData as in AdTask component
+  // Check if ads are available
+  const hasAds = useMemo(() => {
+    if (loading || !userData) return false;
     const adsWatchedToday = userData.adsWatchedToday || 0;
     const limit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-    const remaining = Math.max(0, limit - adsWatchedToday);
-    
-    return { 
-      remainingAds: remaining, 
-      dailyLimit: limit 
-    };
+    return adsWatchedToday < limit;
   }, [userData, loading, adsConfig, isPremium]);
 
   // Memoize tasks configuration
@@ -165,11 +158,9 @@ function TaskSection() {
       accentColor: '#28C76F',
       iconColor: '#28C76F',
       path: '/AdsPage',
-      showBadge: true,
-      badgeCount: remainingAds !== null ? remainingAds : 0,
-      dailyLimit: dailyLimit !== null ? dailyLimit : (isPremium ? 100 : 50)
-    },
-  ], [remainingAds, dailyLimit, isPremium]);
+      showBadge: hasAds // Only show badge if ads are available
+    }
+  ], [hasAds]);
 
   const handleTaskClick = (path) => {
     navigate(path);
@@ -201,11 +192,7 @@ function TaskSection() {
             onClick={() => handleTaskClick(task.path)}
             aria-label={`${task.name} task`}
           >
-            {task.showBadge && (
-              <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
-                {task.badgeCount} {/* Showing exact remaining count */}
-              </AdsBadge>
-            )}
+            {task.showBadge && <AdsBadge />}
             <TaskIconWrapper $iconColor={task.iconColor}>
               {task.icon}
             </TaskIconWrapper>
