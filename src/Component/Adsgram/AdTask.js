@@ -671,7 +671,7 @@ const AdTask = () => {
         </TaskHeader>
         
         <TaskDescription>
-          Watch short video ads and earn NEWCATS tokens and USD rewards. 
+          Watch short video ads and earn Berry tokens and USD rewards. 
           {isPremium ? " Enjoy unlimited ads with your Premium status!" : " Complete your daily limit for maximum earnings."}
         </TaskDescription>
         
@@ -682,7 +682,7 @@ const AdTask = () => {
             $shadowColor="rgba(227, 11, 92, 0.1)"
             whileHover={{ scale: 1.05 }}
           >
-            <FaCoins size={16} /> +{localAdsConfig.pointsBonus} NEWCATS
+            <FaCoins size={16} /> +{localAdsConfig.pointsBonus} Berry
           </RewardBadge>
           <RewardBadge
             $bgColor={berryTheme.colors.successLight}
