@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaThumbsUp, FaThumbsDown, FaArrowRight, FaExpand, FaCompress, FaCheckCircle, FaDollarSign, FaPlay, FaPause } from 'react-icons/fa';
+import { FaThumbsUp, FaThumbsDown, FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
 import NavBar from '../Nweb/NavBar';
 import { useUser } from '../../context/userContext';
 
@@ -145,8 +145,6 @@ const ClaimButton = styled.button`
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
   width: 100%;
-  position: relative;
-  z-index: 1;
 
   &:hover {
     transform: translateY(-2px);
@@ -260,33 +258,15 @@ const VideoContainer = styled.div`
   border: 1px solid rgba(255,255,255,0.2);
   backdrop-filter: blur(10px);
   background: rgba(255,255,255,0.9);
-  transition: all 0.3s ease;
-  
-  ${props => props.$isFullscreen && `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    border-radius: 0;
-    padding: 20px;
-  `}
 `;
 
 const VideoWrapper = styled.div`
   position: relative;
   width: 100%;
-  aspect-ratio: ${props => props.$aspectRatio};
+  aspect-ratio: 16/9;
   overflow: hidden;
   border-radius: 15px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-`;
-
-const VideoThumbnail = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 `;
 
 const YouTubeIframe = styled.iframe`
@@ -413,63 +393,6 @@ const ActionButtons = styled.div`
   justify-content: space-between;
   align-items: center;
   gap: 15px;
-`;
-
-const ViewOptions = styled.div`
-  display: flex;
-  gap: 10px;
-`;
-
-const AspectButton = styled.button`
-  background: rgba(0,0,0,0.1);
-  color: ${berryTheme.colors.textDark};
-  border: none;
-  border-radius: 20px;
-  padding: 8px 15px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: rgba(0,0,0,0.2);
-  }
-`;
-
-const FullscreenButton = styled.button`
-  background: rgba(0,0,0,0.1);
-  color: ${berryTheme.colors.textDark};
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: rgba(0,0,0,0.2);
-  }
-`;
-
-const PlayPauseButton = styled.button`
-  background: rgba(0,0,0,0.1);
-  color: ${berryTheme.colors.textDark};
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: rgba(0,0,0,0.2);
-  }
 `;
 
 const FeedbackButtons = styled.div`
@@ -628,462 +551,183 @@ const PromptButton = styled.button`
       : '0 4px 15px rgba(0,0,0,0.1)'};
   }
 `;
-;
-
-const LoadingState = () => (
-  <Container>
-    <Header>
-      <LogoImage src='/Berry.png' alt="Berry Logo" />
-      <LogoText>berry</LogoText>
-    </Header>
-    <LoadingMessage>
-      <Spinner />
-      <p>Loading video content...</p>
-    </LoadingMessage>
-    <NavBar />
-  </Container>
-);
-
-const Spinner = styled.div`
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border-top: 4px solid ${berryTheme.colors.primary};
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px;
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-const LoadingMessage = styled.div`
-  text-align: center;
-  padding: 60px 40px;
-  color: ${berryTheme.colors.textSecondary};
-  
-  p {
-    margin-top: 20px;
-    font-size: 1.1rem;
-  }
-`;
-
-const ErrorState = ({ error }) => (
-  <Container>
-    <Header>
-      <LogoImage src='/Berry.png' alt="Berry Logo" />
-      <LogoText>berry</LogoText>
-    </Header>
-    <ErrorMessage>
-      <ErrorIcon>⚠️</ErrorIcon>
-      <h3>Oops! Something went wrong</h3>
-      <p>{error}</p>
-      <RetryButton onClick={() => window.location.reload()}>
-        Try Again
-      </RetryButton>
-    </ErrorMessage>
-    <NavBar />
-  </Container>
-);
-
-const ErrorIcon = styled.div`
-  font-size: 3rem;
-  margin-bottom: 20px;
-`;
-
-const ErrorMessage = styled.div`
-  text-align: center;
-  padding: 40px;
-  color: ${berryTheme.colors.error};
-  
-  h3 {
-    color: ${berryTheme.colors.error};
-    margin-bottom: 15px;
-    font-size: 1.5rem;
-  }
-  
-  p {
-    margin-bottom: 25px;
-    font-size: 1.1rem;
-    color: ${berryTheme.colors.textSecondary};
-  }
-`;
-
-const RetryButton = styled.button`
-  background: linear-gradient(45deg, #FF8A00, #E52E71);
-  color: white;
-  border: none;
-  border-radius: 25px;
-  padding: 12px 30px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(229, 46, 113, 0.3);
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(229, 46, 113, 0.4);
-  }
-`;
-
-const NoVideosState = () => (
-  <Container>
-    <Header>
-      <LogoImage src='/Berry.png' alt="Berry Logo" />
-      <LogoText>berry</LogoText>
-    </Header>
-    <NoVideosMessage>
-      <h3>No videos available</h3>
-      <p>There are currently no videos to watch. Please check back later.</p>
-    </NoVideosMessage>
-    <NavBar />
-  </Container>
-);
-
-const NoVideosMessage = styled.div`
-  text-align: center;
-  padding: 60px 40px;
-  color: ${berryTheme.colors.textSecondary};
-  
-  h3 {
-    color: ${berryTheme.colors.primary};
-    margin-bottom: 15px;
-    font-size: 1.5rem;
-  }
-  
-  p {
-    font-size: 1.1rem;
-  }
-`;
 
 // Main Component
 const VideoWatchPage = () => {
-  const { 
-    dollarBalance2,
-    lastVideoTime,
-    id,
-    watchVideo
-  } = useUser();
+  const { dollarBalance2, watchVideo } = useUser();
   
   // State management
   const [currentVideo, setCurrentVideo] = useState(null);
-  const [availableVideos, setAvailableVideos] = useState([]);
   const [watchedTime, setWatchedTime] = useState(0);
   const [hasQualified, setHasQualified] = useState(false);
-  const [hasLiked, setHasLiked] = useState(null);
+  const [hasClaimed, setHasClaimed] = useState(false);
   const [rewardEarned, setRewardEarned] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showControls, setShowControls] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState('16/9');
-  const [showRewardPopup, setShowRewardPopup] = useState(false);
-  const [claimedReward, setClaimedReward] = useState(false);
-  const [watchedVideos, setWatchedVideos] = useState([]);
+  const [hasLiked, setHasLiked] = useState(null);
   const [videoEnded, setVideoEnded] = useState(false);
-  const [showNextVideoPrompt, setShowNextVideoPrompt] = useState(false);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
-  const [videoProgress, setVideoProgress] = useState({});
+  const [showNextPrompt, setShowNextPrompt] = useState(false);
 
-  const videoRef = useRef(null);
   const timerRef = useRef(null);
-  const controlsTimeoutRef = useRef(null);
-  const confettiTimeoutRef = useRef(null);
+const confettiTimeoutRef = useRef(null);
 
-  // Stable mock videos data
-  const mockVideos = React.useMemo(() => [
-    {
-      id: 'vid_1',
-      youtubeId: 'dQw4w9WgXcQ',
-      title: 'Premium Video Content',
-      minWatchTime: 15,
-      fullDuration: 30,
-      rewardAmount: 1.00,
-      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-    },
-    {
-      id: 'vid_2',
-      youtubeId: 'JGwWNGJdvx8',
-      title: 'Special Bonus Content',
-      minWatchTime: 15,
-      fullDuration: 45,
-      rewardAmount: 1.50,
-      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
-    }
-  ], []);
+// Mock videos data - moved outside component or memoized to prevent recreation
+const mockVideos = React.useMemo(() => [
+  {
+    id: 'vid1',
+    youtubeId: 'dQw4w9WgXcQ',
+    title: 'Premium Content',
+    duration: 30, // seconds
+    thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+  },
+  {
+    id: 'vid2',
+    youtubeId: 'JGwWNGJdvx8',
+    title: 'Special Bonus',
+    duration: 45,
+    thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
+  }
+], []);
 
-  // Enhanced fetch videos with better error handling
-  const fetchVideos = useCallback(async () => {
-    try {
-      // Always use mock videos in development or if API fails
-      if (process.env.NODE_ENV === 'development') {
-        return mockVideos.filter(video => !watchedVideos.includes(video.id));
-      }
+// Track hasQualified with ref to avoid dependency
+const hasQualifiedRef = useRef();
+hasQualifiedRef.current = hasQualified;
 
-      const response = await fetch('/api/videos');
+// Load initial video
+useEffect(() => {
+  if (mockVideos.length > 0) {
+    setCurrentVideo(mockVideos[0]);
+  }
+}, [mockVideos]); // Added mockVideos to dependencies
+
+// Timer logic
+useEffect(() => {
+  if (!currentVideo) return;
+
+  // Reset state for new video
+  setWatchedTime(0);
+  setHasQualified(false);
+  setHasClaimed(false);
+  setVideoEnded(false);
+  setShowNextPrompt(false);
+
+  timerRef.current = setInterval(() => {
+    setWatchedTime(prev => {
+      const newTime = prev + 1;
       
-      // Check if response is HTML (error page) instead of JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Received non-JSON response');
+      // Check if qualified for reward (15 seconds)
+      if (newTime >= 15 && !hasQualifiedRef.current) {
+        setHasQualified(true);
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Check if video ended
+      if (newTime >= currentVideo.duration) {
+        clearInterval(timerRef.current);
+        setVideoEnded(true);
+        setShowNextPrompt(true);
       }
 
-      const videos = await response.json();
-      return videos.filter(video => !watchedVideos.includes(video.id));
-    } catch (err) {
-      console.error('Error fetching videos, using mock data:', err);
-      return mockVideos.filter(video => !watchedVideos.includes(video.id));
-    }
-  }, [watchedVideos, mockVideos]);
+      return newTime;
+    });
+  }, 1000);
 
-  // Load initial videos with better error handling
-  useEffect(() => {
-    const loadVideos = async () => {
-      try {
-        setIsLoading(true);
-        const videos = await fetchVideos();
-        
-        if (!videos || videos.length === 0) {
-          throw new Error('No videos available');
-        }
-
-        setAvailableVideos(videos);
-        const firstVideo = videos[0];
-        setCurrentVideo(firstVideo);
-        
-        if (videoProgress[firstVideo.id]) {
-          setWatchedTime(videoProgress[firstVideo.id] * firstVideo.fullDuration);
-        }
-      } catch (err) {
-        console.error('Error loading videos:', err);
-        setError(err.message || 'Failed to load videos');
-        setAvailableVideos([]);
-        setCurrentVideo(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadVideos();
-  }, [fetchVideos, videoProgress]);
-
-  // Handle video end
-  useEffect(() => {
-    if (videoEnded && availableVideos.length > 0) {
-      const timer = setTimeout(() => {
-        setShowNextVideoPrompt(true);
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [videoEnded, availableVideos]);
-
-  // Video timer logic
-  const startTimer = useCallback(() => {
-    if (!currentVideo) return;
-
-    // Check if user can watch another video
-    if (lastVideoTime) {
-      const now = new Date();
-      const lastWatchTime = new Date(lastVideoTime);
-      const minutesSinceLastWatch = (now - lastWatchTime) / (1000 * 60);
-      
-      if (minutesSinceLastWatch < 1) {
-        setError(`Please wait ${Math.ceil(60 - minutesSinceLastWatch)} minutes before watching another video`);
-        setIsVideoPlaying(false);
-        return;
-      }
-    }
-
-    clearInterval(timerRef.current);
-    setHasQualified(false);
-    setVideoEnded(false);
-    setIsVideoPlaying(true);
-
-    timerRef.current = setInterval(() => {
-      setWatchedTime(prev => {
-        const newTime = prev + 1;
-        const minDuration = currentVideo.fullDuration || 20;
-        
-        setVideoProgress(prev => ({
-          ...prev,
-          [currentVideo.id]: newTime / minDuration
-        }));
-
-        // Show controls after 5 seconds
-        if (newTime >= 5 && !showControls) {
-          setShowControls(true);
-        }
-
-        // Check if user qualified for reward
-        if (newTime >= currentVideo.minWatchTime && !hasQualified && !claimedReward) {
-          setHasQualified(true);
-          setShowRewardPopup(true);
-        }
-
-        // Check if video ended
-        if (newTime >= minDuration) {
-          clearInterval(timerRef.current);
-          setVideoEnded(true);
-          setIsVideoPlaying(false);
-        }
-
-        return newTime;
-      });
-    }, 1000);
-
-    return () => clearInterval(timerRef.current);
-  }, [currentVideo, showControls, hasQualified, claimedReward, lastVideoTime]);
-
-  // Claim reward handler
-  const claimReward = useCallback(async () => {
-    if (!id || !currentVideo || claimedReward) return;
+  return () => clearInterval(timerRef.current);
+}, [currentVideo]); // No need for hasQualified in dependencies now
+  // Claim reward
+  const handleClaimReward = async () => {
+    if (!hasQualified || hasClaimed) return;
 
     try {
-      setShowRewardPopup(false);
-      const result = await watchVideo(currentVideo.rewardAmount);
-      
+      const result = await watchVideo(1.00); // $1 reward
       if (result?.success) {
-        setRewardEarned(currentVideo.rewardAmount);
-        setClaimedReward(true);
-        setWatchedVideos(prev => [...prev, currentVideo.id]);
-        
-        // Show confetti celebration
+        setRewardEarned(1.00);
+        setHasClaimed(true);
         setShowConfetti(true);
+        
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
-      } else {
-        throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (err) {
-      console.error('Claim reward error:', err);
-      setError(err.message || 'Failed to claim reward');
+      console.error('Claim error:', err);
     }
-  }, [id, currentVideo, claimedReward, watchVideo]);
+  };
 
-  // Next video handler
-  const handleNextVideo = useCallback(() => {
-    if (availableVideos.length <= 1) {
-      setError('No more videos available at this time');
-      return;
-    }
-
-    setShowNextVideoPrompt(false);
-    setWatchedTime(0);
-    setHasQualified(false);
-    setHasLiked(null);
-    setRewardEarned(0);
-    setClaimedReward(false);
-    setVideoEnded(false);
-    setIsVideoPlaying(true);
-
-    const remainingVideos = availableVideos.filter(v => v.id !== currentVideo.id);
-    setAvailableVideos(remainingVideos);
+  // Next video
+  const handleNextVideo = () => {
+    if (!currentVideo) return;
     
-    if (remainingVideos.length > 0) {
-      const nextVideo = remainingVideos[0];
-      setCurrentVideo(nextVideo);
-      
-      if (videoProgress[nextVideo.id]) {
-        setWatchedTime(videoProgress[nextVideo.id] * nextVideo.fullDuration);
-      }
-    }
-  }, [availableVideos, currentVideo, videoProgress]);
+    // Find current video index
+    const currentIndex = mockVideos.findIndex(v => v.id === currentVideo.id);
+    const nextIndex = (currentIndex + 1) % mockVideos.length;
+    
+    setCurrentVideo(mockVideos[nextIndex]);
+    setShowNextPrompt(false);
+  };
 
-  // Clean up on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
-      clearTimeout(controlsTimeoutRef.current);
       clearTimeout(confettiTimeoutRef.current);
     };
   }, []);
 
-  // UI event handlers
-  const togglePlayPause = () => setIsVideoPlaying(prev => !prev);
-  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
-  const toggleAspectRatio = () => setAspectRatio(prev => prev === '16/9' ? '9/16' : '16/9');
-  const handleMouseMove = () => {
-    setShowControls(true);
-    clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
-  };
-
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState error={error} />;
-  if (!currentVideo || availableVideos.length === 0) {
-    return <NoVideosState />;
-  }
-
-  // Safely handle potential undefined values
-  const progressPercentage = currentVideo?.fullDuration 
-    ? (watchedTime / currentVideo.fullDuration) * 100 
-    : 0;
-  
-  const canClaimReward = hasQualified && !claimedReward;
-  const rewardAmount = currentVideo?.rewardAmount?.toFixed(2) || '0.00';
-  const minWatchTime = currentVideo?.minWatchTime || 0;
-  const fullDuration = currentVideo?.fullDuration || 0;
-  const nextVideoReward = availableVideos[0]?.rewardAmount?.toFixed(2) || '0.00';
+  if (!currentVideo) return (
+    <Container>
+      <Header>
+        <LogoImage src='/Berry.png' alt="Berry Logo" />
+        <LogoText>berry</LogoText>
+      </Header>
+      <Content>
+        <p>Loading videos...</p>
+      </Content>
+      <NavBar />
+    </Container>
+  );
 
   return (
-    <Container onMouseMove={handleMouseMove}>
+    <Container>
       {/* Confetti Celebration */}
       {showConfetti && (
         <ConfettiOverlay>
           <Confetti src="/celebrating.gif" alt="Confetti celebration" />
           <RewardMessage>
-            <FaDollarSign /> +{rewardAmount} Added to Your Balance!
+            <FaDollarSign /> +1.00 Added to Your Balance!
           </RewardMessage>
           <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
       )}
 
       {/* Reward Popup */}
-      {showRewardPopup && canClaimReward && (
-        <RewardPopup onClick={() => setShowRewardPopup(false)}>
+      {hasQualified && !hasClaimed && (
+        <RewardPopup onClick={() => setShowNextPrompt(false)}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
             <FaCheckCircle size={60} color="#4CAF50" />
-            <PopupTitle>Congratulations!</PopupTitle>
+            <PopupTitle>Reward Available!</PopupTitle>
             <PopupText>
-              You've earned <strong>${rewardAmount}</strong> for watching this video!
+              You've earned <strong>$1.00</strong> for watching 15 seconds!
             </PopupText>
-            <ClaimButton 
-              onClick={(e) => {
-                e.stopPropagation();
-                claimReward();
-              }}
-              disabled={claimedReward}
-            >
-              {claimedReward ? 'Reward Claimed' : 'Claim Your Reward'}
+            <ClaimButton onClick={handleClaimReward}>
+              Claim Your Reward
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
       )}
 
       {/* Next Video Prompt */}
-      {showNextVideoPrompt && (
+      {showNextPrompt && (
         <NextVideoPrompt>
           <PromptContent>
-            <PromptTitle>Watch Another Video?</PromptTitle>
+            <PromptTitle>Continue Watching?</PromptTitle>
             <PromptText>
-              You can earn ${nextVideoReward} for watching the next video!
+              You can earn another $1.00 for watching the next video!
             </PromptText>
             <PromptButtons>
               <PromptButton $accept onClick={handleNextVideo}>
-                Yes, Continue Watching
+                Watch Next Video
               </PromptButton>
-              <PromptButton onClick={() => setShowNextVideoPrompt(false)}>
-                No Thanks
+              <PromptButton onClick={() => setShowNextPrompt(false)}>
+                Not Now
               </PromptButton>
             </PromptButtons>
           </PromptContent>
@@ -1107,87 +751,71 @@ const VideoWatchPage = () => {
           )}
         </BalanceCard>
         
-        <VideoContainer $isFullscreen={isFullscreen}>
-          <VideoTitle>{currentVideo?.title || 'Video'}</VideoTitle>
+        <VideoContainer>
+          <VideoTitle>{currentVideo.title}</VideoTitle>
           
-          <VideoWrapper $aspectRatio={aspectRatio}>
-            {isLoading ? (
-              <VideoThumbnail src={currentVideo?.thumbnail} alt="Video thumbnail" />
-            ) : (
-              <YouTubeIframe
-                src={`https://www.youtube.com/embed/${currentVideo?.youtubeId}?autoplay=${isVideoPlaying ? 1 : 0}&controls=0&modestbranding=1&rel=0&start=${Math.floor(watchedTime)}`}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                onLoad={startTimer}
-                ref={videoRef}
-              />
-            )}
+          <VideoWrapper>
+            <YouTubeIframe
+              src={`https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=1&controls=0`}
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+              allowFullScreen
+            />
           </VideoWrapper>
           
           <ProgressBar>
-            <ProgressFill $progress={progressPercentage} />
-            {hasQualified && !claimedReward && (
-              <QualifiedMarker $position={(minWatchTime / fullDuration) * 100}>
-                <QualifiedTooltip>Earn ${rewardAmount} here!</QualifiedTooltip>
+            <ProgressFill $progress={(watchedTime / currentVideo.duration) * 100} />
+            {hasQualified && (
+              <QualifiedMarker $position={(15 / currentVideo.duration) * 100}>
+                <QualifiedTooltip>Earn $1.00 here!</QualifiedTooltip>
               </QualifiedMarker>
             )}
           </ProgressBar>
           
-          {(showControls || videoEnded) && (
-            <VideoControls>
-              <TimeDisplay>
-                {watchedTime}s / {fullDuration}s
-                {hasQualified && !claimedReward && (
-                  <QualifyText>Reward available to claim!</QualifyText>
-                )}
-                {claimedReward && (
-                  <QualifyText>Reward claimed!</QualifyText>
-                )}
-              </TimeDisplay>
+          <VideoControls>
+            <TimeDisplay>
+              {watchedTime}s / {currentVideo.duration}s
+              {hasQualified && !hasClaimed && (
+                <QualifyText>Reward available to claim!</QualifyText>
+              )}
+              {hasClaimed && (
+                <QualifyText>Reward claimed!</QualifyText>
+              )}
+            </TimeDisplay>
+            
+            <ActionButtons>
+              {watchedTime >= 10 && (
+                <FeedbackButtons>
+                  <LikeButton 
+                    onClick={() => setHasLiked(true)} 
+                    $active={hasLiked === true}
+                  >
+                    <FaThumbsUp />
+                  </LikeButton>
+                  <DislikeButton 
+                    onClick={() => setHasLiked(false)} 
+                    $active={hasLiked === false}
+                  >
+                    <FaThumbsDown />
+                  </DislikeButton>
+                </FeedbackButtons>
+              )}
               
-              <ActionButtons>
-                <ViewOptions>
-                  <AspectButton onClick={toggleAspectRatio}>
-                    {aspectRatio === '16/9' ? 'Portrait' : 'Landscape'}
-                  </AspectButton>
-                  <PlayPauseButton onClick={togglePlayPause}>
-                    {isVideoPlaying ? <FaPause /> : <FaPlay />}
-                  </PlayPauseButton>
-                  <FullscreenButton onClick={toggleFullscreen}>
-                    {isFullscreen ? <FaCompress /> : <FaExpand />}
-                  </FullscreenButton>
-                </ViewOptions>
-                
-                {watchedTime >= 10 && (
-                  <FeedbackButtons>
-                    <LikeButton onClick={() => setHasLiked(true)} $active={hasLiked === true}>
-                      <FaThumbsUp />
-                    </LikeButton>
-                    <DislikeButton onClick={() => setHasLiked(false)} $active={hasLiked === false}>
-                      <FaThumbsDown />
-                    </DislikeButton>
-                  </FeedbackButtons>
-                )}
-                
-                {videoEnded && (
-                  <NextButton onClick={handleNextVideo}>
-                    Next Video <FaArrowRight />
-                  </NextButton>
-                )}
-              </ActionButtons>
-            </VideoControls>
-          )}
+              {(videoEnded || hasClaimed) && (
+                <NextButton onClick={handleNextVideo}>
+                  Next Video <FaArrowRight />
+                </NextButton>
+              )}
+            </ActionButtons>
+          </VideoControls>
         </VideoContainer>
         
         <Instructions>
           <h3>How it works:</h3>
           <ul>
             <li>Watch videos to earn money</li>
-            <li>Must watch at least {minWatchTime} seconds to earn ${rewardAmount}</li>
-            <li>Reward must be claimed before moving to next video</li>
-            <li>Each video can only be rewarded once</li>
-            <li>Video will continue playing after claiming reward</li>
+            <li>Earn $1.00 after 15 seconds of watching</li>
+            <li>Each video reward can only be claimed once</li>
+            <li>Video continues playing after claiming</li>
           </ul>
         </Instructions>
       </Content>
