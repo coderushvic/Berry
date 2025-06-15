@@ -347,6 +347,7 @@ export default function WithdrawForm() {
     setCheckinRewards
   } = useUser();
 
+  // Total available balance including ad earnings
   const totalAvailableBalance = getTotalBalance();
 
   const navigate = useNavigate();
@@ -409,7 +410,7 @@ export default function WithdrawForm() {
       // Calculate withdrawal distribution across balance types
       const userRef = doc(db, 'telegramUsers', id);
       
-      // First try to deduct from adsBalance
+      // First try to deduct from adsBalance (earnings from AdTask)
       let remainingAmount = totalAmount;
       let updates = {};
       
@@ -462,12 +463,12 @@ export default function WithdrawForm() {
 
       // Update UI state
       setAdsBalance(prev => Math.max(0, prev - (totalAmount > prev ? prev : totalAmount)));
-setDollarBalance2(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads ? (totalAmount - balanceDetails.ads > prev ? prev : totalAmount - balanceDetails.ads) : 0)));
-setCheckinRewards(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available ? (totalAmount - balanceDetails.ads - balanceDetails.available > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available) : 0)));
-setBalance(prev => {
-  const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards;
-  return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
-});
+      setDollarBalance2(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads ? (totalAmount - balanceDetails.ads > prev ? prev : totalAmount - balanceDetails.ads) : 0)));
+      setCheckinRewards(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available ? (totalAmount - balanceDetails.ads - balanceDetails.available > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available) : 0)));
+      setBalance(prev => {
+        const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards;
+        return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
+      });
 
       setSuccess('Withdrawal request submitted!');
       
