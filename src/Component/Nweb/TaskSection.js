@@ -116,7 +116,6 @@ const LoadingMessage = styled.div`
 function TaskSection() {
   const navigate = useNavigate();
   const { 
-    adsWatched, 
     userData, 
     loading, 
     adsConfig = {
@@ -139,7 +138,7 @@ function TaskSection() {
       remainingAds: remaining, 
       dailyLimit: limit 
     };
-  }, [adsWatched, userData, loading, adsConfig, isPremium]);
+  }, [userData, loading, adsConfig, isPremium]);
 
   // Memoize tasks configuration
   const tasks = useMemo(() => [
@@ -168,7 +167,7 @@ function TaskSection() {
       path: '/AdsPage',
       showBadge: true,
       badgeCount: remainingAds !== null ? remainingAds : 0,
-      dailyLimit: dailyLimit !== null ? dailyLimit : (isPremium ? 100 : 50) // Fallback to default values
+      dailyLimit: dailyLimit !== null ? dailyLimit : (isPremium ? 100 : 50)
     },
   ], [remainingAds, dailyLimit, isPremium]);
 
