@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaThumbsUp, FaThumbsDown, FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
+import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
 import NavBar from '../Nweb/NavBar';
 import { useUser } from '../../context/userContext';
 
@@ -120,11 +120,13 @@ const PopupText = styled.p`
   color: ${berryTheme.colors.textSecondary};
   font-size: 1.1rem;
   margin-bottom: 25px;
-  line-height: 1.5;
+  line-height: 1.6;
+  padding: 0 15px;
   
   strong {
     color: ${berryTheme.colors.primary};
     font-weight: 700;
+    font-size: 1.2rem;
   }
 `;
 
@@ -383,56 +385,9 @@ const TimeDisplay = styled.div`
 `;
 
 const QualifyText = styled.span`
-  font-size: 0.8rem;
-  color: #FF8A00;
+  font-size: 0.9rem;
+  color: ${props => props.$claimed ? '#4CAF50' : '#FF8A00'};
   font-weight: 600;
-`;
-
-const ActionButtons = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-`;
-
-const FeedbackButtons = styled.div`
-  display: flex;
-  gap: 15px;
-`;
-
-const ButtonBase = styled.button`
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 10px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem;
-  transition: all 0.2s ease;
-  width: 44px;
-  height: 44px;
-`;
-
-const LikeButton = styled(ButtonBase)`
-  color: ${props => props.$active ? '#4CAF50' : berryTheme.colors.textSecondary};
-  background: ${props => props.$active ? 'rgba(76, 175, 80, 0.1)' : 'rgba(0,0,0,0.05)'};
-  
-  &:hover {
-    color: #4CAF50;
-    background: rgba(76, 175, 80, 0.1);
-  }
-`;
-
-const DislikeButton = styled(ButtonBase)`
-  color: ${props => props.$active ? '#F44336' : berryTheme.colors.textSecondary};
-  background: ${props => props.$active ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.05)'};
-  
-  &:hover {
-    color: #F44336;
-    background: rgba(244, 67, 54, 0.1);
-  }
 `;
 
 const NextButton = styled.button`
@@ -449,6 +404,7 @@ const NextButton = styled.button`
   gap: 8px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(229, 46, 113, 0.3);
+  margin: 0 auto;
   
   &:hover {
     transform: translateY(-2px);
@@ -552,7 +508,6 @@ const PromptButton = styled.button`
   }
 `;
 
-// Main Component
 const VideoWatchPage = () => {
   const { dollarBalance2, watchVideo } = useUser();
   
@@ -563,100 +518,103 @@ const VideoWatchPage = () => {
   const [hasClaimed, setHasClaimed] = useState(false);
   const [rewardEarned, setRewardEarned] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [hasLiked, setHasLiked] = useState(null);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
 
   const timerRef = useRef(null);
-const confettiTimeoutRef = useRef(null);
+  const confettiTimeoutRef = useRef(null);
 
-// Mock videos data - moved outside component or memoized to prevent recreation
-const mockVideos = React.useMemo(() => [
-  {
-    id: 'vid1',
-    youtubeId: 'dQw4w9WgXcQ',
-    title: 'Premium Content',
-    duration: 30, // seconds
-    thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-  },
-  {
-    id: 'vid2',
-    youtubeId: 'JGwWNGJdvx8',
-    title: 'Special Bonus',
-    duration: 45,
-    thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
-  }
-], []);
+  // Memoized videos data
+  const mockVideos = useMemo(() => [
+    {
+      id: 'vid1',
+      youtubeId: 'dQw4w9WgXcQ',
+      title: 'Premium Content',
+      duration: 30,
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+    },
+    {
+      id: 'vid2',
+      youtubeId: 'JGwWNGJdvx8',
+      title: 'Special Bonus',
+      duration: 45,
+      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
+    }
+  ], []);
 
-// Track hasQualified with ref to avoid dependency
-const hasQualifiedRef = useRef();
-hasQualifiedRef.current = hasQualified;
+  // Track hasQualified with ref to avoid stale closure
+  const hasQualifiedRef = useRef();
+  hasQualifiedRef.current = hasQualified;
 
-// Load initial video
-useEffect(() => {
-  if (mockVideos.length > 0) {
-    setCurrentVideo(mockVideos[0]);
-  }
-}, [mockVideos]); // Added mockVideos to dependencies
+  // Load initial video
+  useEffect(() => {
+    if (mockVideos.length > 0) {
+      setCurrentVideo(mockVideos[0]);
+    }
+  }, [mockVideos]);
 
-// Timer logic
-useEffect(() => {
-  if (!currentVideo) return;
+  // Timer logic
+  useEffect(() => {
+    if (!currentVideo) return;
 
-  // Reset state for new video
-  setWatchedTime(0);
-  setHasQualified(false);
-  setHasClaimed(false);
-  setVideoEnded(false);
-  setShowNextPrompt(false);
+    // Reset state for new video
+    setWatchedTime(0);
+    setHasQualified(false);
+    setHasClaimed(false);
+    setVideoEnded(false);
+    setShowNextPrompt(false);
 
-  timerRef.current = setInterval(() => {
-    setWatchedTime(prev => {
-      const newTime = prev + 1;
-      
-      // Check if qualified for reward (15 seconds)
-      if (newTime >= 15 && !hasQualifiedRef.current) {
-        setHasQualified(true);
-      }
+    timerRef.current = setInterval(() => {
+      setWatchedTime(prev => {
+        const newTime = prev + 1;
+        
+        // Check if qualified for reward (15 seconds)
+        if (newTime >= 15 && !hasQualifiedRef.current) {
+          setHasQualified(true);
+        }
 
-      // Check if video ended
-      if (newTime >= currentVideo.duration) {
-        clearInterval(timerRef.current);
-        setVideoEnded(true);
-        setShowNextPrompt(true);
-      }
+        // Check if video ended
+        if (newTime >= currentVideo.duration) {
+          clearInterval(timerRef.current);
+          setVideoEnded(true);
+          setShowNextPrompt(true);
+        }
 
-      return newTime;
-    });
-  }, 1000);
+        return newTime;
+      });
+    }, 1000);
 
-  return () => clearInterval(timerRef.current);
-}, [currentVideo]); // No need for hasQualified in dependencies now
-  // Claim reward
+    return () => clearInterval(timerRef.current);
+  }, [currentVideo]);
+
+  // Claim reward function
   const handleClaimReward = async () => {
     if (!hasQualified || hasClaimed) return;
 
     try {
       const result = await watchVideo(1.00); // $1 reward
+      
       if (result?.success) {
         setRewardEarned(1.00);
         setHasClaimed(true);
         setShowConfetti(true);
         
+        // Hide confetti after 5 seconds
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
+      } else {
+        throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (err) {
-      console.error('Claim error:', err);
+      console.error('Error claiming reward:', err);
     }
   };
 
-  // Next video
+  // Next video handler
   const handleNextVideo = () => {
     if (!currentVideo) return;
     
-    // Find current video index
     const currentIndex = mockVideos.findIndex(v => v.id === currentVideo.id);
     const nextIndex = (currentIndex + 1) % mockVideos.length;
     
@@ -705,10 +663,12 @@ useEffect(() => {
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Reward Available!</PopupTitle>
             <PopupText>
-              You've earned <strong>$1.00</strong> for watching 15 seconds!
+              Congratulations! You've watched <strong>15 seconds</strong> and earned <strong>$1.00</strong>.
+              <br /><br />
+              Click below to claim your reward and continue watching.
             </PopupText>
             <ClaimButton onClick={handleClaimReward}>
-              Claim Your Reward
+              Claim Your $1.00 Reward
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
@@ -720,7 +680,7 @@ useEffect(() => {
           <PromptContent>
             <PromptTitle>Continue Watching?</PromptTitle>
             <PromptText>
-              You can earn another $1.00 for watching the next video!
+              You've completed this video. Watch another to earn more rewards!
             </PromptText>
             <PromptButtons>
               <PromptButton $accept onClick={handleNextVideo}>
@@ -774,48 +734,26 @@ useEffect(() => {
           <VideoControls>
             <TimeDisplay>
               {watchedTime}s / {currentVideo.duration}s
-              {hasQualified && !hasClaimed && (
-                <QualifyText>Reward available to claim!</QualifyText>
-              )}
-              {hasClaimed && (
-                <QualifyText>Reward claimed!</QualifyText>
-              )}
+              <QualifyText $claimed={hasClaimed}>
+                {hasClaimed ? 'Reward claimed!' : hasQualified ? 'Reward available!' : 'Watch 15s to earn $1.00'}
+              </QualifyText>
             </TimeDisplay>
             
-            <ActionButtons>
-              {watchedTime >= 10 && (
-                <FeedbackButtons>
-                  <LikeButton 
-                    onClick={() => setHasLiked(true)} 
-                    $active={hasLiked === true}
-                  >
-                    <FaThumbsUp />
-                  </LikeButton>
-                  <DislikeButton 
-                    onClick={() => setHasLiked(false)} 
-                    $active={hasLiked === false}
-                  >
-                    <FaThumbsDown />
-                  </DislikeButton>
-                </FeedbackButtons>
-              )}
-              
-              {(videoEnded || hasClaimed) && (
-                <NextButton onClick={handleNextVideo}>
-                  Next Video <FaArrowRight />
-                </NextButton>
-              )}
-            </ActionButtons>
+            {(videoEnded || hasClaimed) && (
+              <NextButton onClick={handleNextVideo}>
+                Next Video <FaArrowRight />
+              </NextButton>
+            )}
           </VideoControls>
         </VideoContainer>
         
         <Instructions>
-          <h3>How it works:</h3>
+          <h3>How to earn rewards:</h3>
           <ul>
-            <li>Watch videos to earn money</li>
-            <li>Earn $1.00 after 15 seconds of watching</li>
+            <li>Watch videos to earn money automatically</li>
+            <li>Earn $1.00 after watching 15 seconds</li>
             <li>Each video reward can only be claimed once</li>
-            <li>Video continues playing after claiming</li>
+            <li>Continue watching to discover more content</li>
           </ul>
         </Instructions>
       </Content>
