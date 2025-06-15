@@ -628,67 +628,7 @@ const PromptButton = styled.button`
       : '0 4px 15px rgba(0,0,0,0.1)'};
   }
 `;
-
-const NoVideosOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1001;
-  animation: ${fadeIn} 0.3s ease;
-`;
-
-const NoVideosContent = styled.div`
-  background: white;
-  border-radius: 20px;
-  padding: 30px;
-  text-align: center;
-  max-width: 400px;
-  width: 90%;
-  animation: ${popIn} 0.4s ease;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-`;
-
-const NoVideosIcon = styled.div`
-  font-size: 3rem;
-  margin-bottom: 1rem;
-`;
-
-const NoVideosTitle = styled.h2`
-  color: ${berryTheme.colors.primaryDark};
-  margin: 15px 0 10px;
-  font-size: 1.8rem;
-`;
-
-const NoVideosText = styled.p`
-  color: ${berryTheme.colors.textSecondary};
-  font-size: 1.1rem;
-  margin-bottom: 25px;
-  line-height: 1.5;
-`;
-
-const RefreshButton = styled.button`
-  background: linear-gradient(45deg, #FF8A00, #E52E71);
-  color: white;
-  border: none;
-  border-radius: 25px;
-  padding: 15px 30px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(229, 46, 113, 0.3);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(229, 46, 113, 0.4);
-  }
-`;
+;
 
 const LoadingState = () => (
   <Container>
@@ -876,43 +816,57 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Fetch videos
+  // Enhanced fetch videos with better error handling
   const fetchVideos = useCallback(async () => {
     try {
+      // Always use mock videos in development or if API fails
       if (process.env.NODE_ENV === 'development') {
         return mockVideos.filter(video => !watchedVideos.includes(video.id));
       }
 
       const response = await fetch('/api/videos');
-      if (!response.ok) throw new Error('Failed to fetch videos');
+      
+      // Check if response is HTML (error page) instead of JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Received non-JSON response');
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const videos = await response.json();
       return videos.filter(video => !watchedVideos.includes(video.id));
     } catch (err) {
-      console.error('Error fetching videos:', err);
+      console.error('Error fetching videos, using mock data:', err);
       return mockVideos.filter(video => !watchedVideos.includes(video.id));
     }
   }, [watchedVideos, mockVideos]);
 
-  // Load initial videos
+  // Load initial videos with better error handling
   useEffect(() => {
     const loadVideos = async () => {
       try {
         setIsLoading(true);
         const videos = await fetchVideos();
-        setAvailableVideos(videos);
         
-        if (videos.length > 0) {
-          const firstVideo = videos[0];
-          setCurrentVideo(firstVideo);
-          
-          if (videoProgress[firstVideo.id]) {
-            setWatchedTime(videoProgress[firstVideo.id] * firstVideo.fullDuration);
-          }
-        } else {
-          setError('No more videos available at this time');
+        if (!videos || videos.length === 0) {
+          throw new Error('No videos available');
+        }
+
+        setAvailableVideos(videos);
+        const firstVideo = videos[0];
+        setCurrentVideo(firstVideo);
+        
+        if (videoProgress[firstVideo.id]) {
+          setWatchedTime(videoProgress[firstVideo.id] * firstVideo.fullDuration);
         }
       } catch (err) {
+        console.error('Error loading videos:', err);
         setError(err.message || 'Failed to load videos');
+        setAvailableVideos([]);
+        setCurrentVideo(null);
       } finally {
         setIsLoading(false);
       }
@@ -1066,10 +1020,20 @@ const VideoWatchPage = () => {
 
   if (isLoading) return <LoadingState />;
   if (error) return <ErrorState error={error} />;
-  if (!currentVideo) return <NoVideosState />;
+  if (!currentVideo || availableVideos.length === 0) {
+    return <NoVideosState />;
+  }
 
-  const progressPercentage = (watchedTime / (currentVideo.fullDuration || 20)) * 100;
+  // Safely handle potential undefined values
+  const progressPercentage = currentVideo?.fullDuration 
+    ? (watchedTime / currentVideo.fullDuration) * 100 
+    : 0;
+  
   const canClaimReward = hasQualified && !claimedReward;
+  const rewardAmount = currentVideo?.rewardAmount?.toFixed(2) || '0.00';
+  const minWatchTime = currentVideo?.minWatchTime || 0;
+  const fullDuration = currentVideo?.fullDuration || 0;
+  const nextVideoReward = availableVideos[0]?.rewardAmount?.toFixed(2) || '0.00';
 
   return (
     <Container onMouseMove={handleMouseMove}>
@@ -1078,7 +1042,7 @@ const VideoWatchPage = () => {
         <ConfettiOverlay>
           <Confetti src="/celebrating.gif" alt="Confetti celebration" />
           <RewardMessage>
-            <FaDollarSign /> +{currentVideo.rewardAmount.toFixed(2)} Added to Your Balance!
+            <FaDollarSign /> +{rewardAmount} Added to Your Balance!
           </RewardMessage>
           <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
@@ -1091,7 +1055,7 @@ const VideoWatchPage = () => {
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Congratulations!</PopupTitle>
             <PopupText>
-              You've earned <strong>${currentVideo.rewardAmount.toFixed(2)}</strong> for watching this video!
+              You've earned <strong>${rewardAmount}</strong> for watching this video!
             </PopupText>
             <ClaimButton 
               onClick={(e) => {
@@ -1112,7 +1076,7 @@ const VideoWatchPage = () => {
           <PromptContent>
             <PromptTitle>Watch Another Video?</PromptTitle>
             <PromptText>
-              You can earn ${availableVideos[0]?.rewardAmount.toFixed(2)} for watching the next video!
+              You can earn ${nextVideoReward} for watching the next video!
             </PromptText>
             <PromptButtons>
               <PromptButton $accept onClick={handleNextVideo}>
@@ -1126,22 +1090,6 @@ const VideoWatchPage = () => {
         </NextVideoPrompt>
       )}
 
-      {/* No Videos Available */}
-      {availableVideos.length === 0 && !isLoading && (
-        <NoVideosOverlay>
-          <NoVideosContent>
-            <NoVideosIcon>📺</NoVideosIcon>
-            <NoVideosTitle>No More Videos Available</NoVideosTitle>
-            <NoVideosText>
-              You've watched all available videos. Check back later for new content!
-            </NoVideosText>
-            <RefreshButton onClick={() => window.location.reload()}>
-              Refresh
-            </RefreshButton>
-          </NoVideosContent>
-        </NoVideosOverlay>
-      )}
-
       {/* Main Content */}
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
@@ -1151,7 +1099,7 @@ const VideoWatchPage = () => {
       <Content>
         <BalanceCard>
           <BalanceLabel>Video Earnings Balance</BalanceLabel>
-          <BalanceAmount>${dollarBalance2.toFixed(2)}</BalanceAmount>
+          <BalanceAmount>${dollarBalance2?.toFixed(2) || '0.00'}</BalanceAmount>
           {rewardEarned > 0 && (
             <RewardNotification>
               <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
@@ -1160,14 +1108,14 @@ const VideoWatchPage = () => {
         </BalanceCard>
         
         <VideoContainer $isFullscreen={isFullscreen}>
-          <VideoTitle>{currentVideo.title}</VideoTitle>
+          <VideoTitle>{currentVideo?.title || 'Video'}</VideoTitle>
           
           <VideoWrapper $aspectRatio={aspectRatio}>
             {isLoading ? (
-              <VideoThumbnail src={currentVideo.thumbnail} alt="Video thumbnail" />
+              <VideoThumbnail src={currentVideo?.thumbnail} alt="Video thumbnail" />
             ) : (
               <YouTubeIframe
-                src={`https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${isVideoPlaying ? 1 : 0}&controls=0&modestbranding=1&rel=0&start=${Math.floor(watchedTime)}`}
+                src={`https://www.youtube.com/embed/${currentVideo?.youtubeId}?autoplay=${isVideoPlaying ? 1 : 0}&controls=0&modestbranding=1&rel=0&start=${Math.floor(watchedTime)}`}
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -1180,8 +1128,8 @@ const VideoWatchPage = () => {
           <ProgressBar>
             <ProgressFill $progress={progressPercentage} />
             {hasQualified && !claimedReward && (
-              <QualifiedMarker $position={(currentVideo.minWatchTime / (currentVideo.fullDuration || 20)) * 100}>
-                <QualifiedTooltip>Earn ${currentVideo.rewardAmount.toFixed(2)} here!</QualifiedTooltip>
+              <QualifiedMarker $position={(minWatchTime / fullDuration) * 100}>
+                <QualifiedTooltip>Earn ${rewardAmount} here!</QualifiedTooltip>
               </QualifiedMarker>
             )}
           </ProgressBar>
@@ -1189,7 +1137,7 @@ const VideoWatchPage = () => {
           {(showControls || videoEnded) && (
             <VideoControls>
               <TimeDisplay>
-                {watchedTime}s / {currentVideo.fullDuration || 20}s
+                {watchedTime}s / {fullDuration}s
                 {hasQualified && !claimedReward && (
                   <QualifyText>Reward available to claim!</QualifyText>
                 )}
@@ -1236,7 +1184,7 @@ const VideoWatchPage = () => {
           <h3>How it works:</h3>
           <ul>
             <li>Watch videos to earn money</li>
-            <li>Must watch at least {currentVideo.minWatchTime} seconds to earn ${currentVideo.rewardAmount.toFixed(2)}</li>
+            <li>Must watch at least {minWatchTime} seconds to earn ${rewardAmount}</li>
             <li>Reward must be claimed before moving to next video</li>
             <li>Each video can only be rewarded once</li>
             <li>Video will continue playing after claiming reward</li>
