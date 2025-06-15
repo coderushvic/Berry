@@ -160,6 +160,12 @@ const Countdown = styled.span`
   font-weight: 700;
 `;
 
+const LastClaimed = styled.div`
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: ${berryTheme.colors.textMuted};
+`;
+
 const Confetti = styled.div`
   position: absolute;
   width: 10px;
@@ -195,51 +201,82 @@ const generateConfetti = () => {
 const DailyReward = () => {
   const { id, userData, setBalance, loading } = useUser();
   const [lastClaimed, setLastClaimed] = useState(null);
-  const [nextClaim, setNextClaim] = useState(null);
+  const [canClaimToday, setCanClaimToday] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isCheckingClaim, setIsCheckingClaim] = useState(true);
+  const [nextClaimDate, setNextClaimDate] = useState(null);
 
   // Check reward eligibility on load
   useEffect(() => {
     const checkRewardStatus = async () => {
       if (!id) return;
+      setIsCheckingClaim(true);
 
-      const userDoc = await getDoc(doc(db, 'telegramUsers', id));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        if (data.lastDailyReward) {
-          setLastClaimed(data.lastDailyReward.toDate());
+      try {
+        const userDoc = await getDoc(doc(db, 'telegramUsers', id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const now = new Date();
           
-          // Calculate next claim time (24 hours after last claim)
-          const nextAvailable = new Date(data.lastDailyReward.toDate());
-          nextAvailable.setHours(nextAvailable.getHours() + 24);
-          setNextClaim(nextAvailable);
+          if (data.lastDailyReward) {
+            const lastClaimDate = data.lastDailyReward.toDate();
+            setLastClaimed(lastClaimDate);
+            
+            // Check if last claim was today
+            const lastClaimDay = new Date(lastClaimDate);
+            lastClaimDay.setHours(0, 0, 0, 0);
+            
+            const currentDay = new Date(now);
+            currentDay.setHours(0, 0, 0, 0);
+            
+            if (lastClaimDay.getTime() === currentDay.getTime()) {
+              // Already claimed today
+              setCanClaimToday(false);
+              
+              // Set next claim date to tomorrow at midnight
+              const tomorrow = new Date(currentDay);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              setNextClaimDate(tomorrow);
+            } else {
+              // Not claimed today - new day
+              setCanClaimToday(true);
+              setNextClaimDate(null);
+            }
+          } else {
+            // Never claimed before
+            setCanClaimToday(true);
+            setNextClaimDate(null);
+          }
         }
+      } catch (error) {
+        console.error('Error checking reward status:', error);
+      } finally {
+        setIsCheckingClaim(false);
       }
     };
 
     checkRewardStatus();
   }, [id, userData]);
 
-  // Countdown timer
+  // Countdown to next claim date
   useEffect(() => {
-    if (!nextClaim) return;
+    if (!nextClaimDate) return;
 
     const timer = setInterval(() => {
       const now = new Date();
-      if (now >= nextClaim) {
-        setNextClaim(null);
+      if (now >= nextClaimDate) {
+        setCanClaimToday(true);
+        setNextClaimDate(null);
         clearInterval(timer);
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [nextClaim]);
-
-  const canClaim = !lastClaimed || (nextClaim && new Date() >= nextClaim);
+  }, [nextClaimDate]);
 
   const handleClaimReward = async () => {
-    if (!canClaim || isClaiming) return;
+    if (!canClaimToday || isClaiming) return;
 
     setIsClaiming(true);
     try {
@@ -248,6 +285,7 @@ const DailyReward = () => {
       setTimeout(() => setShowConfetti(false), 2000);
 
       // Update Firestore
+      const now = new Date();
       const userRef = doc(db, 'telegramUsers', id);
       await updateDoc(userRef, {
         balance: increment(5),
@@ -256,12 +294,14 @@ const DailyReward = () => {
 
       // Update local state
       setBalance(prev => prev + 5);
-      setLastClaimed(new Date());
+      setLastClaimed(now);
+      setCanClaimToday(false);
       
-      // Set next claim time
-      const nextClaimTime = new Date();
-      nextClaimTime.setHours(nextClaimTime.getHours() + 24);
-      setNextClaim(nextClaimTime);
+      // Set next claim date to tomorrow at midnight
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      setNextClaimDate(tomorrow);
     } catch (error) {
       console.error('Error claiming reward:', error);
     } finally {
@@ -269,11 +309,11 @@ const DailyReward = () => {
     }
   };
 
-  const getTimeRemaining = () => {
-    if (!nextClaim) return '00:00:00';
+  const getTimeUntilNextClaim = () => {
+    if (!nextClaimDate) return '00:00:00';
     
     const now = new Date();
-    const diff = nextClaim - now;
+    const diff = nextClaimDate - now;
     
     if (diff <= 0) return '00:00:00';
     
@@ -283,6 +323,37 @@ const DailyReward = () => {
     
     return `${hours}:${minutes}:${seconds}`;
   };
+
+  const formatLastClaimed = () => {
+    if (!lastClaimed) return 'Never claimed';
+    
+    const options = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    return lastClaimed.toLocaleDateString(undefined, options);
+  };
+
+  if (isCheckingClaim) {
+    return (
+      <Container>
+        <PageHeader>
+          <LogoImage src='/Berry.png' alt="Berry Logo" />
+          <LogoText>berry</LogoText>
+        </PageHeader>
+        <MainContent>
+          <RewardCard>
+            <RewardDescription>Checking reward status...</RewardDescription>
+          </RewardCard>
+        </MainContent>
+        <NavBar />
+      </Container>
+    );
+  }
 
   return (
     <Container>
@@ -295,45 +366,47 @@ const DailyReward = () => {
         <RewardCard>
           {showConfetti && generateConfetti()}
           
-          <RewardIcon $claimed={!canClaim} $pulse={canClaim}>
-            {canClaim ? <FaGift /> : <FaCheckCircle />}
+          <RewardIcon $claimed={!canClaimToday} $pulse={canClaimToday}>
+            {canClaimToday ? <FaGift /> : <FaCheckCircle />}
           </RewardIcon>
           
           <RewardTitle>Daily Reward</RewardTitle>
           <RewardAmount>$5</RewardAmount>
           
           <RewardDescription>
-            Claim your daily $5 reward. Come back every 24 hours to claim again!
+            Claim your daily $5 reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
             onClick={handleClaimReward}
-            disabled={!canClaim || isClaiming || loading}
+            disabled={!canClaimToday || isClaiming || loading}
           >
             {isClaiming ? (
-              <>
-                Processing...
-              </>
-            ) : canClaim ? (
+              'Processing...'
+            ) : canClaimToday ? (
               'Claim Your Reward'
             ) : (
-              'Already Claimed'
+              'Already Claimed Today'
             )}
           </ClaimButton>
           
-          {!canClaim && nextClaim && (
+          {!canClaimToday && nextClaimDate && (
             <StatusMessage className="waiting">
               <FaClock />
-              Next reward in: <Countdown>{getTimeRemaining()}</Countdown>
+              Next reward available at midnight: <Countdown>{getTimeUntilNextClaim()}</Countdown>
             </StatusMessage>
           )}
           
-          {lastClaimed && canClaim && (
+          {canClaimToday && (
             <StatusMessage className="claimed">
               <FaCheckCircle />
-              Reward available!
+              Daily reward available!
             </StatusMessage>
           )}
+
+          <LastClaimed>
+            Last claimed: {formatLastClaimed()}
+          </LastClaimed>
         </RewardCard>
       </MainContent>
 
