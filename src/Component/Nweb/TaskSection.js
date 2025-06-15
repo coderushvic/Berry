@@ -201,7 +201,7 @@ function TaskSection() {
             onClick={() => handleTaskClick(task.path)}
             aria-label={`${task.name} task`}
           >
-            {task.showBadge && task.badgeCount > 0 && (
+            {task.showBadge && (
               <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
                 {task.badgeCount}
               </AdsBadge>
