@@ -115,18 +115,19 @@ const LoadingMessage = styled.div`
 
 function TaskSection() {
   const navigate = useNavigate();
-  const { adsWatched, userData, loading } = useUser();
+  const { adsWatched, userData, loading, adsConfig, isPremium } = useUser();
 
   // Calculate remaining ads with all safeguards
-  const remainingAds = useMemo(() => {
-    if (loading || typeof adsWatched !== 'number') return null;
+  const { remainingAds, dailyLimit } = useMemo(() => {
+    if (loading || typeof adsWatched !== 'number') return { remainingAds: null, dailyLimit: null };
     
     const today = new Date().toISOString().split('T')[0];
     const dailyWatched = userData?.dailyAdsWatched?.[today] || 0;
-    const dailyLimit = userData?.dailyAdLimit || 100;
+    const limit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
+    const remaining = Math.max(0, limit - dailyWatched);
     
-    return Math.max(0, dailyLimit - dailyWatched);
-  }, [adsWatched, userData, loading]);
+    return { remainingAds: remaining, dailyLimit: limit };
+  }, [adsWatched, userData, loading, adsConfig, isPremium]);
 
   // Memoize tasks configuration
   const tasks = useMemo(() => [
@@ -154,9 +155,10 @@ function TaskSection() {
       iconColor: '#28C76F',
       path: '/AdsPage',
       showBadge: true,
-      badgeCount: remainingAds !== null ? remainingAds : 0
+      badgeCount: remainingAds !== null ? remainingAds : 0,
+      dailyLimit: dailyLimit
     },
-  ], [remainingAds]);
+  ], [remainingAds, dailyLimit]);
 
   const handleTaskClick = (path) => {
     navigate(path);
@@ -190,7 +192,7 @@ function TaskSection() {
           >
             {task.showBadge && task.badgeCount > 0 && (
               <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
-                {task.badgeCount > 9 ? '9+' : task.badgeCount}
+                {task.badgeCount > 9 ? `${task.dailyLimit}` : task.badgeCount}
               </AdsBadge>
             )}
             <TaskIconWrapper $iconColor={task.iconColor}>
