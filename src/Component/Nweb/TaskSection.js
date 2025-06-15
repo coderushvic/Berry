@@ -115,18 +115,30 @@ const LoadingMessage = styled.div`
 
 function TaskSection() {
   const navigate = useNavigate();
-  const { adsWatched, userData, loading, adsConfig, isPremium } = useUser();
+  const { 
+    adsWatched, 
+    userData, 
+    loading, 
+    adsConfig = {
+      dailyLimit: 50,
+      premiumDailyLimit: 100
+    }, 
+    isPremium 
+  } = useUser();
 
   // Calculate remaining ads with all safeguards
   const { remainingAds, dailyLimit } = useMemo(() => {
-    if (loading || typeof adsWatched !== 'number') return { remainingAds: null, dailyLimit: null };
+    if (loading || !userData) return { remainingAds: null, dailyLimit: null };
     
     const today = new Date().toISOString().split('T')[0];
-    const dailyWatched = userData?.dailyAdsWatched?.[today] || 0;
+    const dailyWatched = userData.dailyAdsWatched?.[today] || 0;
     const limit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
     const remaining = Math.max(0, limit - dailyWatched);
     
-    return { remainingAds: remaining, dailyLimit: limit };
+    return { 
+      remainingAds: remaining, 
+      dailyLimit: limit 
+    };
   }, [adsWatched, userData, loading, adsConfig, isPremium]);
 
   // Memoize tasks configuration
@@ -156,9 +168,9 @@ function TaskSection() {
       path: '/AdsPage',
       showBadge: true,
       badgeCount: remainingAds !== null ? remainingAds : 0,
-      dailyLimit: dailyLimit
+      dailyLimit: dailyLimit !== null ? dailyLimit : (isPremium ? 100 : 50) // Fallback to default values
     },
-  ], [remainingAds, dailyLimit]);
+  ], [remainingAds, dailyLimit, isPremium]);
 
   const handleTaskClick = (path) => {
     navigate(path);
@@ -192,7 +204,7 @@ function TaskSection() {
           >
             {task.showBadge && task.badgeCount > 0 && (
               <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
-                {task.badgeCount > 9 ? `${task.dailyLimit}` : task.badgeCount}
+                {task.badgeCount}
               </AdsBadge>
             )}
             <TaskIconWrapper $iconColor={task.iconColor}>
