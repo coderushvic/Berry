@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FiCheckCircle, FiAlertCircle, FiArrowLeft, FiX, FiInfo } from 'react-icons/fi';
 import { db } from '../../firebase/firestore';
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { berryTheme } from '../../Theme';
 import styled, { keyframes } from 'styled-components';
@@ -335,30 +335,19 @@ const DoneButton = styled.button`
 
 export default function WithdrawForm() {
   const { 
-    balance = 0,
-    adsBalance = 0,
-    dollarBalance2 = 0,
-    checkinRewards = 0,
-    refBonus = 0,
-    processedReferrals = [],
+    getTotalBalance,
+    balanceDetails,
     id,
     username,
     fullName,
     loading,
+    setBalance,
     setAdsBalance,
+    setDollarBalance2,
+    setCheckinRewards
   } = useUser();
 
-  // Calculate total referral earnings
-  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-    const bonus = parseFloat(referral.refBonus) || 0;
-    return total + bonus;
-  }, 0);
-  
-  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
-  
-  // Calculate total revenue (sum of all balance types)
-  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
-                       parseFloat(checkinRewards) + totalReferralEarnings;
+  const totalAvailableBalance = getTotalBalance();
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -412,16 +401,46 @@ export default function WithdrawForm() {
     const amountNum = parseFloat(formData.amount);
     if (isNaN(amountNum)) return setError('Please enter a valid amount');
     if (amountNum < MIN_WITHDRAWAL) return setError(`Minimum withdrawal is $${MIN_WITHDRAWAL}`);
-    if (totalAmount > adsBalance) return setError(`You can only withdraw from your ads balance ($${adsBalance.toFixed(2)} available)`);
+    if (totalAmount > totalAvailableBalance) return setError(`Insufficient balance ($${totalAvailableBalance.toFixed(2)} available)`);
     if (!formData.walletAddress) return setError('Please enter your wallet address');
     if (!formData.network) return setError('Please select a network');
 
     try {
-      // Update user balance (still only deduct from adsBalance)
+      // Calculate withdrawal distribution across balance types
       const userRef = doc(db, 'telegramUsers', id);
-      await updateDoc(userRef, {
-        adsBalance: adsBalance - totalAmount
-      });
+      
+      // First try to deduct from adsBalance
+      let remainingAmount = totalAmount;
+      let updates = {};
+      
+      if (balanceDetails.ads > 0) {
+        const deductFromAds = Math.min(balanceDetails.ads, remainingAmount);
+        updates.adsBalance = increment(-deductFromAds);
+        remainingAmount -= deductFromAds;
+      }
+      
+      // Then deduct from dollarBalance2 if needed
+      if (remainingAmount > 0 && balanceDetails.available > 0) {
+        const deductFromDollar = Math.min(balanceDetails.available, remainingAmount);
+        updates.dollarBalance2 = increment(-deductFromDollar);
+        remainingAmount -= deductFromDollar;
+      }
+      
+      // Then deduct from checkinRewards if needed
+      if (remainingAmount > 0 && balanceDetails.checkinRewards > 0) {
+        const deductFromCheckin = Math.min(balanceDetails.checkinRewards, remainingAmount);
+        updates.checkinRewards = increment(-deductFromCheckin);
+        remainingAmount -= deductFromCheckin;
+      }
+      
+      // Then deduct from balance (points converted to dollars)
+      if (remainingAmount > 0 && balanceDetails.points > 0) {
+        const pointsToDeduct = remainingAmount * 1000; // Convert dollars to points
+        const deductFromBalance = Math.min(balanceDetails.points, pointsToDeduct);
+        updates.balance = increment(-deductFromBalance);
+      }
+
+      await updateDoc(userRef, updates);
 
       // Create withdrawal record
       const withdrawalRef = collection(db, 'withdrawalRequests');
@@ -436,13 +455,20 @@ export default function WithdrawForm() {
         network: formData.network,
         status: 'pending',
         createdAt: serverTimestamp(),
-        balanceType: 'ads'
+        balanceType: 'combined' // Indicates this used multiple balance sources
       };
       
       const docRef = await addDoc(withdrawalRef, withdrawalData);
 
       // Update UI state
-      setAdsBalance(prev => prev - totalAmount);
+      setAdsBalance(prev => Math.max(0, prev - (totalAmount > prev ? prev : totalAmount)));
+setDollarBalance2(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads ? (totalAmount - balanceDetails.ads > prev ? prev : totalAmount - balanceDetails.ads) : 0)));
+setCheckinRewards(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available ? (totalAmount - balanceDetails.ads - balanceDetails.available > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available) : 0)));
+setBalance(prev => {
+  const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards;
+  return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
+});
+
       setSuccess('Withdrawal request submitted!');
       
       // Prepare receipt data
@@ -465,7 +491,7 @@ export default function WithdrawForm() {
   };
 
   const handleMaxClick = () => {
-    const maxAmount = adsBalance / (1 + (FEE_PERCENTAGE / 100));
+    const maxAmount = totalAvailableBalance / (1 + (FEE_PERCENTAGE / 100));
     setFormData(prev => ({
       ...prev,
       amount: maxAmount.toFixed(3)
@@ -474,7 +500,7 @@ export default function WithdrawForm() {
 
   const isSubmitDisabled = loading || !formData.amount || 
                          parseFloat(formData.amount) < MIN_WITHDRAWAL || 
-                         totalAmount > adsBalance ||
+                         totalAmount > totalAvailableBalance ||
                          !formData.walletAddress || 
                          !formData.network;
 
@@ -493,7 +519,7 @@ export default function WithdrawForm() {
           <BalanceCard>
             <div>
               <BalanceLabel>Available for Withdrawal</BalanceLabel>
-              <BalanceAmount>${adsBalance.toFixed(3)}</BalanceAmount>
+              <BalanceAmount>${totalAvailableBalance.toFixed(3)}</BalanceAmount>
             </div>
             <FiInfo size={20} color={berryTheme.colors.primary} />
           </BalanceCard>
@@ -510,11 +536,11 @@ export default function WithdrawForm() {
                   onChange={handleChange}
                   step="0.001"
                   min={MIN_WITHDRAWAL}
-                  max={adsBalance}
+                  max={totalAvailableBalance}
                 />
                 <MaxButton 
                   onClick={handleMaxClick}
-                  disabled={!adsBalance || adsBalance < MIN_WITHDRAWAL}
+                  disabled={!totalAvailableBalance || totalAvailableBalance < MIN_WITHDRAWAL}
                 >
                   MAX
                 </MaxButton>
@@ -524,9 +550,9 @@ export default function WithdrawForm() {
                   Minimum withdrawal is ${MIN_WITHDRAWAL}
                 </p>
               )}
-              {formData.amount && totalAmount > adsBalance && (
+              {formData.amount && totalAmount > totalAvailableBalance && (
                 <p style={{ color: berryTheme.colors.error, fontSize: '0.75rem', marginTop: '4px' }}>
-                  You can only withdraw from your ads balance (${adsBalance.toFixed(2)} available)
+                  Insufficient balance (${totalAvailableBalance.toFixed(2)} available)
                 </p>
               )}
             </FormGroup>
@@ -543,10 +569,6 @@ export default function WithdrawForm() {
               <FeeRow>
                 <span style={{ fontWeight: '600' }}>Total:</span>
                 <span style={{ fontWeight: '700' }}>${totalAmount.toFixed(3)}</span>
-              </FeeRow>
-              <FeeRow>
-                <span style={{ fontWeight: '600' }}>Remaining Balance:</span>
-                <span style={{ fontWeight: '700' }}>${(adsBalance - totalAmount).toFixed(3)}</span>
               </FeeRow>
             </FeeBreakdown>
 
