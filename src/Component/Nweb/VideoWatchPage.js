@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaThumbsUp, FaThumbsDown, FaArrowRight, FaExpand, FaCompress, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
+import { FaThumbsUp, FaThumbsDown, FaArrowRight, FaExpand, FaCompress, FaCheckCircle, FaDollarSign, FaPlay, FaPause } from 'react-icons/fa';
 import NavBar from '../Nweb/NavBar';
 import { useUser } from '../../context/userContext';
 
@@ -16,28 +16,6 @@ const popIn = keyframes`
   80% { transform: scale(1.1); }
   100% { transform: scale(1); opacity: 1; }
 `;
-
-// Mock videos data
-const mockVideos = [
-  {
-    id: '1',
-    youtubeId: 'dQw4w9WgXcQ',
-    title: 'Premium Video Content',
-    minWatchTime: 15,
-    fullDuration: 30,
-    rewardAmount: 1.00,
-    thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-  },
-  {
-    id: '2',
-    youtubeId: 'JGwWNGJdvx8',
-    title: 'Special Bonus Content',
-    minWatchTime: 15,
-    fullDuration: 45,
-    rewardAmount: 1.50,
-    thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
-  }
-];
 
 // Styled Components
 const Container = styled.div`
@@ -476,6 +454,24 @@ const FullscreenButton = styled.button`
   }
 `;
 
+const PlayPauseButton = styled.button`
+  background: rgba(0,0,0,0.1);
+  color: ${berryTheme.colors.textDark};
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(0,0,0,0.2);
+  }
+`;
+
 const FeedbackButtons = styled.div`
   display: flex;
   gap: 15px;
@@ -832,6 +828,7 @@ const VideoWatchPage = () => {
     watchVideo
   } = useUser();
   
+  // Local state for video management
   const [currentVideo, setCurrentVideo] = useState(null);
   const [availableVideos, setAvailableVideos] = useState([]);
   const [watchedTime, setWatchedTime] = useState(0);
@@ -849,6 +846,8 @@ const VideoWatchPage = () => {
   const [watchedVideos, setWatchedVideos] = useState([]);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextVideoPrompt, setShowNextVideoPrompt] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  const [videoProgress, setVideoProgress] = useState({});
 
   const videoRef = useRef(null);
   const timerRef = useRef(null);
@@ -856,6 +855,28 @@ const VideoWatchPage = () => {
   const confettiTimeoutRef = useRef(null);
 
   const fetchVideos = useCallback(async () => {
+    // Define mockVideos inside the callback
+    const mockVideos = [
+      {
+        id: 'vid_1',
+        youtubeId: 'dQw4w9WgXcQ',
+        title: 'Premium Video Content',
+        minWatchTime: 15,
+        fullDuration: 30,
+        rewardAmount: 1.00,
+        thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+      },
+      {
+        id: 'vid_2',
+        youtubeId: 'JGwWNGJdvx8',
+        title: 'Special Bonus Content',
+        minWatchTime: 15,
+        fullDuration: 45,
+        rewardAmount: 1.50,
+        thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
+      }
+    ];
+
     if (process.env.NODE_ENV === 'development') {
       return mockVideos.filter(video => !watchedVideos.includes(video.id));
     }
@@ -869,7 +890,7 @@ const VideoWatchPage = () => {
       console.error('Error fetching videos:', err);
       return mockVideos.filter(video => !watchedVideos.includes(video.id));
     }
-  }, [watchedVideos]);
+  }, [watchedVideos]); // Now only depends on watchedVideos
 
   useEffect(() => {
     const loadVideos = async () => {
@@ -879,7 +900,13 @@ const VideoWatchPage = () => {
         setAvailableVideos(videos);
         
         if (videos.length > 0) {
-          setCurrentVideo(videos[0]);
+          const firstVideo = videos[0];
+          setCurrentVideo(firstVideo);
+          
+          // Check if user has progress on this video
+          if (videoProgress[firstVideo.id]) {
+            setWatchedTime(videoProgress[firstVideo.id] * firstVideo.fullDuration);
+          }
         } else {
           setError('No more videos available at this time');
         }
@@ -892,7 +919,7 @@ const VideoWatchPage = () => {
     };
 
     loadVideos();
-  }, [fetchVideos]);
+  }, [fetchVideos, videoProgress]);
 
   useEffect(() => {
     if (videoEnded && availableVideos.length > 0) {
@@ -912,26 +939,32 @@ const VideoWatchPage = () => {
       
       if (hoursSinceLastWatch < 1) {
         setError(`Please wait ${Math.ceil(60 - (hoursSinceLastWatch * 60))} minutes before watching another video`);
+        setIsVideoPlaying(false);
         return;
       }
     }
 
     clearInterval(timerRef.current);
-    setWatchedTime(0);
     setHasQualified(false);
-    setClaimedReward(false);
     setVideoEnded(false);
+    setIsVideoPlaying(true);
 
     timerRef.current = setInterval(() => {
       setWatchedTime(prev => {
         const newTime = prev + 1;
         const minDuration = currentVideo.fullDuration || 20;
         
+        // Track progress in local state
+        setVideoProgress(prev => ({
+          ...prev,
+          [currentVideo.id]: newTime / minDuration
+        }));
+
         if (newTime >= 10 && !showControls) {
           setShowControls(true);
         }
 
-        if (newTime >= currentVideo.minWatchTime && !hasQualified) {
+        if (newTime >= currentVideo.minWatchTime && !hasQualified && !claimedReward) {
           setHasQualified(true);
           showRewardNotification();
         }
@@ -939,6 +972,7 @@ const VideoWatchPage = () => {
         if (newTime >= minDuration) {
           clearInterval(timerRef.current);
           setVideoEnded(true);
+          setIsVideoPlaying(false);
         }
 
         return newTime;
@@ -951,10 +985,7 @@ const VideoWatchPage = () => {
   };
 
   const claimReward = async () => {
-    if (!id || !currentVideo) {
-      console.error('User ID or current video not available');
-      return;
-    }
+    if (!id || !currentVideo || claimedReward) return;
 
     try {
       console.log('Attempting to claim reward...');
@@ -965,21 +996,25 @@ const VideoWatchPage = () => {
         setRewardEarned(currentVideo.rewardAmount);
         setClaimedReward(true);
         setShowRewardPopup(false);
-        
         setWatchedVideos(prev => [...prev, currentVideo.id]);
+        
+        // Keep video playing after claiming
+        setIsVideoPlaying(true);
         
         setShowConfetti(true);
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
       } else {
-        const errorMsg = result?.message || 'Failed to claim reward';
+        const errorMsg = result?.error || result?.message || 'Failed to claim reward';
         console.error('Claim reward error:', errorMsg);
         setError(errorMsg);
+        setShowRewardPopup(false);
       }
     } catch (err) {
       console.error('Error in claimReward:', err);
       setError(err.message || 'Failed to claim reward');
+      setShowRewardPopup(false);
     }
   };
 
@@ -1000,12 +1035,20 @@ const VideoWatchPage = () => {
     setShowControls(false);
     setShowRewardPopup(false);
     setVideoEnded(false);
+    setClaimedReward(false);
+    setIsVideoPlaying(true);
     
     const remainingVideos = availableVideos.filter(v => v.id !== currentVideo.id);
     setAvailableVideos(remainingVideos);
     
     if (remainingVideos.length > 0) {
-      setCurrentVideo(remainingVideos[0]);
+      const nextVideo = remainingVideos[0];
+      setCurrentVideo(nextVideo);
+      
+      // Check if user has progress on the next video
+      if (videoProgress[nextVideo.id]) {
+        setWatchedTime(videoProgress[nextVideo.id] * nextVideo.fullDuration);
+      }
     }
   };
 
@@ -1035,9 +1078,16 @@ const VideoWatchPage = () => {
     setAspectRatio(prev => prev === '16/9' ? '9/16' : '16/9');
   };
 
+  const togglePlayPause = () => {
+    setIsVideoPlaying(prev => !prev);
+  };
+
   if (isLoading) return <LoadingState />;
   if (error) return <ErrorState error={error} />;
   if (!currentVideo) return <NoVideosState />;
+
+  const progressPercentage = (watchedTime / (currentVideo.fullDuration || 20)) * 100;
+  const canClaimReward = hasQualified && !claimedReward;
 
   return (
     <Container onMouseMove={handleMouseMove}>
@@ -1051,7 +1101,7 @@ const VideoWatchPage = () => {
         </ConfettiOverlay>
       )}
 
-      {showRewardPopup && !claimedReward && (
+      {showRewardPopup && canClaimReward && (
         <RewardPopup onClick={() => setShowRewardPopup(false)}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
             <FaCheckCircle size={60} color="#4CAF50" />
@@ -1066,7 +1116,7 @@ const VideoWatchPage = () => {
               }}
               disabled={claimedReward}
             >
-              Claim Your Reward
+              {claimedReward ? 'Reward Claimed' : 'Claim Your Reward'}
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
@@ -1130,7 +1180,7 @@ const VideoWatchPage = () => {
               <VideoThumbnail src={currentVideo.thumbnail} alt="Video thumbnail" />
             ) : (
               <YouTubeIframe
-                src={`https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=1&controls=0&modestbranding=1&rel=0`}
+                src={`https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${isVideoPlaying ? 1 : 0}&controls=0&modestbranding=1&rel=0&start=${Math.floor(watchedTime)}`}
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -1141,10 +1191,10 @@ const VideoWatchPage = () => {
           </VideoWrapper>
           
           <ProgressBar>
-            <ProgressFill $progress={(watchedTime / (currentVideo.fullDuration || 20)) * 100} />
+            <ProgressFill $progress={progressPercentage} />
             {hasQualified && !claimedReward && (
               <QualifiedMarker $position={(currentVideo.minWatchTime / (currentVideo.fullDuration || 20)) * 100}>
-                <QualifiedTooltip>Earned ${currentVideo.rewardAmount.toFixed(2)} here!</QualifiedTooltip>
+                <QualifiedTooltip>Earn ${currentVideo.rewardAmount.toFixed(2)} here!</QualifiedTooltip>
               </QualifiedMarker>
             )}
           </ProgressBar>
@@ -1153,11 +1203,11 @@ const VideoWatchPage = () => {
             <VideoControls>
               <TimeDisplay>
                 {watchedTime}s / {currentVideo.fullDuration || 20}s
-                {watchedTime >= currentVideo.minWatchTime && !claimedReward && (
+                {hasQualified && !claimedReward && (
                   <QualifyText>Reward available to claim!</QualifyText>
                 )}
                 {claimedReward && (
-                  <QualifyText $claimed>Reward claimed!</QualifyText>
+                  <QualifyText>Reward claimed!</QualifyText>
                 )}
               </TimeDisplay>
               
@@ -1166,6 +1216,9 @@ const VideoWatchPage = () => {
                   <AspectButton onClick={toggleAspectRatio}>
                     {aspectRatio === '16/9' ? 'Portrait' : 'Landscape'}
                   </AspectButton>
+                  <PlayPauseButton onClick={togglePlayPause}>
+                    {isVideoPlaying ? <FaPause /> : <FaPlay />}
+                  </PlayPauseButton>
                   <FullscreenButton onClick={toggleFullscreen}>
                     {isFullscreen ? <FaCompress /> : <FaExpand />}
                   </FullscreenButton>
@@ -1199,6 +1252,7 @@ const VideoWatchPage = () => {
             <li>Must watch at least {currentVideo.minWatchTime} seconds to earn ${currentVideo.rewardAmount.toFixed(2)}</li>
             <li>Reward must be claimed before moving to next video</li>
             <li>Each video can only be rewarded once</li>
+            <li>Video will continue playing after claiming reward</li>
           </ul>
         </Instructions>
       </Content>
