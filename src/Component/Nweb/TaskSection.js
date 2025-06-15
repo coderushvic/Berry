@@ -130,7 +130,8 @@ function TaskSection() {
     if (loading || !userData) return { remainingAds: null, dailyLimit: null };
     
     const today = new Date().toISOString().split('T')[0];
-    const dailyWatched = userData.dailyAdsWatched?.[today] || 0;
+    // Check both dailyAdsWatched (date-based) and adsWatchedToday (count) for maximum accuracy
+    const dailyWatched = userData.dailyAdsWatched?.[today] ?? userData.adsWatchedToday ?? 0;
     const limit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
     const remaining = Math.max(0, limit - dailyWatched);
     
@@ -203,7 +204,7 @@ function TaskSection() {
           >
             {task.showBadge && (
               <AdsBadge aria-label={`${task.badgeCount} ads remaining`}>
-                {task.badgeCount}
+                {task.badgeCount} {/* Always showing exact count */}
               </AdsBadge>
             )}
             <TaskIconWrapper $iconColor={task.iconColor}>
