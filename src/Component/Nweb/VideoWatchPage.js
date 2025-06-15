@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
+import { berryTheme } from '../../Theme';
 import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
-import NavBar from '../Nweb/NavBar';
+import NavBar from './NavBar';
+import { useUser } from "../../context/userContext";
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
 
 // Animations
-const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
 const popIn = keyframes`
   0% { transform: scale(0.5); opacity: 0; }
   80% { transform: scale(1.1); }
@@ -13,8 +21,8 @@ const popIn = keyframes`
 
 // Styled Components
 const Container = styled.div`
-  font-family: 'Arial', sans-serif;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-family: ${berryTheme.fonts.main};
+  background: ${berryTheme.colors.backgroundGradient};
   min-height: 100vh;
   position: relative;
   padding-bottom: 80px;
@@ -62,7 +70,7 @@ const RewardMessage = styled.div`
 
 const OkButton = styled.button`
   background: white;
-  color: #E52E71;
+  color: ${berryTheme.colors.primary};
   border: none;
   border-radius: 25px;
   padding: 12px 30px;
@@ -105,20 +113,20 @@ const PopupContent = styled.div`
 `;
 
 const PopupTitle = styled.h2`
-  color: #2c3e50;
+  color: ${berryTheme.colors.primaryDark};
   margin: 15px 0 10px;
   font-size: 1.8rem;
 `;
 
 const PopupText = styled.p`
-  color: #7f8c8d;
+  color: ${berryTheme.colors.textSecondary};
   font-size: 1.1rem;
   margin-bottom: 25px;
   line-height: 1.6;
   padding: 0 15px;
   
   strong {
-    color: #E52E71;
+    color: ${berryTheme.colors.primary};
     font-weight: 700;
     font-size: 1.2rem;
   }
@@ -156,11 +164,11 @@ const ClaimButton = styled.button`
 `;
 
 const Header = styled.header`
-  padding: 20px 15px 15px;
+  padding: ${berryTheme.spacing.large} ${berryTheme.spacing.medium} ${berryTheme.spacing.medium};
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: ${berryTheme.spacing.small};
 `;
 
 const LogoImage = styled.img`
@@ -170,12 +178,12 @@ const LogoImage = styled.img`
 
 const LogoText = styled.span`
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #E52E71;
+  font-weight: ${berryTheme.fonts.bold};
+  color: ${berryTheme.colors.primary};
 `;
 
 const Content = styled.div`
-  padding: 15px;
+  padding: ${berryTheme.spacing.medium};
   max-width: 800px;
   margin: 0 auto;
 `;
@@ -192,18 +200,29 @@ const BalanceCard = styled.div`
   border: 1px solid rgba(255,255,255,0.2);
   backdrop-filter: blur(10px);
   background: rgba(255,255,255,0.9);
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255,138,128,0.1), rgba(227,11,92,0.05));
+    z-index: 0;
+  }
 `;
 
 const BalanceLabel = styled.div`
   font-size: 1rem;
-  color: #7f8c8d;
+  color: ${berryTheme.colors.textSecondary};
   margin-bottom: 5px;
 `;
 
 const BalanceAmount = styled.div`
   font-size: 2.5rem;
   font-weight: 800;
-  color: #2c3e50;
+  color: ${berryTheme.colors.primaryDark};
   margin: 10px 0;
   position: relative;
   z-index: 1;
@@ -240,6 +259,9 @@ const VideoContainer = styled.div`
   margin-bottom: 25px;
   position: relative;
   overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
 `;
 
 const VideoWrapper = styled.div`
@@ -262,7 +284,7 @@ const YouTubeIframe = styled.iframe`
 
 const VideoTitle = styled.h2`
   font-size: 1.4rem;
-  color: #2c3e50;
+  color: ${berryTheme.colors.textDark};
   margin-bottom: 15px;
   text-align: center;
   font-weight: 700;
@@ -271,7 +293,7 @@ const VideoTitle = styled.h2`
 const ProgressBar = styled.div`
   width: 100%;
   height: 8px;
-  background: #ecf0f1;
+  background: ${berryTheme.colors.grey200};
   border-radius: 4px;
   margin-top: 15px;
   overflow: hidden;
@@ -357,7 +379,7 @@ const VideoControls = styled.div`
 
 const TimeDisplay = styled.div`
   font-size: 1rem;
-  color: #7f8c8d;
+  color: ${berryTheme.colors.textSecondary};
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -397,9 +419,12 @@ const Instructions = styled.div`
   border-radius: 20px;
   padding: 25px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
   
   h3 {
-    color: #2c3e50;
+    color: ${berryTheme.colors.primaryDark};
     margin-top: 0;
     margin-bottom: 15px;
     font-size: 1.3rem;
@@ -412,7 +437,7 @@ const Instructions = styled.div`
   
   li {
     margin-bottom: 10px;
-    color: #7f8c8d;
+    color: ${berryTheme.colors.textSecondary};
     line-height: 1.6;
   }
 `;
@@ -443,13 +468,13 @@ const PromptContent = styled.div`
 `;
 
 const PromptTitle = styled.h2`
-  color: #2c3e50;
+  color: ${berryTheme.colors.primaryDark};
   margin: 15px 0 10px;
   font-size: 1.8rem;
 `;
 
 const PromptText = styled.p`
-  color: #7f8c8d;
+  color: ${berryTheme.colors.textSecondary};
   font-size: 1.1rem;
   margin-bottom: 25px;
   line-height: 1.5;
@@ -465,7 +490,7 @@ const PromptButton = styled.button`
   background: ${({ $accept }) => $accept 
     ? 'linear-gradient(45deg, #4CAF50, #2E7D32)' 
     : 'rgba(0,0,0,0.1)'};
-  color: ${({ $accept }) => $accept ? 'white' : '#2c3e50'};
+  color: ${({ $accept }) => $accept ? 'white' : berryTheme.colors.textDark};
   border: none;
   border-radius: 25px;
   padding: 15px 30px;
@@ -495,12 +520,16 @@ const VideoWatchPage = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
-  const [balance, setBalance] = useState(0);
-
+  
+  const { user, dollarBalance2, setDollarBalance2 } = useUser();
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
-  const hasQualifiedRef = useRef();
-  hasQualifiedRef.current = hasQualified;
+  const hasQualifiedRef = useRef(hasQualified);
+
+  // Update ref when hasQualified changes
+  useEffect(() => {
+    hasQualifiedRef.current = hasQualified;
+  }, [hasQualified]);
 
   // Mock videos data
   const mockVideos = useMemo(() => [
@@ -520,48 +549,35 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Simulate API call to claim reward
-  const claimReward = async (amount) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 500);
-    });
-  };
-
-  // Watch video and earn reward function
-  const watchVideo = async (amount) => {
-    try {
-      const result = await claimReward(amount);
-      if (result?.success) {
-        setBalance(prev => {
-          const newBalance = prev + amount;
-          localStorage.setItem('videoBalance', newBalance.toString());
-          return newBalance;
+  // Combined balance update function
+  const updateBalance = async (amount) => {
+    const newBalance = (dollarBalance2 || 0) + amount;
+    
+    // Optimistic UI update
+    setDollarBalance2(newBalance);
+    
+    // Sync with Firebase
+    if (user?.uid) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), {
+          dollarBalance2: newBalance
         });
-        return { success: true };
+      } catch (error) {
+        console.error("Failed to update balance:", error);
+        // Revert on error
+        setDollarBalance2(dollarBalance2);
+        return false;
       }
-      throw new Error(result?.error || 'Failed to claim reward');
-    } catch (error) {
-      console.error('Error claiming reward:', error);
-      return { success: false, error: error.message };
     }
+    return true;
   };
-
-  // Load balance from localStorage on mount
-  useEffect(() => {
-    const savedBalance = localStorage.getItem('videoBalance');
-    if (savedBalance) {
-      setBalance(parseFloat(savedBalance));
-    }
-  }, []);
 
   // Load initial video
   useEffect(() => {
-    if (mockVideos.length > 0) {
+    if (mockVideos.length > 0 && !currentVideo) {
       setCurrentVideo(mockVideos[0]);
     }
-  }, [mockVideos]);
+  }, [mockVideos, currentVideo]);
 
   // Timer logic
   useEffect(() => {
@@ -578,12 +594,10 @@ const VideoWatchPage = () => {
       setWatchedTime(prev => {
         const newTime = prev + 1;
         
-        // Check if qualified for reward (15 seconds)
         if (newTime >= 15 && !hasQualifiedRef.current) {
           setHasQualified(true);
         }
 
-        // Check if video ended
         if (newTime >= currentVideo.duration) {
           clearInterval(timerRef.current);
           setVideoEnded(true);
@@ -603,20 +617,16 @@ const VideoWatchPage = () => {
     
     if (!hasQualified || hasClaimed) return;
 
-    try {
-      const result = await watchVideo(1.00);
+    const success = await updateBalance(1.00);
+    
+    if (success) {
+      setRewardEarned(1.00);
+      setHasClaimed(true);
+      setShowConfetti(true);
       
-      if (result?.success) {
-        setRewardEarned(1.00);
-        setHasClaimed(true);
-        setShowConfetti(true);
-        
-        confettiTimeoutRef.current = setTimeout(() => {
-          setShowConfetti(false);
-        }, 5000);
-      }
-    } catch (err) {
-      console.error('Error claiming reward:', err);
+      confettiTimeoutRef.current = setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
     }
   };
 
@@ -715,7 +725,7 @@ const VideoWatchPage = () => {
       <Content>
         <BalanceCard>
           <BalanceLabel>Video Earnings Balance</BalanceLabel>
-          <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+          <BalanceAmount>${(dollarBalance2 || 0).toFixed(2)}</BalanceAmount>
           {rewardEarned > 0 && (
             <RewardNotification>
               <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
