@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaLink, FaCopy, FaShareAlt, FaWhatsapp, FaTelegram, FaUserFriends, FaFacebook, FaTwitter, FaTimes } from 'react-icons/fa';
 import NavBar from './NavBar';
 import { useUser } from "../../context/userContext";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
 
 // Animation for shimmer effect
 const shimmer = keyframes`
@@ -293,14 +295,44 @@ const EmptyState = styled.div`
 `;
 
 function Referrals() {
-  const { id, referrals = [], loading, processedReferrals = [] } = useUser();
+  const { id } = useUser();
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [referrals, setReferrals] = useState([]);
+  const [processedReferrals, setProcessedReferrals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [totalReferralEarnings, setTotalReferralEarnings] = useState(0);
 
-  // Calculate total referral earnings in dollars
-  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
-    return total + (referral.refBonus || 0) * 0.01; // Convert points to dollars (100 points = $1)
-  }, 0);
+  // Load referral data from Firestore
+  useEffect(() => {
+    const loadReferralData = async () => {
+      if (!id) return;
+      setLoading(true);
+
+      try {
+        const userDoc = await getDoc(doc(db, 'telegramUsers', id));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          // Set referrals and processed referrals
+          setReferrals(userData.referrals || []);
+          setProcessedReferrals(userData.processedReferrals || []);
+
+          // Calculate total earnings (100 points = $1)
+          const earnings = (userData.processedReferrals || []).reduce((total, referral) => {
+            return total + (referral.refBonus || 0) / 100;
+          }, 0);
+          setTotalReferralEarnings(earnings);
+        }
+      } catch (error) {
+        console.error("Error loading referral data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReferralData();
+  }, [id]);
 
   const getInitials = (fullName = "") => {
     const nameParts = fullName.split(" ");
@@ -424,16 +456,16 @@ function Referrals() {
             </EmptyState>
           ) : (
             <ReferralList>
-              {referrals.map((user, index) => (
+              {processedReferrals.map((referral, index) => (
                 <ReferralItem key={index}>
                   <Avatar color={getRandomColor()}>
-                    {getInitials(user.fullName || user.username || "N/A")}
+                    {getInitials(referral.fullName || referral.username || "N/A")}
                   </Avatar>
                   <ReferralInfo>
-                    <ReferralName>{user.username || "Anonymous"}</ReferralName>
+                    <ReferralName>{referral.username || "Anonymous"}</ReferralName>
                   </ReferralInfo>
                   <ReferralBonus>
-                    ${((user.refBonus || 0) * 0.01).toFixed(2)}
+                    ${((referral.refBonus || 0) / 100).toFixed(2)}
                   </ReferralBonus>
                 </ReferralItem>
               ))}
