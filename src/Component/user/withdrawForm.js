@@ -344,10 +344,11 @@ export default function WithdrawForm() {
     setBalance,
     setAdsBalance,
     setDollarBalance2,
-    setCheckinRewards
+    setCheckinRewards,
+    setTotalReferralEarnings
   } = useUser();
 
-  // Total available balance including ad earnings
+  // Total available balance including all revenue sources
   const totalAvailableBalance = getTotalBalance();
 
   const navigate = useNavigate();
@@ -407,34 +408,41 @@ export default function WithdrawForm() {
     if (!formData.network) return setError('Please select a network');
 
     try {
-      // Calculate withdrawal distribution across balance types
+      // Calculate withdrawal distribution across all balance types
       const userRef = doc(db, 'telegramUsers', id);
       
-      // First try to deduct from adsBalance (earnings from AdTask)
       let remainingAmount = totalAmount;
       let updates = {};
       
+      // 1. Deduct from adsBalance first
       if (balanceDetails.ads > 0) {
         const deductFromAds = Math.min(balanceDetails.ads, remainingAmount);
         updates.adsBalance = increment(-deductFromAds);
         remainingAmount -= deductFromAds;
       }
       
-      // Then deduct from dollarBalance2 if needed
+      // 2. Then deduct from dollarBalance2 if needed
       if (remainingAmount > 0 && balanceDetails.available > 0) {
         const deductFromDollar = Math.min(balanceDetails.available, remainingAmount);
         updates.dollarBalance2 = increment(-deductFromDollar);
         remainingAmount -= deductFromDollar;
       }
       
-      // Then deduct from checkinRewards if needed
+      // 3. Then deduct from checkinRewards if needed
       if (remainingAmount > 0 && balanceDetails.checkinRewards > 0) {
         const deductFromCheckin = Math.min(balanceDetails.checkinRewards, remainingAmount);
         updates.checkinRewards = increment(-deductFromCheckin);
         remainingAmount -= deductFromCheckin;
       }
       
-      // Then deduct from balance (points converted to dollars)
+      // 4. Then deduct from referral earnings if needed
+      if (remainingAmount > 0 && balanceDetails.referralEarnings > 0) {
+        const deductFromReferrals = Math.min(balanceDetails.referralEarnings, remainingAmount);
+        updates.totalReferralEarnings = increment(-deductFromReferrals);
+        remainingAmount -= deductFromReferrals;
+      }
+      
+      // 5. Finally deduct from balance (points converted to dollars)
       if (remainingAmount > 0 && balanceDetails.points > 0) {
         const pointsToDeduct = remainingAmount * 1000; // Convert dollars to points
         const deductFromBalance = Math.min(balanceDetails.points, pointsToDeduct);
@@ -465,8 +473,9 @@ export default function WithdrawForm() {
       setAdsBalance(prev => Math.max(0, prev - (totalAmount > prev ? prev : totalAmount)));
       setDollarBalance2(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads ? (totalAmount - balanceDetails.ads > prev ? prev : totalAmount - balanceDetails.ads) : 0)));
       setCheckinRewards(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available ? (totalAmount - balanceDetails.ads - balanceDetails.available > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available) : 0)));
+      setTotalReferralEarnings(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available + balanceDetails.checkinRewards ? (totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards) : 0)));
       setBalance(prev => {
-        const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards;
+        const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards - balanceDetails.referralEarnings;
         return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
       });
 
