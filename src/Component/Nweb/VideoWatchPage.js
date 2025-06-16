@@ -3,6 +3,8 @@ import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
 import NavBar from './NavBar';
+import { getDatabase, ref, increment, update, onValue } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 
 // Animations
 const fadeIn = keyframes`
@@ -518,6 +520,8 @@ const VideoWatchPage = () => {
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
@@ -542,52 +546,92 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Simulate API call to claim reward
-  const claimReward = async (amount) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 500);
+  // Initialize auth and get user ID
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setUserId(user.uid);
+        loadUserBalance(user.uid);
+      } else {
+        setLoading(false);
+        // Handle case where user is not logged in
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load user balance from Firebase
+  const loadUserBalance = (uid) => {
+    const db = getDatabase();
+    const userRef = ref(db, `users/${uid}/balance`);
+
+    onValue(userRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setBalance(data.videoEarnings || 0);
+        localStorage.setItem('videoBalance', data.videoEarnings?.toString() || '0');
+      } else {
+        // Initialize balance if it doesn't exist
+        update(ref(db), {
+          [`users/${uid}/balance/videoEarnings`]: 0,
+          [`users/${uid}/balance/totalBalance`]: 0
+        });
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error('Error loading balance:', error);
+      // Fallback to localStorage
+      const savedBalance = localStorage.getItem('videoBalance');
+      if (savedBalance) {
+        setBalance(parseFloat(savedBalance));
+      }
+      setLoading(false);
     });
   };
 
   // Watch video and earn reward function
   const watchVideo = async (amount) => {
+    if (!userId) {
+      console.error('No user ID available');
+      return { success: false, error: 'User not authenticated' };
+    }
+
     try {
-      const result = await claimReward(amount);
-      if (result?.success) {
-        setBalance(prev => {
-          const newBalance = prev + amount;
-          localStorage.setItem('videoBalance', newBalance.toString());
-          return newBalance;
-        });
-        return { success: true };
-      }
-      throw new Error(result?.error || 'Failed to claim reward');
+      const db = getDatabase();
+      const updates = {
+        [`users/${userId}/balance/videoEarnings`]: increment(amount),
+        [`users/${userId}/balance/totalBalance`]: increment(amount),
+        [`users/${userId}/lastRewardClaimed`]: new Date().toISOString()
+      };
+
+      await update(ref(db), updates);
+      
+      // Update local state
+      setBalance(prev => {
+        const newBalance = prev + amount;
+        localStorage.setItem('videoBalance', newBalance.toString());
+        return newBalance;
+      });
+      
+      return { success: true };
     } catch (error) {
-      console.error('Error claiming reward:', error);
+      console.error('Error updating Firebase balance:', error);
       return { success: false, error: error.message };
     }
   };
 
-  // Load balance from localStorage on mount
-  useEffect(() => {
-    const savedBalance = localStorage.getItem('videoBalance');
-    if (savedBalance) {
-      setBalance(parseFloat(savedBalance));
-    }
-  }, []);
-
   // Load initial video
   useEffect(() => {
-    if (mockVideos.length > 0) {
+    if (mockVideos.length > 0 && !loading) {
       setCurrentVideo(mockVideos[0]);
     }
-  }, [mockVideos]);
+  }, [mockVideos, loading]);
 
   // Timer logic
   useEffect(() => {
-    if (!currentVideo) return;
+    if (!currentVideo || loading) return;
 
     // Reset state for new video
     setWatchedTime(0);
@@ -617,13 +661,13 @@ const VideoWatchPage = () => {
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [currentVideo]);
+  }, [currentVideo, loading]);
 
   // Claim reward function
   const handleClaimReward = async (e) => {
     e.stopPropagation();
     
-    if (!hasQualified || hasClaimed) return;
+    if (!hasQualified || hasClaimed || !userId) return;
 
     try {
       const result = await watchVideo(1.00);
@@ -660,6 +704,19 @@ const VideoWatchPage = () => {
       clearTimeout(confettiTimeoutRef.current);
     };
   }, []);
+
+  if (loading) return (
+    <Container>
+      <Header>
+        <LogoImage src='/Berry.png' alt="Berry Logo" />
+        <LogoText>berry</LogoText>
+      </Header>
+      <Content>
+        <p>Loading user data...</p>
+      </Content>
+      <NavBar />
+    </Container>
+  );
 
   if (!currentVideo) return (
     <Container>
