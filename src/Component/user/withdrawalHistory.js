@@ -6,7 +6,7 @@ import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
-    user,
+    user, // Added user object from context
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
@@ -16,46 +16,21 @@ export default function WithdrawalHistory() {
     checkinRewards = 0,
     refBonus = 0,
     processedReferrals = [],
-    fetchWithdrawals,
-    initTelegramAuth,
-    telegramUser
+    fetchWithdrawals
   } = useUser();
 
   const [formattedWithdrawals, setFormattedWithdrawals] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedTx, setExpandedTx] = useState(null);
-  const [telegramInitData, setTelegramInitData] = useState(null);
-  const [isTelegramApp, setIsTelegramApp] = useState(false);
 
-  // Initialize Telegram WebApp
-  useEffect(() => {
-    if (window.Telegram?.WebApp) {
-      const tg = window.Telegram.WebApp;
-      setIsTelegramApp(true);
-      tg.expand();
-      setTelegramInitData(tg.initData || tg.initDataUnsafe);
-      
-      if (tg.initDataUnsafe?.user) {
-        console.log('Telegram user opened withdrawal history', {
-          userId: tg.initDataUnsafe.user.id,
-          firstName: tg.initDataUnsafe.user.first_name,
-          lastName: tg.initDataUnsafe.user.last_name
-        });
-      }
-
-      if (tg.initDataUnsafe?.user && !user) {
-        initTelegramAuth(tg.initDataUnsafe.user);
-      }
-    }
-  }, [initTelegramAuth, user]);
-
-  // Fixed referral earnings calculation
-  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-  return total + (parseFloat(referral.refBonus) || 0);  // Added missing closing parenthesis
+  // Calculate total referral earnings
+const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+  return total + (parseFloat(referral.refBonus) || 0);
 }, 0);
   
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
+  // Calculate total revenue (sum of all balance types)
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
                      parseFloat(checkinRewards) + totalReferralEarnings;
 
@@ -79,20 +54,19 @@ export default function WithdrawalHistory() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user && !telegramUser) return;
+      if (!user) return; // Only load if user exists
       setRefreshing(true);
       await fetchWithdrawals();
       setRefreshing(false);
     };
     loadData();
-  }, [user, telegramUser, fetchWithdrawals]);
+  }, [user, fetchWithdrawals]); // Added user to dependencies
 
   useEffect(() => {
-    if (!user && !telegramUser) return;
+    if (!user) return; // Only process if user exists
 
     const combined = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w && typeof w === 'object' && 
-             (w.userId === user?.id || w.userId === telegramUser?.id))
+      .filter(w => w && typeof w === 'object' && w.userId === user.id) // Ensure withdrawal belongs to current user
       .map(w => {
         const txId = w.txId || w.transactionId || w.hash || null;
         const date = w.createdAt?.toDate?.() || new Date(w.createdAt || w.date || w.timestamp);
@@ -109,7 +83,7 @@ export default function WithdrawalHistory() {
       .sort((a, b) => b.createdAt - a.createdAt);
 
     setFormattedWithdrawals(combined);
-  }, [user, telegramUser, allWithdrawals, adsWithdrawals]);
+  }, [user, allWithdrawals, adsWithdrawals]); // Added user to dependencies
 
   const statusConfig = {
     'completed': {
@@ -137,22 +111,17 @@ export default function WithdrawalHistory() {
   };
 
   const handleRefresh = async () => {
-    if (!user && !telegramUser) return;
+    if (!user) return; // Only refresh if user exists
     setRefreshing(true);
     await fetchWithdrawals();
     setRefreshing(false);
   };
 
-  if ((!user && !telegramUser) && !loading) {
+  if (!user) {
     return (
       <div className={styles.container}>
         <div className={styles.emptyState}>
           <h3 className={styles.emptyTitle}>Please sign in to view your withdrawal history</h3>
-          {isTelegramApp && (
-            <p className={styles.emptyDescription}>
-              {telegramInitData ? 'Completing Telegram authentication...' : 'Waiting for Telegram connection...'}
-            </p>
-          )}
         </div>
       </div>
     );
@@ -175,9 +144,7 @@ export default function WithdrawalHistory() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Withdrawal History</h1>
-          <p className={styles.subtitle}>
-            {isTelegramApp ? 'Your Telegram withdrawal requests' : 'Your withdrawal requests'}
-          </p>
+          <p className={styles.subtitle}>Your personal withdrawal requests</p> {/* Updated subtitle */}
         </div>
         
         <div className={styles.amountContainer}>
@@ -189,7 +156,7 @@ export default function WithdrawalHistory() {
           )}
           <button 
             onClick={handleRefresh}
-            disabled={refreshing || (!user && !telegramUser)}
+            disabled={refreshing || !user} // Disable if no user
             className={styles.refreshButton}
           >
             <FiRefreshCw className={`${refreshing ? styles.skeletonPulse : ''}`} />
@@ -201,11 +168,7 @@ export default function WithdrawalHistory() {
         <div className={styles.emptyState}>
           <FiDollarSign className={styles.emptyIcon} />
           <h3 className={styles.emptyTitle}>No withdrawal history yet</h3>
-          <p className={styles.emptyDescription}>
-            {isTelegramApp ? 
-              'Your Telegram withdrawal requests will appear here' : 
-              'Your withdrawal requests will appear here'}
-          </p>
+          <p className={styles.emptyDescription}>When you make withdrawal requests, they will appear here</p>
         </div>
       ) : (
         <div className={styles.withdrawalList}>
@@ -217,7 +180,7 @@ export default function WithdrawalHistory() {
 
             return (
               <motion.div 
-                key={`${withdrawal.id}-${user?.id || telegramUser?.id}`}
+                key={`${withdrawal.id}-${user.id}`} // Include user id in key for uniqueness
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
@@ -289,12 +252,6 @@ export default function WithdrawalHistory() {
                         ${withdrawal.fee?.toFixed(3) || '0.000'}
                       </span>
                     </div>
-                    {isTelegramApp && (
-                      <div className={styles.detailRow}>
-                        <span className={styles.detailLabel}>Source:</span>
-                        <span className={styles.detailValue}>Telegram Mini App</span>
-                      </div>
-                    )}
                   </motion.div>
                 )}
               </motion.div>
