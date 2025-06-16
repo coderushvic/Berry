@@ -6,6 +6,7 @@ import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
+    user, // Added user object from context
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
@@ -23,9 +24,9 @@ export default function WithdrawalHistory() {
   const [expandedTx, setExpandedTx] = useState(null);
 
   // Calculate total referral earnings
-  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-    return total + (parseFloat(referral.refBonus) || 0);
-  }, 0);
+const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+  return total + (parseFloat(referral.refBonus) || 0);
+}, 0);
   
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
@@ -53,16 +54,19 @@ export default function WithdrawalHistory() {
 
   useEffect(() => {
     const loadData = async () => {
+      if (!user) return; // Only load if user exists
       setRefreshing(true);
       await fetchWithdrawals();
       setRefreshing(false);
     };
     loadData();
-  }, [fetchWithdrawals]);
+  }, [user, fetchWithdrawals]); // Added user to dependencies
 
   useEffect(() => {
+    if (!user) return; // Only process if user exists
+
     const combined = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w && typeof w === 'object')
+      .filter(w => w && typeof w === 'object' && w.userId === user.id) // Ensure withdrawal belongs to current user
       .map(w => {
         const txId = w.txId || w.transactionId || w.hash || null;
         const date = w.createdAt?.toDate?.() || new Date(w.createdAt || w.date || w.timestamp);
@@ -79,7 +83,7 @@ export default function WithdrawalHistory() {
       .sort((a, b) => b.createdAt - a.createdAt);
 
     setFormattedWithdrawals(combined);
-  }, [allWithdrawals, adsWithdrawals]);
+  }, [user, allWithdrawals, adsWithdrawals]); // Added user to dependencies
 
   const statusConfig = {
     'completed': {
@@ -107,10 +111,21 @@ export default function WithdrawalHistory() {
   };
 
   const handleRefresh = async () => {
+    if (!user) return; // Only refresh if user exists
     setRefreshing(true);
     await fetchWithdrawals();
     setRefreshing(false);
   };
+
+  if (!user) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.emptyState}>
+          <h3 className={styles.emptyTitle}>Please sign in to view your withdrawal history</h3>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !refreshing) {
     return (
@@ -129,10 +144,10 @@ export default function WithdrawalHistory() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Withdrawal History</h1>
-          <p className={styles.subtitle}>Track all your withdrawal requests</p>
+          <p className={styles.subtitle}>Your personal withdrawal requests</p> {/* Updated subtitle */}
         </div>
         
-          <div className={styles.amountContainer}>
+        <div className={styles.amountContainer}>
           {totalRevenue > 0 && (
             <div className={styles.balanceCard}>
               <p className={styles.balanceLabel}>Available Balance</p>
@@ -141,7 +156,7 @@ export default function WithdrawalHistory() {
           )}
           <button 
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || !user} // Disable if no user
             className={styles.refreshButton}
           >
             <FiRefreshCw className={`${refreshing ? styles.skeletonPulse : ''}`} />
@@ -153,7 +168,7 @@ export default function WithdrawalHistory() {
         <div className={styles.emptyState}>
           <FiDollarSign className={styles.emptyIcon} />
           <h3 className={styles.emptyTitle}>No withdrawal history yet</h3>
-          <p className={styles.emptyDescription}>Your withdrawal requests will appear here</p>
+          <p className={styles.emptyDescription}>When you make withdrawal requests, they will appear here</p>
         </div>
       ) : (
         <div className={styles.withdrawalList}>
@@ -165,7 +180,7 @@ export default function WithdrawalHistory() {
 
             return (
               <motion.div 
-                key={withdrawal.id || withdrawal.timestamp}
+                key={`${withdrawal.id}-${user.id}`} // Include user id in key for uniqueness
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
