@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
-import { doc, updateDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/firestore';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import NavBar from '../Nweb/NavBar';
 
-// Animations
 const pulse = keyframes`
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
@@ -19,7 +18,6 @@ const confetti = keyframes`
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 `;
 
-// Styled Components
 const Container = styled.div`
   min-height: 100vh;
   display: flex;
@@ -199,15 +197,15 @@ const generateConfetti = () => {
 };
 
 const DailyReward = () => {
-  const { id, userData, setBalance, loading } = useUser();
+  const { id, addRewards, loading } = useUser();
   const [lastClaimed, setLastClaimed] = useState(null);
   const [canClaimToday, setCanClaimToday] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCheckingClaim, setIsCheckingClaim] = useState(true);
   const [nextClaimDate, setNextClaimDate] = useState(null);
+  const DAILY_REWARD_AMOUNT = 5;
 
-  // Check reward eligibility on load
   useEffect(() => {
     const checkRewardStatus = async () => {
       if (!id) return;
@@ -223,7 +221,6 @@ const DailyReward = () => {
             const lastClaimDate = data.lastDailyReward.toDate();
             setLastClaimed(lastClaimDate);
             
-            // Check if last claim was today
             const lastClaimDay = new Date(lastClaimDate);
             lastClaimDay.setHours(0, 0, 0, 0);
             
@@ -231,20 +228,15 @@ const DailyReward = () => {
             currentDay.setHours(0, 0, 0, 0);
             
             if (lastClaimDay.getTime() === currentDay.getTime()) {
-              // Already claimed today
               setCanClaimToday(false);
-              
-              // Set next claim date to tomorrow at midnight
               const tomorrow = new Date(currentDay);
               tomorrow.setDate(tomorrow.getDate() + 1);
               setNextClaimDate(tomorrow);
             } else {
-              // Not claimed today - new day
               setCanClaimToday(true);
               setNextClaimDate(null);
             }
           } else {
-            // Never claimed before
             setCanClaimToday(true);
             setNextClaimDate(null);
           }
@@ -257,9 +249,8 @@ const DailyReward = () => {
     };
 
     checkRewardStatus();
-  }, [id, userData]);
+  }, [id]);
 
-  // Countdown to next claim date
   useEffect(() => {
     if (!nextClaimDate) return;
 
@@ -280,28 +271,26 @@ const DailyReward = () => {
 
     setIsClaiming(true);
     try {
-      // Show confetti effect
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2000);
 
-      // Update Firestore
       const now = new Date();
-      const userRef = doc(db, 'telegramUsers', id);
-      await updateDoc(userRef, {
-        balance: increment(5),
-        lastDailyReward: serverTimestamp()
-      });
-
-      // Update local state
-      setBalance(prev => prev + 5);
-      setLastClaimed(now);
-      setCanClaimToday(false);
+      const result = await addRewards(DAILY_REWARD_AMOUNT, 'main');
       
-      // Set next claim date to tomorrow at midnight
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      setNextClaimDate(tomorrow);
+      if (result.success) {
+        const userRef = doc(db, 'telegramUsers', id);
+        await updateDoc(userRef, {
+          lastDailyReward: serverTimestamp()
+        });
+
+        setLastClaimed(now);
+        setCanClaimToday(false);
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        setNextClaimDate(tomorrow);
+      }
     } catch (error) {
       console.error('Error claiming reward:', error);
     } finally {
@@ -371,23 +360,17 @@ const DailyReward = () => {
           </RewardIcon>
           
           <RewardTitle>Daily Reward</RewardTitle>
-          <RewardAmount>$5</RewardAmount>
+          <RewardAmount>${DAILY_REWARD_AMOUNT}</RewardAmount>
           
           <RewardDescription>
-            Claim your daily $5 reward. Available once per calendar day.
+            Claim your daily ${DAILY_REWARD_AMOUNT} reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
             onClick={handleClaimReward}
             disabled={!canClaimToday || isClaiming || loading}
           >
-            {isClaiming ? (
-              'Processing...'
-            ) : canClaimToday ? (
-              'Claim Your Reward'
-            ) : (
-              'Already Claimed Today'
-            )}
+            {isClaiming ? 'Processing...' : canClaimToday ? 'Claim Your Reward' : 'Already Claimed Today'}
           </ClaimButton>
           
           {!canClaimToday && nextClaimDate && (
