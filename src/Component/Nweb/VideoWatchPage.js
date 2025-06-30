@@ -17,18 +17,6 @@ const popIn = keyframes`
   100% { transform: scale(1); opacity: 1; }
 `;
 
-const float = keyframes`
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
-`;
-
-const pulse = keyframes`
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-`;
-
 // Styled Components
 const Container = styled.div`
   font-family: ${berryTheme.fonts.main};
@@ -51,18 +39,42 @@ const ConfettiOverlay = styled.div`
   align-items: center;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(8px);
   animation: ${fadeIn} 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, 
+      rgba(255, 215, 0, 0.1) 0%, 
+      rgba(255, 138, 0, 0.05) 50%, 
+      transparent 70%);
+    z-index: 1;
+  }
 `;
 
 const Confetti = styled.div`
   position: absolute;
   width: 100%;
   height: 100%;
-  background: url('/confetti-particles.gif') center/cover no-repeat;
+  background: 
+    url('/confetti-particles.gif') center/cover no-repeat,
+    radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.3) 0%, transparent 25%),
+    radial-gradient(circle at 80% 70%, rgba(255, 105, 180, 0.3) 0%, transparent 25%);
   opacity: 0.9;
   z-index: 1;
+  mix-blend-mode: screen;
+  animation: confettiFloat 8s linear infinite;
+  
+  @keyframes confettiFloat {
+    0% { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(-20px) rotate(5deg); }
+  }
 `;
 
 const RewardMessage = styled.div`
@@ -71,7 +83,7 @@ const RewardMessage = styled.div`
   color: white;
   text-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
   z-index: 2;
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 50%, #f6d365 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   padding: 25px 40px;
@@ -80,7 +92,9 @@ const RewardMessage = styled.div`
   align-items: center;
   gap: 15px;
   margin-bottom: 30px;
-  box-shadow: 0 10px 30px rgba(246, 211, 101, 0.3);
+  box-shadow: 
+    0 10px 30px rgba(246, 211, 101, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: ${popIn} 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s both;
   position: relative;
   overflow: hidden;
@@ -92,15 +106,17 @@ const RewardMessage = styled.div`
     left: -2px;
     right: -2px;
     bottom: -2px;
-    background: linear-gradient(135deg, rgba(246, 211, 101, 0.2), rgba(253, 160, 133, 0.2));
+    background: linear-gradient(135deg, 
+      rgba(246, 211, 101, 0.3), 
+      rgba(253, 160, 133, 0.3));
     z-index: -1;
     border-radius: 50px;
     animation: pulseGlow 2s infinite alternate;
   }
 
   @keyframes pulseGlow {
-    0% { opacity: 0.7; }
-    100% { opacity: 1; }
+    0% { opacity: 0.5; transform: scale(0.98); }
+    100% { opacity: 1; transform: scale(1.02); }
   }
 `;
 
@@ -115,15 +131,18 @@ const OkButton = styled.button`
   cursor: pointer;
   z-index: 2;
   transition: all 0.3s ease;
-  box-shadow: 0 5px 20px rgba(79, 172, 254, 0.4);
+  box-shadow: 
+    0 5px 20px rgba(79, 172, 254, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
   animation: ${fadeIn} 0.5s ease 0.4s both;
-  border: 2px solid rgba(255, 255, 255, 0.2);
   
   &:hover {
     transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(79, 172, 254, 0.6);
+    box-shadow: 
+      0 8px 25px rgba(79, 172, 254, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.3);
   }
   
   &:active {
@@ -676,10 +695,10 @@ const VideoWatchPage = () => {
     setIsClaiming(true);
 
     try {
-      const result = await addRewards(2.00, 'video');
+      const result = await addRewards(1.00, 'video');
       
       if (result?.success) {
-        setRewardEarned(2.00);
+        setRewardEarned(1.00);
         setHasClaimed(true);
         setShowConfetti(true);
         setShowClaimPrompt(false);
@@ -745,17 +764,11 @@ const VideoWatchPage = () => {
       {/* Confetti Celebration */}
       {showConfetti && (
         <ConfettiOverlay>
-          <Confetti />
+          <Confetti src="/celebrating.gif" alt="Confetti celebration" />
           <RewardMessage>
-            <FaDollarSign style={{
-              animation: `${float} 2s ease-in-out infinite, ${pulse} 1.5s ease-in-out infinite`,
-              filter: 'drop-shadow(0 2px 5px rgba(255, 215, 0, 0.5))'
-            }} /> 
-            +2.00 Added to Your Balance!
+            <FaDollarSign /> +2.00 Added to Your Balance!
           </RewardMessage>
-          <OkButton onClick={() => setShowConfetti(false)}>
-            Awesome!
-          </OkButton>
+          <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
       )}
 
