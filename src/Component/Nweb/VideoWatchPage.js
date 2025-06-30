@@ -1,785 +1,889 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { IoCheckmarkCircleSharp, IoTimeOutline, IoSparkles } from "react-icons/io5";
-import { FaCoins, FaGem, FaCrown } from "react-icons/fa";
-import { 
-  doc, 
-  updateDoc, 
-  getDoc, 
-  runTransaction, 
-  serverTimestamp,
-  increment,
-  arrayUnion
-} from "firebase/firestore";
-import { db } from "../../firebase/firestore";
-import { useUser } from "../../context/userContext";
-import { motion, AnimatePresence } from "framer-motion";
-import { berryTheme } from '../../Theme';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
+import { berryTheme } from '../../Theme';
+import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
+import NavBar from './NavBar';
+import { useUser } from '../../context/userContext';
 
 // Animations
-const float = keyframes`
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
 `;
 
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+const popIn = keyframes`
+  0% { transform: scale(0.5); opacity: 0; }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
 `;
 
-// Styled components
-const TaskContainer = styled.div`
-  margin-bottom: ${berryTheme.spacing.large};
-  width: 100%;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  perspective: 1000px;
-`;
-
-const TaskCard = styled(motion.div)`
-  background: linear-gradient(135deg, #ffffff 0%, #f9f9ff 100%);
-  border-radius: 20px;
-  padding: 28px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+// Styled Components
+const Container = styled.div`
+  font-family: ${berryTheme.fonts.main};
+  background: ${berryTheme.colors.backgroundGradient};
+  min-height: 100vh;
   position: relative;
+  padding-bottom: 80px;
   overflow: hidden;
-  backdrop-filter: blur(5px);
-  transform-style: preserve-3d;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-      to bottom right,
-      rgba(227, 11, 92, 0.05) 0%,
-      rgba(255, 255, 255, 0) 60%
-    );
-    z-index: 0;
-  }
 `;
 
-const GlowEffect = styled.div`
-  position: absolute;
+const ConfettiOverlay = styled.div`
+  position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, 
-    ${berryTheme.colors.primary} 0%, 
-    ${berryTheme.colors.secondary} 50%, 
-    ${berryTheme.colors.primary} 100%);
-  background-size: 200% 100%;
-  animation: ${shimmer} 3s linear infinite;
-`;
-
-const TaskHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  position: relative;
-  z-index: 1;
-`;
-
-const TaskTitle = styled.h3`
-  margin: 0;
-  font-size: 1.4rem;
-  color: ${berryTheme.colors.primaryDark};
-  font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.05);
-`;
-
-const TaskDescription = styled.p`
-  color: ${berryTheme.colors.textSecondary};
-  margin-bottom: 24px;
-  line-height: 1.6;
-  font-size: 0.95rem;
-  position: relative;
-  z-index: 1;
-`;
-
-const RewardBadges = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
-`;
-
-const RewardBadge = styled(motion.div)`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${props => props.$textColor || berryTheme.colors.textDark};
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: ${props => props.$bgColor || berryTheme.colors.grey100};
-  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(0,0,0,0.05)'};
-  transition: all 0.3s ease;
-  cursor: default;
-  
-  &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 16px ${props => props.$shadowColor || 'rgba(0,0,0,0.1)'};
-  }
-`;
-
-const ProgressContainer = styled.div`
   width: 100%;
-  height: 8px;
-  background: ${berryTheme.colors.grey100};
-  border-radius: 4px;
-  margin-bottom: 24px;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-`;
-
-const ProgressBar = styled(motion.div)`
   height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, 
-    ${berryTheme.colors.primary} 0%, 
-    ${berryTheme.colors.secondary} 100%);
-  width: ${props => props.$progress}%;
-`;
-
-const TaskStats = styled.div`
-  font-size: 0.9rem;
-  color: ${berryTheme.colors.textMuted};
-  margin-bottom: 24px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
-  z-index: 1;
-`;
-
-const ErrorText = styled(motion.div)`
-  font-size: 0.9rem;
-  color: ${berryTheme.colors.error};
-  margin-bottom: 20px;
-  padding: 12px;
-  background: rgba(255, 0, 0, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid ${berryTheme.colors.error};
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-`;
-
-const ActionButtons = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
-`;
-
-const ActionButton = styled(motion.button)`
-  background: ${props => props.$bgColor || berryTheme.colors.primary};
-  color: ${props => props.$textColor || 'white'};
-  border: none;
-  border-radius: 14px;
-  padding: 16px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  gap: 10px;
-  position: relative;
+  align-items: center;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  animation: ${fadeIn} 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
-  box-shadow: 0 4px 12px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.2)'};
   
-  &:hover:not(:disabled) {
-    background: ${props => props.$hoverColor || berryTheme.colors.primaryDark};
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px ${props => props.$shadowColor || 'rgba(227, 11, 92, 0.3)'};
-  }
-
-  &:disabled {
-    background: ${berryTheme.colors.grey200};
-    color: ${berryTheme.colors.textMuted};
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
   &::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, 
+      rgba(255, 215, 0, 0.1) 0%, 
+      rgba(255, 138, 0, 0.05) 50%, 
+      transparent 70%);
+    z-index: 1;
+  }
+`;
+
+const Confetti = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    url('/confetti-particles.gif') center/cover no-repeat,
+    radial-gradient(circle at 20% 30%, rgba(255, 215, 0, 0.3) 0%, transparent 25%),
+    radial-gradient(circle at 80% 70%, rgba(255, 105, 180, 0.3) 0%, transparent 25%);
+  opacity: 0.9;
+  z-index: 1;
+  mix-blend-mode: screen;
+  animation: confettiFloat 8s linear infinite;
+  
+  @keyframes confettiFloat {
+    0% { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(-20px) rotate(5deg); }
+  }
+`;
+
+const RewardMessage = styled.div`
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 50%, #f6d365 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding: 25px 40px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
+  box-shadow: 
+    0 10px 30px rgba(246, 211, 101, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  animation: ${popIn} 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s both;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, 
+      rgba(246, 211, 101, 0.3), 
+      rgba(253, 160, 133, 0.3));
+    z-index: -1;
+    border-radius: 50px;
+    animation: pulseGlow 2s infinite alternate;
+  }
+
+  @keyframes pulseGlow {
+    0% { opacity: 0.5; transform: scale(0.98); }
+    100% { opacity: 1; transform: scale(1.02); }
+  }
+`;
+
+const OkButton = styled.button`
+  background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 16px 40px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 5px 20px rgba(79, 172, 254, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+  animation: ${fadeIn} 0.5s ease 0.4s both;
+  
+  &:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 
+      0 8px 25px rgba(79, 172, 254, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(1px);
+  }
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent
+      to right,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      rgba(255, 255, 255, 0) 100%
     );
-    transition: all 0.5s ease;
+    transform: translateX(-100%);
   }
-
-  &:hover:not(:disabled)::before {
-    left: 100%;
+  
+  &:hover::after {
+    animation: shimmer 1.5s infinite;
   }
-`;
-
-const Spinner = styled.span`
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 3px solid currentColor;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 `;
 
-const SparkleIcon = styled(IoSparkles)`
-  color: gold;
-  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
-  animation: ${float} 3s ease-in-out infinite;
-`;
-
-const Notification = styled(motion.div)`
+const RewardPopup = styled.div`
   position: fixed;
-  top: 1.5rem;
+  top: 0;
   left: 0;
-  right: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: ${fadeIn} 0.3s ease;
+`;
+
+const PopupContent = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  animation: ${popIn} 0.4s ease;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+`;
+
+const PopupTitle = styled.h2`
+  color: ${berryTheme.colors.primaryDark};
+  margin: 15px 0 10px;
+  font-size: 1.8rem;
+`;
+
+const PopupText = styled.p`
+  color: ${berryTheme.colors.textSecondary};
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+  line-height: 1.6;
+  padding: 0 15px;
+  
+  strong {
+    color: ${berryTheme.colors.primary};
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+`;
+
+const ClaimButton = styled.button`
+  background: linear-gradient(45deg, #4CAF50, #2E7D32);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1rem;
-  z-index: 1000;
-  pointer-events: none;
-`;
-
-const NotificationContent = styled(motion.div)`
-  background: ${props => props.$bgColor};
-  color: ${props => props.$textColor};
-  border-radius: 14px;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
   gap: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  font-weight: 600;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 0 auto;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  width: 100%;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
+  }
+
+  &:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
 `;
 
-const PremiumTag = styled.div`
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: linear-gradient(135deg, #ffd700 0%, #ffcc00 100%);
-  color: #8a6d00;
-  padding: 4px 12px;
+const Header = styled.header`
+  padding: ${berryTheme.spacing.large} ${berryTheme.spacing.medium} ${berryTheme.spacing.medium};
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: ${berryTheme.spacing.small};
+`;
+
+const LogoImage = styled.img`
+  height: 36px;
+  width: auto;
+`;
+
+const LogoText = styled.span`
+  font-size: 1.5rem;
+  font-weight: ${berryTheme.fonts.bold};
+  color: ${berryTheme.colors.primary};
+`;
+
+const Content = styled.div`
+  padding: ${berryTheme.spacing.medium};
+  max-width: 800px;
+  margin: 0 auto;
+`;
+
+const BalanceCard = styled.div`
+  background: white;
   border-radius: 20px;
-  font-size: 0.75rem;
+  padding: 25px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  margin-bottom: 25px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255,138,128,0.1), rgba(227,11,92,0.05));
+    z-index: 0;
+  }
+`;
+
+const BalanceLabel = styled.div`
+  font-size: 1rem;
+  color: ${berryTheme.colors.textSecondary};
+  margin-bottom: 5px;
+`;
+
+const BalanceAmount = styled.div`
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: ${berryTheme.colors.primaryDark};
+  margin: 10px 0;
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(45deg, #FF8A00, #E52E71);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+`;
+
+const RewardNotification = styled.div`
+  font-size: 1rem;
+  color: #28C76F;
   font-weight: 700;
+  background: rgba(40, 199, 111, 0.1);
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  animation: pulse 2s infinite;
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const VideoContainer = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+  margin-bottom: 25px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
+`;
+
+const VideoWrapper = styled.div`
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+`;
+
+const YouTubeIframe = styled.iframe`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+`;
+
+const VideoTitle = styled.h2`
+  font-size: 1.4rem;
+  color: ${berryTheme.colors.textDark};
+  margin-bottom: 15px;
+  text-align: center;
+  font-weight: 700;
+`;
+
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 8px;
+  background: ${berryTheme.colors.grey200};
+  border-radius: 4px;
+  margin-top: 15px;
+  overflow: hidden;
+  position: relative;
+`;
+
+const ProgressFill = styled.div`
+  width: ${props => props.$progress}%;
+  height: 100%;
+  background: linear-gradient(90deg, #FF8A00, #E52E71);
+  transition: width 1s linear;
+  border-radius: 4px;
+`;
+
+const QualifiedMarker = styled.div`
+  position: absolute;
+  left: ${props => props.$position}%;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: #4CAF50;
+  transform: translateX(-2px);
+  z-index: 2;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    width: 14px;
+    height: 14px;
+    background: #4CAF50;
+    border-radius: 50%;
+    border: 2px solid white;
+  }
+`;
+
+const QualifiedTooltip = styled.div`
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4CAF50;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+
+  ${QualifiedMarker}:hover & {
+    opacity: 1;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #4CAF50;
+  }
+`;
+
+const VideoControls = styled.div`
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+const TimeDisplay = styled.div`
+  font-size: 1rem;
+  color: ${berryTheme.colors.textSecondary};
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+`;
+
+const QualifyText = styled.span`
+  font-size: 0.9rem;
+  color: ${props => props.$claimed ? '#4CAF50' : '#FF8A00'};
+  font-weight: 600;
+`;
+
+const NextButton = styled.button`
+  background: linear-gradient(45deg, #FF8A00, #E52E71);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 12px 25px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
-  z-index: 2;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(229, 46, 113, 0.3);
+  margin: 0 auto;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(229, 46, 113, 0.4);
+  }
 `;
 
-const AdTask = () => {
-  const {
-    id,
-    isPremium,
-    adsConfig,
-    adsWatched,
-    dailyAdsWatched,
-    lastAdTimestamp,
-    setBalance,
-    setTaskPoints,
-    setAdsBalance,
-    setDollarBalance2,
-    setAdsWatched,
-    setDailyAdsWatched,
-    setLastAdTimestamp,
-    checkAndResetDailyAds
-  } = useUser();
+const Instructions = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.9);
+  
+  h3 {
+    color: ${berryTheme.colors.primaryDark};
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.3rem;
+  }
+  
+  ul {
+    padding-left: 25px;
+    margin: 0;
+  }
+  
+  li {
+    margin-bottom: 10px;
+    color: ${berryTheme.colors.textSecondary};
+    line-height: 1.6;
+  }
+`;
 
-  const [adWatched, setAdWatched] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  const [congrats, setCongrats] = useState(false);
-  const [isAdLoading, setIsAdLoading] = useState(false);
-  const [adError, setAdError] = useState(null);
-  const [showCooldownPopup, setShowCooldownPopup] = useState(false);
-  const [cooldownMessage, setCooldownMessage] = useState("");
-  const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  const [activeAd, setActiveAd] = useState(adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0]);
+const NextVideoPrompt = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  animation: ${fadeIn} 0.3s ease;
+`;
 
-  // Calculate progress percentage
-  const progressPercentage = useMemo(() => {
-    const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-    return Math.min(100, (dailyAdsWatched / dailyLimit) * 100);
-  }, [dailyAdsWatched, adsConfig, isPremium]);
+const PromptContent = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  animation: ${popIn} 0.4s ease;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+`;
 
-  // Update active ad when config changes
+const PromptTitle = styled.h2`
+  color: ${berryTheme.colors.primaryDark};
+  margin: 15px 0 10px;
+  font-size: 1.8rem;
+`;
+
+const PromptText = styled.p`
+  color: ${berryTheme.colors.textSecondary};
+  font-size: 1.1rem;
+  margin-bottom: 25px;
+  line-height: 1.5;
+`;
+
+const PromptButtons = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const PromptButton = styled.button`
+  background: ${({ $accept }) => $accept 
+    ? 'linear-gradient(45deg, #4CAF50, #2E7D32)' 
+    : 'rgba(0,0,0,0.1)'};
+  color: ${({ $accept }) => $accept ? 'white' : berryTheme.colors.textDark};
+  border: none;
+  border-radius: 25px;
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: ${({ $accept }) => $accept 
+    ? '0 4px 15px rgba(76, 175, 80, 0.3)' 
+    : 'none'};
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${({ $accept }) => $accept 
+      ? '0 8px 20px rgba(76, 175, 80, 0.4)' 
+      : '0 4px 15px rgba(0,0,0,0.1)'};
+  }
+`;
+
+const VideoWatchPage = () => {
+  // Use the user context
+  const { id, addRewards, balance, loading: userLoading } = useUser();
+  
+  // State management
+  const [currentVideo, setCurrentVideo] = useState(null);
+  const [watchedTime, setWatchedTime] = useState(0);
+  const [hasQualified, setHasQualified] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(false);
+  const [rewardEarned, setRewardEarned] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [videoEnded, setVideoEnded] = useState(false);
+  const [showNextPrompt, setShowNextPrompt] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [showClaimPrompt, setShowClaimPrompt] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  const timerRef = useRef(null);
+  const confettiTimeoutRef = useRef(null);
+  const hasQualifiedRef = useRef();
+  hasQualifiedRef.current = hasQualified;
+
+  // Mock videos data
+  const mockVideos = useMemo(() => [
+    {
+      id: 'vid1',
+      youtubeId: 'dQw4w9WgXcQ',
+      title: 'Premium Content',
+      duration: 30,
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+    },
+    {
+      id: 'vid2',
+      youtubeId: 'JGwWNGJdvx8',
+      title: 'Special Bonus',
+      duration: 45,
+      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
+    }
+  ], []);
+
+  // Load initial video
   useEffect(() => {
-    setActiveAd(adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0]);
-  }, [adsConfig]);
+    if (mockVideos.length > 0 && !userLoading) {
+      setCurrentVideo(mockVideos[0]);
+      setVideoLoading(false);
+    }
+  }, [mockVideos, userLoading]);
 
-  // Load user ad data
+  // Timer logic
   useEffect(() => {
-    const loadUserAdData = async () => {
-      if (!id) return;
-      
-      try {
-        const userRef = doc(db, "telegramUsers", id);
-        const userDoc = await getDoc(userRef);
+    if (!currentVideo || userLoading) return;
+
+    // Reset state for new video
+    setWatchedTime(0);
+    setHasQualified(false);
+    setHasClaimed(false);
+    setVideoEnded(false);
+    setShowNextPrompt(false);
+    setShowClaimPrompt(false);
+    setIsClaiming(false);
+
+    timerRef.current = setInterval(() => {
+      setWatchedTime(prev => {
+        const newTime = prev + 1;
         
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const now = new Date();
-          
-          if (!userData.lastActive || (now - userData.lastActive.toDate()) > 3600000) {
-            await updateDoc(userRef, {
-              lastActive: serverTimestamp()
-            });
-          }
+        // Check if qualified for reward (15 seconds)
+        if (newTime >= 15 && !hasQualifiedRef.current) {
+          setHasQualified(true);
+          setShowClaimPrompt(true);
         }
-      } catch (error) {
-        console.error("Error loading user ad data:", error);
-      }
-    };
 
-    loadUserAdData();
-  }, [id]);
+        // Check if video ended
+        if (newTime >= currentVideo.duration) {
+          clearInterval(timerRef.current);
+          setVideoEnded(true);
+          setShowNextPrompt(true);
+        }
 
-  // Check for daily reset and update cooldown timer
-  useEffect(() => {
-    checkAndResetDailyAds();
-
-    const updateCooldown = () => {
-      if (!lastAdTimestamp) {
-        setCooldownRemaining(0);
-        return;
-      }
-      
-      const now = new Date();
-      const timePassed = now - lastAdTimestamp;
-      const remaining = Math.max(0, Math.ceil((adsConfig.cooldown - timePassed) / 1000));
-      setCooldownRemaining(remaining);
-    };
-
-    updateCooldown();
-    const timer = setInterval(updateCooldown, 1000);
-    return () => clearInterval(timer);
-  }, [lastAdTimestamp, adsConfig.cooldown, checkAndResetDailyAds]);
-
-  // Load ad script based on config
-  useEffect(() => {
-    if (!activeAd) return;
-
-    const existingScript = document.querySelector(`script[data-zone="${activeAd.zoneId}"]`);
-    if (existingScript) return;
-
-    const tag = document.createElement("script");
-    tag.src = activeAd.scriptSrc;
-    tag.dataset.zone = activeAd.zoneId;
-    tag.dataset.sdk = activeAd.sdkVar;
-    tag.async = true;
-    
-    tag.onerror = () => {
-      setAdError("Failed to load ad provider. Please refresh the page.");
-      setIsAdLoading(false);
-    };
-    
-    document.body.appendChild(tag);
+        return newTime;
+      });
+    }, 1000);
 
     return () => {
-      if (tag.parentNode) {
-        document.body.removeChild(tag);
-      }
+      clearInterval(timerRef.current);
     };
-  }, [activeAd]);
+  }, [currentVideo, userLoading]);
 
-  const showCooldownNotification = useCallback((message) => {
-    setCooldownMessage(message);
-    setShowCooldownPopup(true);
-    setTimeout(() => setShowCooldownPopup(false), 3000);
+  // Claim reward function with double-claim prevention
+  const handleClaimReward = async (e) => {
+    if (e) e.stopPropagation();
+    
+    // Prevent claiming if already claimed or in process
+    if (hasClaimed || isClaiming || !id) return;
+
+    setIsClaiming(true);
+
+    try {
+      const result = await addRewards(1.00, 'video');
+      
+      if (result?.success) {
+        setRewardEarned(1.00);
+        setHasClaimed(true);
+        setShowConfetti(true);
+        setShowClaimPrompt(false);
+        
+        confettiTimeoutRef.current = setTimeout(() => {
+          setShowConfetti(false);
+        }, 5000);
+      }
+    } catch (err) {
+      console.error('Error claiming reward:', err);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
+  // Next video handler
+  const handleNextVideo = () => {
+    if (!currentVideo) return;
+    
+    const currentIndex = mockVideos.findIndex(v => v.id === currentVideo.id);
+    const nextIndex = (currentIndex + 1) % mockVideos.length;
+    
+    setCurrentVideo(mockVideos[nextIndex]);
+    setShowNextPrompt(false);
+  };
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      clearInterval(timerRef.current);
+      clearTimeout(confettiTimeoutRef.current);
+    };
   }, []);
 
-  const recordAdWatch = useCallback(async (adData) => {
-    if (!id) throw new Error('User not authenticated');
-    
-    const now = new Date();
-    const userRef = doc(db, 'telegramUsers', id);
-    
-    try {
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) throw new Error("User does not exist");
-        
-        const userData = userDoc.data();
-        const currentDailyCount = userData.dailyAdsWatched || 0;
-        const dailyLimit = userData.isPremium ? 
-          adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-        
-        if (currentDailyCount >= dailyLimit) {
-          throw new Error("Daily ad limit reached");
-        }
-        
-        const newAdEntry = {
-          adId: adData.adId,
-          timestamp: now,
-          pointsEarned: adsConfig.pointsBonus,
-          dollarsEarned: adsConfig.dollarBonus
-        };
-        
-        transaction.update(userRef, {
-          adsWatched: increment(1),
-          dailyAdsWatched: increment(1),
-          lastAdTimestamp: serverTimestamp(),
-          adHistory: arrayUnion(newAdEntry),
-          balance: increment(adsConfig.pointsBonus),
-          adsBalance: increment(adsConfig.dollarBonus),
-          dollarBalance2: increment(adsConfig.dollarBonus)
-        });
-      });
-      
-      setAdsWatched(prev => prev + 1);
-      setDailyAdsWatched(prev => prev + 1);
-      setLastAdTimestamp(now);
-      setBalance(prev => prev + adsConfig.pointsBonus);
-      setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
-      setDollarBalance2(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
-      
-      return true;
-    } catch (error) {
-      console.error("Error recording ad watch:", error);
-      throw error;
-    }
-  }, [
-    id, 
-    adsConfig,
-    setAdsWatched,
-    setDailyAdsWatched,
-    setLastAdTimestamp,
-    setBalance,
-    setAdsBalance,
-    setDollarBalance2
-  ]);
+  if (userLoading || videoLoading) return (
+    <Container>
+      <Header>
+        <LogoImage src='/Berry.png' alt="Berry Logo" />
+        <LogoText>berry</LogoText>
+      </Header>
+      <Content>
+        <p>Loading...</p>
+      </Content>
+      <NavBar />
+    </Container>
+  );
 
-  const handleAdCompletion = useCallback(async () => {
-    try {
-      const now = new Date();
-      await recordAdWatch({
-        adId: activeAd.id,
-        pointsEarned: adsConfig.pointsBonus,
-        dollarsEarned: adsConfig.dollarBonus,
-        timestamp: now
-      });
-      setAdWatched(true);
-    } catch (error) {
-      console.error("Error recording ad completion:", error);
-      setAdError(error.message);
-    }
-  }, [recordAdWatch, activeAd, adsConfig]);
-
-  const canClaimReward = useMemo(() => {
-    if (!adWatched) return false;
-    
-    if (!lastAdTimestamp) return true;
-    
-    return (new Date() - lastAdTimestamp) < 3600000;
-  }, [adWatched, lastAdTimestamp]);
-
-  const claimReward = useCallback(async () => {
-    if (!adWatched || claiming) return;
-    
-    setClaiming(true);
-    setAdError(null);
-    
-    try {
-      const userRef = doc(db, "telegramUsers", id);
-      
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error("User document doesn't exist");
-        }
-        
-        const userData = userDoc.data();
-        const lastAdTime = userData.lastAdTimestamp?.toDate();
-        
-        if (!lastAdTime || (new Date() - lastAdTime) > adsConfig.cooldown * 3) {
-          throw new Error("No valid ad watch recorded. Please watch an ad first.");
-        }
-        
-        transaction.update(userRef, {
-          balance: increment(adsConfig.pointsBonus),
-          taskPoints: increment(adsConfig.pointsBonus),
-          adsBalance: increment(adsConfig.dollarBonus),
-          dollarBalance2: increment(adsConfig.dollarBonus),
-          lastClaimDate: serverTimestamp()
-        });
-      });
-      
-      setBalance(prev => prev + adsConfig.pointsBonus);
-      setTaskPoints(prev => prev + adsConfig.pointsBonus);
-      setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
-      setDollarBalance2(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
-      
-      setAdWatched(false);
-      setCongrats(true);
-      setTimeout(() => setCongrats(false), 4000);
-      
-    } catch (error) {
-      console.error("Error claiming reward:", error);
-      setAdError(error.message);
-      setTimeout(() => setAdError(null), 5000);
-    } finally {
-      setClaiming(false);
-    }
-  }, [
-    adWatched, 
-    claiming, 
-    id, 
-    adsConfig, 
-    setBalance, 
-    setTaskPoints, 
-    setAdsBalance, 
-    setDollarBalance2
-  ]);
-
-  const showAd = useCallback(async () => {
-    if (isAdLoading) return;
-    
-    setIsAdLoading(true);
-    setAdError(null);
-    
-    try {
-      const now = new Date();
-      const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
-      
-      if (dailyAdsWatched >= dailyLimit) {
-        showCooldownNotification(`Daily limit reached (${dailyLimit} ads). Try again tomorrow.`);
-        return;
-      }
-      
-      if (lastAdTimestamp) {
-        const timeSinceLastAd = now - lastAdTimestamp;
-        if (timeSinceLastAd < adsConfig.cooldown) {
-          const remainingTime = adsConfig.cooldown - timeSinceLastAd;
-          const waitMinutes = Math.ceil(remainingTime / 60000);
-          showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes > 1 ? 's' : ''} before watching another ad.`);
-          return;
-        }
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await handleAdCompletion();
-        return;
-      }
-      
-      if (!window[activeAd.sdkVar]) {
-        throw new Error("Ad provider not loaded yet");
-      }
-      
-      await window[activeAd.sdkVar]();
-      await handleAdCompletion();
-      
-    } catch (error) {
-      console.error("Error showing ad:", error);
-      setAdError(error.message || "Failed to load ad. Please try again.");
-    } finally {
-      setIsAdLoading(false);
-    }
-  }, [
-    isAdLoading, 
-    isPremium, 
-    adsConfig, 
-    dailyAdsWatched, 
-    lastAdTimestamp, 
-    handleAdCompletion, 
-    showCooldownNotification, 
-    activeAd
-  ]);
+  if (!currentVideo) return (
+    <Container>
+      <Header>
+        <LogoImage src='/Berry.png' alt="Berry Logo" />
+        <LogoText>berry</LogoText>
+      </Header>
+      <Content>
+        <p>No videos available</p>
+      </Content>
+      <NavBar />
+    </Container>
+  );
 
   return (
-    <TaskContainer>
-      <TaskCard
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <GlowEffect />
-        
-        {isPremium && (
-          <PremiumTag>
-            <FaCrown size={12} /> PREMIUM
-          </PremiumTag>
-        )}
+    <Container>
+      {/* Confetti Celebration */}
+      {showConfetti && (
+        <ConfettiOverlay>
+          <Confetti src="/celebrating.gif" alt="Confetti celebration" />
+          <RewardMessage>
+            <FaDollarSign /> +2.00 Added to Your Balance!
+          </RewardMessage>
+          <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
+        </ConfettiOverlay>
+      )}
 
-        <TaskHeader>
-          <SparkleIcon size={24} />
-          <TaskTitle>Watch Ads & Earn Rewards</TaskTitle>
-        </TaskHeader>
-        
-        <TaskDescription>
-          Watch short video ads and earn Berry tokens and USD rewards. 
-          {isPremium ? " Enjoy unlimited ads with your Premium status!" : " Complete your daily limit for maximum earnings."}
-          <br /><br />
-          <strong>Total Ads Watched:</strong> {adsWatched}
-        </TaskDescription>
-        
-        <RewardBadges>
-          <RewardBadge
-            $bgColor={berryTheme.colors.primaryLight}
-            $textColor={berryTheme.colors.primaryDark}
-            $shadowColor="rgba(227, 11, 92, 0.1)"
-            whileHover={{ scale: 1.05 }}
-          >
-            <FaCoins size={16} /> +{adsConfig.pointsBonus} Berry
-          </RewardBadge>
-          <RewardBadge
-            $bgColor={berryTheme.colors.successLight}
-            $textColor={berryTheme.colors.successDark}
-            $shadowColor="rgba(46, 204, 113, 0.1)"
-            whileHover={{ scale: 1.05 }}
-          >
-            <FaGem size={16} /> ${adsConfig.dollarBonus.toFixed(3)} USD
-          </RewardBadge>
-        </RewardBadges>
-        
-        <ProgressContainer>
-          <ProgressBar 
-            $progress={progressPercentage}
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPercentage}%` }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          />
-        </ProgressContainer>
-        
-        <TaskStats>
-          <span>
-            <IoTimeOutline /> {dailyAdsWatched}/{isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit} ads today
-          </span>
-          <span>
-            {Math.round(progressPercentage)}% completed
-          </span>
-        </TaskStats>
-        
-        {adError && (
-          <ErrorText
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <IoTimeOutline /> {adError}
-          </ErrorText>
-        )}
+      {/* Reward Claim Prompt */}
+      {showClaimPrompt && !hasClaimed && (
+        <RewardPopup onClick={() => setShowClaimPrompt(false)}>
+          <PopupContent onClick={(e) => e.stopPropagation()}>
+            <FaCheckCircle size={60} color="#4CAF50" />
+            <PopupTitle>Reward Available!</PopupTitle>
+            <PopupText>
+              You've watched <strong>15 seconds</strong> and earned <strong>$2.00</strong>!
+              <br /><br />
+              Click the button below to claim your reward.
+            </PopupText>
+            <ClaimButton 
+              onClick={handleClaimReward}
+              disabled={hasClaimed || isClaiming}
+            >
+              {isClaiming ? 'Processing...' : 
+               hasClaimed ? 'Reward Claimed' : 
+               'Claim $2.00 Reward'}
+            </ClaimButton>
+          </PopupContent>
+        </RewardPopup>
+      )}
 
-        <ActionButtons>
-          <ActionButton
-            onClick={showAd}
-            disabled={cooldownRemaining > 0 || isAdLoading || dailyAdsWatched >= (isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit)}
-            $bgColor={berryTheme.colors.primary}
-            $hoverColor={berryTheme.colors.primaryDark}
-            $shadowColor="rgba(227, 11, 92, 0.3)"
-            whileTap={{ scale: 0.95 }}
-          >
-            {isAdLoading ? (
-              <>
-                <Spinner />
-                Loading
-              </>
-            ) : cooldownRemaining > 0 ? (
-              `${cooldownRemaining}s`
-            ) : (
-              <>
-                <IoSparkles /> Show Ad
-              </>
-            )}
-          </ActionButton>
+      {/* Next Video Prompt */}
+      {showNextPrompt && (
+        <NextVideoPrompt>
+          <PromptContent>
+            <PromptTitle>Continue Watching?</PromptTitle>
+            <PromptText>
+              You've completed this video. Watch another to earn more rewards!
+            </PromptText>
+            <PromptButtons>
+              <PromptButton $accept onClick={handleNextVideo}>
+                Watch Next Video
+              </PromptButton>
+              <PromptButton onClick={() => setShowNextPrompt(false)}>
+                Not Now
+              </PromptButton>
+            </PromptButtons>
+          </PromptContent>
+        </NextVideoPrompt>
+      )}
+
+      {/* Main Content */}
+      <Header>
+        <LogoImage src='/Berry.png' alt="Berry Logo" />
+        <LogoText>berry</LogoText>
+      </Header>
+      
+      <Content>
+        <BalanceCard>
+          <BalanceLabel>Video Earnings Balance</BalanceLabel>
+          <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+          {rewardEarned > 0 && (
+            <RewardNotification>
+              <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
+            </RewardNotification>
+          )}
+        </BalanceCard>
+        
+        <VideoContainer>
+          <VideoTitle>{currentVideo.title}</VideoTitle>
           
-          <ActionButton
-            onClick={claimReward}
-            disabled={!canClaimReward || claiming}
-            $bgColor={canClaimReward ? berryTheme.colors.success : berryTheme.colors.grey200}
-            $textColor={canClaimReward ? 'white' : berryTheme.colors.textMuted}
-            $hoverColor={canClaimReward ? berryTheme.colors.successDark : berryTheme.colors.grey200}
-            $shadowColor={canClaimReward ? "rgba(46, 204, 113, 0.3)" : "rgba(0,0,0,0.1)"}
-            whileTap={{ scale: 0.95 }}
-          >
-            {claiming ? (
-              <>
-                <Spinner />
-                Claiming
-              </>
-            ) : (
-              <>
-                <FaCoins /> Claim Reward
-              </>
+          <VideoWrapper>
+            <YouTubeIframe
+              src={`https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=1&controls=0`}
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+              allowFullScreen
+            />
+          </VideoWrapper>
+          
+          <ProgressBar>
+            <ProgressFill $progress={(watchedTime / currentVideo.duration) * 100} />
+            {hasQualified && (
+              <QualifiedMarker $position={(15 / currentVideo.duration) * 100}>
+                <QualifiedTooltip>Earn $2.00 here!</QualifiedTooltip>
+              </QualifiedMarker>
             )}
-          </ActionButton>
-        </ActionButtons>
-      </TaskCard>
-
-      <AnimatePresence>
-        {congrats && (
-          <Notification>
-            <NotificationContent
-              $bgColor={berryTheme.colors.successLight}
-              $textColor={berryTheme.colors.successDark}
-              initial={{ opacity: 0, y: -50, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -50, scale: 0.8 }}
-              transition={{ type: "spring", damping: 15 }}
-            >
-              <IoCheckmarkCircleSharp size={20} />
-              <span>Reward claimed successfully! 🎉</span>
-            </NotificationContent>
-          </Notification>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCooldownPopup && (
-          <Notification>
-            <NotificationContent
-              $bgColor={berryTheme.colors.primaryLight}
-              $textColor={berryTheme.colors.primaryDark}
-              initial={{ opacity: 0, y: -50, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -50, scale: 0.8 }}
-              transition={{ type: "spring", damping: 15 }}
-            >
-              <IoTimeOutline size={20} />
-              <span>{cooldownMessage}</span>
-            </NotificationContent>
-          </Notification>
-        )}
-      </AnimatePresence>
-    </TaskContainer>
+          </ProgressBar>
+          
+          <VideoControls>
+            <TimeDisplay>
+              {watchedTime}s / {currentVideo.duration}s
+              <QualifyText $claimed={hasClaimed}>
+                {hasClaimed ? 'Reward claimed!' : 
+                 hasQualified ? 'Reward available - click to claim!' : 
+                 'Watch 15s to earn $2.00'}
+              </QualifyText>
+            </TimeDisplay>
+            
+            {(videoEnded || hasClaimed) && (
+              <NextButton onClick={handleNextVideo}>
+                Next Video <FaArrowRight />
+              </NextButton>
+            )}
+          </VideoControls>
+        </VideoContainer>
+        
+        <Instructions>
+          <h3>How to earn rewards:</h3>
+          <ul>
+            <li>Watch videos to earn money</li>
+            <li>Click the claim button when it appears after 15 seconds</li>
+            <li>Each video reward can only be claimed once</li>
+            <li>Continue watching to discover more content</li>
+          </ul>
+        </Instructions>
+      </Content>
+      
+      <NavBar />
+    </Container>
   );
 };
 
-export default AdTask;
+export default VideoWatchPage;
