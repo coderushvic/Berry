@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { IoCheckmarkCircleSharp, IoTimeOutline, IoSparkles } from "react-icons/io5";
 import { FaCoins, FaGem, FaCrown } from "react-icons/fa";
 import { 
-  doc, 
+  doc,
   runTransaction, 
   serverTimestamp,
   increment,
@@ -313,6 +313,20 @@ const SignInPrompt = styled.div`
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 `;
 
+const LoadingOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 20px;
+`;
+
 /* ========== Main Component ========== */
 const AdTask = () => {
   const {
@@ -341,21 +355,35 @@ const AdTask = () => {
   const [cooldownMessage, setCooldownMessage] = useState("");
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [activeAd, setActiveAd] = useState(adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0]);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
 
-  /* ========== Authentication Checks ========== */
+  /* ========== Authentication Verification ========== */
   useEffect(() => {
-    if (!id) {
-      setAdError("Please sign in to access ad features");
-    } else {
-      setAdError(null);
-    }
+    const verifyAuthentication = async () => {
+      setIsAuthenticating(true);
+      try {
+        if (!id) {
+          setAdError("Authentication required - Please sign in");
+        } else {
+          setAdError(null);
+        }
+      } catch (error) {
+        console.error("Authentication check failed:", error);
+        setAdError("Failed to verify authentication status");
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+
+    verifyAuthentication();
   }, [id]);
 
   /* ========== Progress Calculation ========== */
   const progressPercentage = useMemo(() => {
+    if (!id) return 0;
     const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
     return Math.min(100, (dailyAdsWatched / dailyLimit) * 100);
-  }, [dailyAdsWatched, adsConfig, isPremium]);
+  }, [dailyAdsWatched, adsConfig, isPremium, id]);
 
   /* ========== Active Ad Management ========== */
   useEffect(() => {
@@ -423,7 +451,7 @@ const AdTask = () => {
   const recordAdWatch = useCallback(async (adData) => {
     if (!id) {
       console.error("User not authenticated - ID is missing");
-      throw new Error("Please sign in to watch ads");
+      throw new Error("AUTH_REQUIRED: Please sign in to watch ads");
     }
     
     const now = new Date();
@@ -434,7 +462,7 @@ const AdTask = () => {
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists()) {
           console.error("User document does not exist for ID:", id);
-          throw new Error("User account not found");
+          throw new Error("USER_NOT_FOUND: Account not found");
         }
         
         const userData = userDoc.data();
@@ -478,6 +506,12 @@ const AdTask = () => {
         userId: id,
         adData
       });
+      
+      if (error.message.includes("AUTH_REQUIRED") || error.message.includes("USER_NOT_FOUND")) {
+        setAdError(error.message.replace(/^[^:]+:\s*/, ""));
+      } else {
+        setAdError(error.message);
+      }
       throw error;
     }
   }, [
@@ -507,16 +541,17 @@ const AdTask = () => {
       });
       setAdWatched(true);
     } catch (error) {
-      console.error("Ad completion error:", {
-        error: error.message,
-        userId: id,
-        activeAd
-      });
-      setAdError(error.message);
+      if (!error.message.includes("AUTH_REQUIRED")) {
+        console.error("Ad completion error:", {
+          error: error.message,
+          userId: id,
+          activeAd
+        });
+        setAdError(error.message);
+      }
     }
   }, [recordAdWatch, activeAd, adsConfig, id]);
 
-  /* ========== Reward Claiming ========== */
   const canClaimReward = useMemo(() => {
     if (!id || !adWatched) return false;
     
@@ -542,7 +577,7 @@ const AdTask = () => {
       await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists()) {
-          throw new Error("User document doesn't exist");
+          throw new Error("USER_NOT_FOUND: User document doesn't exist");
         }
         
         const userData = userDoc.data();
@@ -575,7 +610,12 @@ const AdTask = () => {
         error: error.message,
         userId: id
       });
-      setAdError(error.message);
+      
+      if (error.message.includes("USER_NOT_FOUND")) {
+        setAdError("Account not found. Please sign in again");
+      } else {
+        setAdError(error.message);
+      }
       setTimeout(() => setAdError(null), 5000);
     } finally {
       setClaiming(false);
@@ -591,7 +631,6 @@ const AdTask = () => {
     setDollarBalance2
   ]);
 
-  /* ========== Ad Display Handler ========== */
   const showAd = useCallback(async () => {
     if (!id) {
       setAdError("Please sign in to watch ads");
@@ -656,7 +695,25 @@ const AdTask = () => {
     id
   ]);
 
-  /* ========== Render Logic ========== */
+  if (isAuthenticating) {
+    return (
+      <TaskContainer>
+        <TaskCard>
+          <LoadingOverlay>
+            <Spinner />
+          </LoadingOverlay>
+          <TaskHeader>
+            <SparkleIcon size={24} />
+            <TaskTitle>Loading Ad Features...</TaskTitle>
+          </TaskHeader>
+          <ProgressContainer>
+            <ProgressBar $progress={0} />
+          </ProgressContainer>
+        </TaskCard>
+      </TaskContainer>
+    );
+  }
+
   if (!id) {
     return (
       <TaskContainer>
@@ -664,14 +721,14 @@ const AdTask = () => {
           <GlowEffect />
           <TaskHeader>
             <SparkleIcon size={24} />
-            <TaskTitle>Watch Ads & Earn Rewards</TaskTitle>
+            <TaskTitle>Authentication Required</TaskTitle>
           </TaskHeader>
           <SignInPrompt>
             <TaskDescription>
-              You need to sign in to access this feature
+              You need to sign in to watch ads and earn rewards
             </TaskDescription>
             <ErrorText>
-              <IoTimeOutline /> Authentication required
+              <IoTimeOutline /> Please sign in to continue
             </ErrorText>
           </SignInPrompt>
         </TaskCard>
@@ -686,6 +743,11 @@ const AdTask = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
+        {isAdLoading && (
+          <LoadingOverlay>
+            <Spinner />
+          </LoadingOverlay>
+        )}
         <GlowEffect />
         
         {isPremium && (
