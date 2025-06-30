@@ -3,8 +3,6 @@ import { IoCheckmarkCircleSharp, IoTimeOutline, IoSparkles } from "react-icons/i
 import { FaCoins, FaGem, FaCrown } from "react-icons/fa";
 import { 
   doc, 
-  updateDoc, 
-  getDoc, 
   runTransaction, 
   serverTimestamp,
   increment,
@@ -16,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { berryTheme } from '../../Theme';
 import styled, { keyframes } from 'styled-components';
 
-// Animations
+/* ========== Animations ========== */
 const float = keyframes`
   0% { transform: translateY(0px); }
   50% { transform: translateY(-5px); }
@@ -28,7 +26,7 @@ const shimmer = keyframes`
   100% { background-position: 200% 0; }
 `;
 
-// Styled components
+/* ========== Styled Components ========== */
 const TaskContainer = styled.div`
   margin-bottom: ${berryTheme.spacing.large};
   width: 100%;
@@ -306,6 +304,16 @@ const PremiumTag = styled.div`
   z-index: 2;
 `;
 
+const SignInPrompt = styled.div`
+  text-align: center;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+`;
+
+/* ========== Main Component ========== */
 const AdTask = () => {
   const {
     id,
@@ -334,46 +342,30 @@ const AdTask = () => {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [activeAd, setActiveAd] = useState(adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0]);
 
-  // Calculate progress percentage
+  /* ========== Authentication Checks ========== */
+  useEffect(() => {
+    if (!id) {
+      setAdError("Please sign in to access ad features");
+    } else {
+      setAdError(null);
+    }
+  }, [id]);
+
+  /* ========== Progress Calculation ========== */
   const progressPercentage = useMemo(() => {
     const dailyLimit = isPremium ? adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
     return Math.min(100, (dailyAdsWatched / dailyLimit) * 100);
   }, [dailyAdsWatched, adsConfig, isPremium]);
 
-  // Update active ad when config changes
+  /* ========== Active Ad Management ========== */
   useEffect(() => {
     setActiveAd(adsConfig.ads.find(ad => ad.active) || adsConfig.ads[0]);
   }, [adsConfig]);
 
-  // Load user ad data
+  /* ========== Cooldown Timer ========== */
   useEffect(() => {
-    const loadUserAdData = async () => {
-      if (!id) return;
-      
-      try {
-        const userRef = doc(db, "telegramUsers", id);
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const now = new Date();
-          
-          if (!userData.lastActive || (now - userData.lastActive.toDate()) > 3600000) {
-            await updateDoc(userRef, {
-              lastActive: serverTimestamp()
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error loading user ad data:", error);
-      }
-    };
+    if (!id) return;
 
-    loadUserAdData();
-  }, [id]);
-
-  // Check for daily reset and update cooldown timer
-  useEffect(() => {
     checkAndResetDailyAds();
 
     const updateCooldown = () => {
@@ -391,11 +383,11 @@ const AdTask = () => {
     updateCooldown();
     const timer = setInterval(updateCooldown, 1000);
     return () => clearInterval(timer);
-  }, [lastAdTimestamp, adsConfig.cooldown, checkAndResetDailyAds]);
+  }, [lastAdTimestamp, adsConfig.cooldown, checkAndResetDailyAds, id]);
 
-  // Load ad script based on config
+  /* ========== Ad Script Loading ========== */
   useEffect(() => {
-    if (!activeAd) return;
+    if (!id || !activeAd) return;
 
     const existingScript = document.querySelector(`script[data-zone="${activeAd.zoneId}"]`);
     if (existingScript) return;
@@ -418,16 +410,21 @@ const AdTask = () => {
         document.body.removeChild(tag);
       }
     };
-  }, [activeAd]);
+  }, [activeAd, id]);
 
+  /* ========== Notification Handlers ========== */
   const showCooldownNotification = useCallback((message) => {
     setCooldownMessage(message);
     setShowCooldownPopup(true);
     setTimeout(() => setShowCooldownPopup(false), 3000);
   }, []);
 
+  /* ========== Core Ad Functions ========== */
   const recordAdWatch = useCallback(async (adData) => {
-    if (!id) throw new Error('User not authenticated');
+    if (!id) {
+      console.error("User not authenticated - ID is missing");
+      throw new Error("Please sign in to watch ads");
+    }
     
     const now = new Date();
     const userRef = doc(db, 'telegramUsers', id);
@@ -435,7 +432,10 @@ const AdTask = () => {
     try {
       await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) throw new Error("User does not exist");
+        if (!userDoc.exists()) {
+          console.error("User document does not exist for ID:", id);
+          throw new Error("User account not found");
+        }
         
         const userData = userDoc.data();
         const currentDailyCount = userData.dailyAdsWatched || 0;
@@ -443,7 +443,7 @@ const AdTask = () => {
           adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
         
         if (currentDailyCount >= dailyLimit) {
-          throw new Error("Daily ad limit reached");
+          throw new Error(`Daily ad limit reached (${dailyLimit} ads)`);
         }
         
         const newAdEntry = {
@@ -473,7 +473,11 @@ const AdTask = () => {
       
       return true;
     } catch (error) {
-      console.error("Error recording ad watch:", error);
+      console.error("Error recording ad watch:", {
+        error: error.message,
+        userId: id,
+        adData
+      });
       throw error;
     }
   }, [
@@ -489,6 +493,11 @@ const AdTask = () => {
 
   const handleAdCompletion = useCallback(async () => {
     try {
+      if (!id) {
+        setAdError("Please sign in to complete this ad");
+        return;
+      }
+
       const now = new Date();
       await recordAdWatch({
         adId: activeAd.id,
@@ -498,20 +507,30 @@ const AdTask = () => {
       });
       setAdWatched(true);
     } catch (error) {
-      console.error("Error recording ad completion:", error);
+      console.error("Ad completion error:", {
+        error: error.message,
+        userId: id,
+        activeAd
+      });
       setAdError(error.message);
     }
-  }, [recordAdWatch, activeAd, adsConfig]);
+  }, [recordAdWatch, activeAd, adsConfig, id]);
 
+  /* ========== Reward Claiming ========== */
   const canClaimReward = useMemo(() => {
-    if (!adWatched) return false;
+    if (!id || !adWatched) return false;
     
     if (!lastAdTimestamp) return true;
     
     return (new Date() - lastAdTimestamp) < 3600000;
-  }, [adWatched, lastAdTimestamp]);
+  }, [adWatched, lastAdTimestamp, id]);
 
   const claimReward = useCallback(async () => {
+    if (!id) {
+      setAdError("Please sign in to claim rewards");
+      return;
+    }
+
     if (!adWatched || claiming) return;
     
     setClaiming(true);
@@ -552,7 +571,10 @@ const AdTask = () => {
       setTimeout(() => setCongrats(false), 4000);
       
     } catch (error) {
-      console.error("Error claiming reward:", error);
+      console.error("Error claiming reward:", {
+        error: error.message,
+        userId: id
+      });
       setAdError(error.message);
       setTimeout(() => setAdError(null), 5000);
     } finally {
@@ -569,7 +591,13 @@ const AdTask = () => {
     setDollarBalance2
   ]);
 
+  /* ========== Ad Display Handler ========== */
   const showAd = useCallback(async () => {
+    if (!id) {
+      setAdError("Please sign in to watch ads");
+      return;
+    }
+
     if (isAdLoading) return;
     
     setIsAdLoading(true);
@@ -608,7 +636,10 @@ const AdTask = () => {
       await handleAdCompletion();
       
     } catch (error) {
-      console.error("Error showing ad:", error);
+      console.error("Error showing ad:", {
+        error: error.message,
+        userId: id
+      });
       setAdError(error.message || "Failed to load ad. Please try again.");
     } finally {
       setIsAdLoading(false);
@@ -621,8 +652,32 @@ const AdTask = () => {
     lastAdTimestamp, 
     handleAdCompletion, 
     showCooldownNotification, 
-    activeAd
+    activeAd,
+    id
   ]);
+
+  /* ========== Render Logic ========== */
+  if (!id) {
+    return (
+      <TaskContainer>
+        <TaskCard>
+          <GlowEffect />
+          <TaskHeader>
+            <SparkleIcon size={24} />
+            <TaskTitle>Watch Ads & Earn Rewards</TaskTitle>
+          </TaskHeader>
+          <SignInPrompt>
+            <TaskDescription>
+              You need to sign in to access this feature
+            </TaskDescription>
+            <ErrorText>
+              <IoTimeOutline /> Authentication required
+            </ErrorText>
+          </SignInPrompt>
+        </TaskCard>
+      </TaskContainer>
+    );
+  }
 
   return (
     <TaskContainer>
