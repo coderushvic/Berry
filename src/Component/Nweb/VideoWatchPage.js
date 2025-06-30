@@ -676,7 +676,7 @@ const VideoWatchPage = () => {
         <ConfettiOverlay>
           <Confetti src="/celebrating.gif" alt="Confetti celebration" />
           <RewardMessage>
-            <FaDollarSign /> +1.00 Added to Your Balance!
+            <FaDollarSign /> +2.00 Added to Your Balance!
           </RewardMessage>
           <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
@@ -689,7 +689,7 @@ const VideoWatchPage = () => {
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Reward Available!</PopupTitle>
             <PopupText>
-              You've watched <strong>15 seconds</strong> and earned <strong>$1.00</strong>!
+              You've watched <strong>15 seconds</strong> and earned <strong>$2.00</strong>!
               <br /><br />
               Click the button below to claim your reward.
             </PopupText>
@@ -699,7 +699,7 @@ const VideoWatchPage = () => {
             >
               {isClaiming ? 'Processing...' : 
                hasClaimed ? 'Reward Claimed' : 
-               'Claim $1.00 Reward'}
+               'Claim $2.00 Reward'}
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
@@ -757,7 +757,7 @@ const VideoWatchPage = () => {
             <ProgressFill $progress={(watchedTime / currentVideo.duration) * 100} />
             {hasQualified && (
               <QualifiedMarker $position={(15 / currentVideo.duration) * 100}>
-                <QualifiedTooltip>Earn $1.00 here!</QualifiedTooltip>
+                <QualifiedTooltip>Earn $2.00 here!</QualifiedTooltip>
               </QualifiedMarker>
             )}
           </ProgressBar>
@@ -768,7 +768,7 @@ const VideoWatchPage = () => {
               <QualifyText $claimed={hasClaimed}>
                 {hasClaimed ? 'Reward claimed!' : 
                  hasQualified ? 'Reward available - click to claim!' : 
-                 'Watch 15s to earn $1.00'}
+                 'Watch 15s to earn $2.00'}
               </QualifyText>
             </TimeDisplay>
             
