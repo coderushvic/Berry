@@ -3,8 +3,7 @@ import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaArrowRight, FaCheckCircle, FaDollarSign } from 'react-icons/fa';
 import NavBar from './NavBar';
-import { getDatabase, ref, increment, update, onValue } from 'firebase/database';
-import { getAuth } from 'firebase/auth';
+import { useUser } from '../../context/userContext';
 
 // Animations
 const fadeIn = keyframes`
@@ -510,6 +509,9 @@ const PromptButton = styled.button`
 `;
 
 const VideoWatchPage = () => {
+  // Use the user context
+  const { id, addRewards, balance, loading: userLoading } = useUser();
+  
   // State management
   const [currentVideo, setCurrentVideo] = useState(null);
   const [watchedTime, setWatchedTime] = useState(0);
@@ -519,9 +521,8 @@ const VideoWatchPage = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
-  const [balance, setBalance] = useState(0);
-  const [userId, setUserId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [showClaimPrompt, setShowClaimPrompt] = useState(false);
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
@@ -546,92 +547,17 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Initialize auth and get user ID
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        setUserId(user.uid);
-        loadUserBalance(user.uid);
-      } else {
-        setLoading(false);
-        // Handle case where user is not logged in
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Load user balance from Firebase
-  const loadUserBalance = (uid) => {
-    const db = getDatabase();
-    const userRef = ref(db, `users/${uid}/balance`);
-
-    onValue(userRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setBalance(data.videoEarnings || 0);
-        localStorage.setItem('videoBalance', data.videoEarnings?.toString() || '0');
-      } else {
-        // Initialize balance if it doesn't exist
-        update(ref(db), {
-          [`users/${uid}/balance/videoEarnings`]: 0,
-          [`users/${uid}/balance/totalBalance`]: 0
-        });
-      }
-      setLoading(false);
-    }, (error) => {
-      console.error('Error loading balance:', error);
-      // Fallback to localStorage
-      const savedBalance = localStorage.getItem('videoBalance');
-      if (savedBalance) {
-        setBalance(parseFloat(savedBalance));
-      }
-      setLoading(false);
-    });
-  };
-
-  // Watch video and earn reward function
-  const watchVideo = async (amount) => {
-    if (!userId) {
-      console.error('No user ID available');
-      return { success: false, error: 'User not authenticated' };
-    }
-
-    try {
-      const db = getDatabase();
-      const updates = {
-        [`users/${userId}/balance/videoEarnings`]: increment(amount),
-        [`users/${userId}/balance/totalBalance`]: increment(amount),
-        [`users/${userId}/lastRewardClaimed`]: new Date().toISOString()
-      };
-
-      await update(ref(db), updates);
-      
-      // Update local state
-      setBalance(prev => {
-        const newBalance = prev + amount;
-        localStorage.setItem('videoBalance', newBalance.toString());
-        return newBalance;
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating Firebase balance:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
   // Load initial video
   useEffect(() => {
-    if (mockVideos.length > 0 && !loading) {
+    if (mockVideos.length > 0 && !userLoading) {
       setCurrentVideo(mockVideos[0]);
+      setVideoLoading(false);
     }
-  }, [mockVideos, loading]);
+  }, [mockVideos, userLoading]);
 
   // Timer logic
   useEffect(() => {
-    if (!currentVideo || loading) return;
+    if (!currentVideo || userLoading) return;
 
     // Reset state for new video
     setWatchedTime(0);
@@ -639,6 +565,7 @@ const VideoWatchPage = () => {
     setHasClaimed(false);
     setVideoEnded(false);
     setShowNextPrompt(false);
+    setShowClaimPrompt(false);
 
     timerRef.current = setInterval(() => {
       setWatchedTime(prev => {
@@ -647,6 +574,7 @@ const VideoWatchPage = () => {
         // Check if qualified for reward (15 seconds)
         if (newTime >= 15 && !hasQualifiedRef.current) {
           setHasQualified(true);
+          setShowClaimPrompt(true);
         }
 
         // Check if video ended
@@ -660,22 +588,26 @@ const VideoWatchPage = () => {
       });
     }, 1000);
 
-    return () => clearInterval(timerRef.current);
-  }, [currentVideo, loading]);
+    return () => {
+      clearInterval(timerRef.current);
+    };
+  }, [currentVideo, userLoading]);
 
   // Claim reward function
   const handleClaimReward = async (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     
-    if (!hasQualified || hasClaimed || !userId) return;
+    if (!hasQualified || hasClaimed || !id) return;
 
     try {
-      const result = await watchVideo(1.00);
+      // Use the addRewards function from UserContext
+      const result = await addRewards(1.00, 'video');
       
       if (result?.success) {
         setRewardEarned(1.00);
         setHasClaimed(true);
         setShowConfetti(true);
+        setShowClaimPrompt(false);
         
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
@@ -705,14 +637,14 @@ const VideoWatchPage = () => {
     };
   }, []);
 
-  if (loading) return (
+  if (userLoading || videoLoading) return (
     <Container>
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
         <LogoText>berry</LogoText>
       </Header>
       <Content>
-        <p>Loading user data...</p>
+        <p>Loading...</p>
       </Content>
       <NavBar />
     </Container>
@@ -725,7 +657,7 @@ const VideoWatchPage = () => {
         <LogoText>berry</LogoText>
       </Header>
       <Content>
-        <p>Loading videos...</p>
+        <p>No videos available</p>
       </Content>
       <NavBar />
     </Container>
@@ -744,9 +676,9 @@ const VideoWatchPage = () => {
         </ConfettiOverlay>
       )}
 
-      {/* Reward Popup */}
-      {hasQualified && !hasClaimed && (
-        <RewardPopup onClick={() => setShowNextPrompt(false)}>
+      {/* Reward Claim Prompt */}
+      {showClaimPrompt && !hasClaimed && (
+        <RewardPopup onClick={() => setShowClaimPrompt(false)}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Reward Available!</PopupTitle>
@@ -826,7 +758,9 @@ const VideoWatchPage = () => {
             <TimeDisplay>
               {watchedTime}s / {currentVideo.duration}s
               <QualifyText $claimed={hasClaimed}>
-                {hasClaimed ? 'Reward claimed!' : hasQualified ? 'Reward available!' : 'Watch 15s to earn $1.00'}
+                {hasClaimed ? 'Reward claimed!' : 
+                 hasQualified ? 'Reward available - click to claim!' : 
+                 'Watch 15s to earn $1.00'}
               </QualifyText>
             </TimeDisplay>
             
@@ -841,9 +775,9 @@ const VideoWatchPage = () => {
         <Instructions>
           <h3>How to earn rewards:</h3>
           <ul>
-            <li>Watch videos to earn money automatically</li>
-            <li>Earn $1.00 after watching 15 seconds</li>
-            <li>Each video reward can only be claimed once</li>
+            <li>Watch videos to earn money</li>
+            <li>Click the claim button when it appears after 15 seconds</li>
+            <li>Each video reward must be manually claimed</li>
             <li>Continue watching to discover more content</li>
           </ul>
         </Instructions>
