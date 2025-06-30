@@ -523,6 +523,7 @@ const VideoWatchPage = () => {
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
   const [showClaimPrompt, setShowClaimPrompt] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
@@ -566,6 +567,7 @@ const VideoWatchPage = () => {
     setVideoEnded(false);
     setShowNextPrompt(false);
     setShowClaimPrompt(false);
+    setIsClaiming(false);
 
     timerRef.current = setInterval(() => {
       setWatchedTime(prev => {
@@ -593,14 +595,16 @@ const VideoWatchPage = () => {
     };
   }, [currentVideo, userLoading]);
 
-  // Claim reward function
+  // Claim reward function with double-claim prevention
   const handleClaimReward = async (e) => {
     if (e) e.stopPropagation();
     
-    if (!hasQualified || hasClaimed || !id) return;
+    // Prevent claiming if already claimed or in process
+    if (hasClaimed || isClaiming || !id) return;
+
+    setIsClaiming(true);
 
     try {
-      // Use the addRewards function from UserContext
       const result = await addRewards(1.00, 'video');
       
       if (result?.success) {
@@ -615,6 +619,8 @@ const VideoWatchPage = () => {
       }
     } catch (err) {
       console.error('Error claiming reward:', err);
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -689,9 +695,11 @@ const VideoWatchPage = () => {
             </PopupText>
             <ClaimButton 
               onClick={handleClaimReward}
-              disabled={hasClaimed}
+              disabled={hasClaimed || isClaiming}
             >
-              {hasClaimed ? 'Reward Claimed' : 'Claim $1.00 Reward'}
+              {isClaiming ? 'Processing...' : 
+               hasClaimed ? 'Reward Claimed' : 
+               'Claim $1.00 Reward'}
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
@@ -777,7 +785,7 @@ const VideoWatchPage = () => {
           <ul>
             <li>Watch videos to earn money</li>
             <li>Click the claim button when it appears after 15 seconds</li>
-            <li>Each video reward must be manually claimed</li>
+            <li>Each video reward can only be claimed once</li>
             <li>Continue watching to discover more content</li>
           </ul>
         </Instructions>
