@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { IoCheckmarkCircleSharp, IoTimeOutline, IoSparkles } from "react-icons/io5";
 import { FaCoins, FaGem, FaCrown } from "react-icons/fa";
-import { doc, updateDoc, increment, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, increment, getDoc, runTransaction } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useUser } from "../../context/userContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -435,7 +435,7 @@ const AdTask = () => {
         
         transaction.update(userRef, {
           adsWatchedToday: increment(1),
-          lastAdTimestamp: serverTimestamp()
+          lastAdTimestamp: now // Using client timestamp instead of serverTimestamp()
         });
       });
       
