@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { 
   doc, getDoc, setDoc, updateDoc, arrayUnion, 
   getDocs, collection, orderBy, where, query, 
-  limit, runTransaction, Timestamp, increment, serverTimestamp 
+  limit, runTransaction, Timestamp, increment, 
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/firestore';
 import YoutubeTasks from '../Component/Alltask/YoutubeTasks';
@@ -73,11 +74,14 @@ export const UserProvider = ({ children }) => {
   const [adsWithdrawals, setAdsWithdrawals] = useState([]);
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState({});
   const [isPremium, setIsPremium] = useState(false);
-  
-  // Ad tracking configuration (updated for 1:1 ratio)
+  const [claimedVideos, setClaimedVideos] = useState([]);
+  const [lastDailyReward, setLastDailyReward] = useState(null);
+  const [lastVideoClaim, setLastVideoClaim] = useState(null);
+
+  // Ad tracking configuration
   const [adsConfig, setAdsConfig] = useState({
-    pointsBonus: 1,       // 1 point
-    dollarBonus: 1,       // $1
+    pointsBonus: 1,
+    dollarBonus: 1,
     dailyLimit: 50,
     premiumDailyLimit: 100,
     cooldown: 20 * 60 * 1000,
@@ -99,7 +103,7 @@ export const UserProvider = ({ children }) => {
       total: ((balance / 1000) + adsBalance + dollarBalance2).toFixed(2),
       available: dollarBalance2.toFixed(2),
       ads: adsBalance.toFixed(2),
-      points: balance // Internal points
+      points: balance
     };
   }, [balance, adsBalance, dollarBalance2]);
 
@@ -162,7 +166,8 @@ export const UserProvider = ({ children }) => {
         const newAdEntry = {
           adId: adData.adId,
           timestamp: serverTimestamp(),
-          dollarsEarned: adsConfig.dollarBonus
+          dollarsEarned: adsConfig.dollarBonus,
+          status: 'pending'
         };
         
         transaction.update(userRef, {
@@ -171,7 +176,7 @@ export const UserProvider = ({ children }) => {
           lastAdTimestamp: serverTimestamp(),
           adHistory: arrayUnion(newAdEntry),
           adsBalance: increment(adsConfig.dollarBonus),
-          balance: increment(adsConfig.dollarBonus * 1000), // Convert $ to points
+          balance: increment(adsConfig.dollarBonus * 1000),
           dollarBalance2: increment(adsConfig.dollarBonus)
         });
       });
@@ -182,7 +187,8 @@ export const UserProvider = ({ children }) => {
       setAdHistory(prev => [...prev, {
         adId: adData.adId,
         timestamp: now,
-        dollarsEarned: adsConfig.dollarBonus
+        dollarsEarned: adsConfig.dollarBonus,
+        status: 'completed'
       }]);
       setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
       setBalance(prev => prev + (adsConfig.dollarBonus * 1000));
@@ -195,8 +201,8 @@ export const UserProvider = ({ children }) => {
     }
   }, [id, adsConfig, checkAndResetDailyAds]);
 
-  // Watch video - maintains both systems
-  const watchVideo = useCallback(async (rewardAmount) => {
+  // Watch video - maintains both systems with claim tracking
+  const watchVideo = useCallback(async (rewardAmount, videoId) => {
     if (!id) throw new Error('User not authenticated');
 
     try {
@@ -205,6 +211,12 @@ export const UserProvider = ({ children }) => {
       const result = await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists()) throw new Error("User does not exist");
+
+        // Check if video was already claimed
+        const userClaimedVideos = userDoc.data().claimedVideos || [];
+        if (videoId && userClaimedVideos.includes(videoId)) {
+          throw new Error("Reward for this video already claimed");
+        }
 
         const now = new Date();
         const lastVideoTime = userDoc.data().lastVideoTime?.toDate();
@@ -216,16 +228,24 @@ export const UserProvider = ({ children }) => {
           }
         }
 
-        transaction.update(userRef, {
+        const updateData = {
           dollarBalance2: increment(rewardAmount),
           videoWatched: increment(1),
           lastVideoTime: serverTimestamp(),
-          balance: increment(rewardAmount * 1000) // Convert $ to points
-        });
+          balance: increment(rewardAmount * 1000)
+        };
+
+        if (videoId) {
+          updateData.claimedVideos = arrayUnion(videoId);
+          updateData.lastVideoClaim = serverTimestamp();
+        }
+
+        transaction.update(userRef, updateData);
 
         return { 
           success: true, 
-          newBalance: (userDoc.data().dollarBalance2 || 0) + rewardAmount
+          newBalance: (userDoc.data().dollarBalance2 || 0) + rewardAmount,
+          videoId
         };
       });
 
@@ -234,9 +254,155 @@ export const UserProvider = ({ children }) => {
       setLastVideoTime(new Date());
       setBalance(prev => prev + (rewardAmount * 1000));
 
+      if (videoId) {
+        setClaimedVideos(prev => [...prev, videoId]);
+        setLastVideoClaim(new Date());
+      }
+
       return result;
     } catch (error) {
       console.error('Error in watchVideo:', error);
+      return { success: false, error: error.message };
+    }
+  }, [id]);
+
+  // Claim daily reward with duplicate prevention
+  const claimDailyReward = useCallback(async (amount = 5) => {
+    if (!id) throw new Error('User not authenticated');
+
+    try {
+      const now = new Date();
+      const userRef = doc(db, 'telegramUsers', id);
+      
+      const result = await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User does not exist");
+
+        const lastClaimDate = userDoc.data().lastDailyReward?.toDate();
+        if (lastClaimDate) {
+          const lastClaimDay = new Date(lastClaimDate);
+          lastClaimDay.setHours(0, 0, 0, 0);
+          
+          const today = new Date(now);
+          today.setHours(0, 0, 0, 0);
+          
+          if (lastClaimDay.getTime() === today.getTime()) {
+            throw new Error("Daily reward already claimed today");
+          }
+        }
+
+        transaction.update(userRef, {
+          balance: increment(amount * 1000),
+          dollarBalance2: increment(amount),
+          lastDailyReward: serverTimestamp()
+        });
+
+        return { success: true, amount };
+      });
+
+      setBalance(prev => prev + (amount * 1000));
+      setDollarBalance2(prev => +(prev + amount).toFixed(2));
+      setLastDailyReward(now);
+
+      return result;
+    } catch (error) {
+      console.error('Error claiming daily reward:', error);
+      return { success: false, error: error.message };
+    }
+  }, [id]);
+
+  // Unified reward adding with transaction safety
+  const addRewards = useCallback(async (amount, type = 'main', options = {}) => {
+    if (!id) throw new Error('User not authenticated');
+    
+    try {
+      const userRef = doc(db, 'telegramUsers', id);
+      const now = new Date();
+      
+      const result = await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User does not exist");
+
+        const updateData = {};
+        const claimId = options.claimId || `${type}-${now.getTime()}`;
+        
+        // Check for duplicate claims
+        if (options.preventDuplicate && userDoc.data().processedClaims?.includes(claimId)) {
+          throw new Error("Reward already claimed");
+        }
+
+        switch (type) {
+          case 'main':
+            updateData.balance = increment(amount * 1000);
+            updateData.dollarBalance2 = increment(amount);
+            break;
+          case 'ads':
+            updateData.adsBalance = increment(amount);
+            updateData.adsWatched = increment(1);
+            updateData.lastAdTimestamp = serverTimestamp();
+            break;
+          case 'video':
+            updateData.dollarBalance2 = increment(amount);
+            updateData.balance = increment(amount * 1000);
+            updateData.videoWatched = increment(1);
+            updateData.lastVideoTime = serverTimestamp();
+            
+            if (options.videoId) {
+              if (userDoc.data().claimedVideos?.includes(options.videoId)) {
+                throw new Error("Video reward already claimed");
+              }
+              updateData.claimedVideos = arrayUnion(options.videoId);
+              updateData.lastVideoClaim = serverTimestamp();
+            }
+            break;
+          default:
+            throw new Error(`Invalid reward type: ${type}`);
+        }
+
+        if (options.preventDuplicate) {
+          updateData.processedClaims = arrayUnion(claimId);
+        }
+
+        transaction.update(userRef, updateData);
+
+        return {
+          success: true,
+          newBalance: (userDoc.data().dollarBalance2 || 0) + amount,
+          claimId
+        };
+      });
+
+      // Update local state
+      switch (type) {
+  case 'main':
+    setBalance(prev => prev + (amount * 1000));
+    setDollarBalance2(prev => +(prev + amount).toFixed(2));
+    break;
+  case 'ads':
+    setAdsBalance(prev => +(prev + amount).toFixed(6));
+    setAdsWatched(prev => prev + 1);
+    setLastAdTimestamp(now);
+    break;
+  case 'video':
+    setDollarBalance2(prev => +(prev + amount).toFixed(3));
+    setVideoWatched(prev => prev + 1);
+    setLastVideoTime(now);
+    setBalance(prev => prev + (amount * 1000));
+    
+    if (options.videoId) {
+      setClaimedVideos(prev => [...prev, options.videoId]);
+      setLastVideoClaim(now);
+    }
+    break;
+  default:
+    // Handle unexpected reward types
+    console.error(`Unknown reward type: ${type}`);
+    throw new Error(`Invalid reward type: ${type}`);
+}
+
+      return result;
+    } catch (error) {
+      console.error('Error adding rewards:', error);
       return { success: false, error: error.message };
     }
   }, [id]);
@@ -265,70 +431,6 @@ export const UserProvider = ({ children }) => {
       adHistory
     };
   }, [adsWatched, dailyAdsWatched, lastAdTimestamp, adHistory, isPremium, adsConfig]);
-
-  // Unified reward adding - maintains both systems
-  const addRewards = async (amount, type = 'main') => {
-    if (!id) throw new Error('User not authenticated');
-    
-    try {
-      const userRef = doc(db, 'telegramUsers', id);
-      
-      const updateData = {};
-      const stateUpdates = {};
-      
-      switch (type) {
-        case 'main':
-          updateData.balance = increment(amount * 1000); // Convert $ to points
-          updateData.dollarBalance2 = increment(amount);
-          stateUpdates.setBalance = amount * 1000;
-          stateUpdates.setDollarBalance2 = amount;
-          break;
-        case 'ads':
-          updateData.adsBalance = increment(amount);
-          updateData.adsWatched = increment(1);
-          updateData.lastAdTimestamp = Timestamp.now();
-          stateUpdates.setAdsBalance = amount;
-          stateUpdates.setAdsWatched = 1;
-          stateUpdates.setLastAdTimestamp = Date.now();
-          break;
-        case 'video':
-          updateData.dollarBalance2 = increment(amount);
-          updateData.balance = increment(amount * 1000); // Convert $ to points
-          updateData.videoWatched = increment(1);
-          updateData.lastVideoTime = Timestamp.now();
-          stateUpdates.setDollarBalance2 = amount;
-          stateUpdates.setBalance = amount * 1000;
-          stateUpdates.setVideoWatched = 1;
-          stateUpdates.setLastVideoTime = Date.now();
-          break;
-        default:
-          throw new Error(`Invalid reward type: ${type}`);
-      }
-      
-      await updateDoc(userRef, updateData);
-      
-      Object.entries(stateUpdates).forEach(([setter, value]) => {
-        const setterFn = {
-          setBalance,
-          setDollarBalance2,
-          setAdsBalance,
-          setAdsWatched,
-          setVideoWatched,
-          setLastAdTimestamp,
-          setLastVideoTime
-        }[setter];
-        
-        if (setterFn) {
-          setterFn(prev => prev + value);
-        }
-      });
-
-      return { success: true, newBalance: getTotalBalance() };
-    } catch (error) {
-      console.error('Error adding rewards:', error);
-      return { success: false, error: error.message };
-    }
-  };
 
   // Fetch top users with caching
   const fetchTopUsers = useCallback(async () => {
@@ -410,7 +512,7 @@ export const UserProvider = ({ children }) => {
           refBonus: refBonus,
         }),
         refBonus: increment(refBonus),
-        balance: increment(refBonus * 1000), // Convert $ to points
+        balance: increment(refBonus * 1000),
         dollarBalance2: increment(refBonus)
       });
 
@@ -427,30 +529,34 @@ export const UserProvider = ({ children }) => {
 
   // Fetch withdrawal history
   const fetchWithdrawals = useCallback(async () => {
-    try {
-      const [withdrawalsSnapshot, adsWithdrawalsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'withdrawalRequests'), orderBy('createdAt', 'desc'))),
-        getDocs(query(collection(db, 'adsWithdrawalRequests'), orderBy('createdAt', 'desc')))
-      ]);
+  try {
+    // Corrected Promise.all destructuring syntax
+    const [
+      withdrawalsSnapshot,
+      adsWithdrawalsSnapshot
+    ] = await Promise.all([
+      getDocs(query(collection(db, 'withdrawalRequests'), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, 'adsWithdrawalRequests'), orderBy('createdAt', 'desc')))
+    ]);
 
-      const processSnapshot = (snapshot, type) => snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        balanceType: type,
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate()
-      }));
+    const processSnapshot = (snapshot, type) => snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      balanceType: type,
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate()
+    }));
 
-      const withdrawalsData = processSnapshot(withdrawalsSnapshot, 'main');
-      const adsWithdrawalsData = processSnapshot(adsWithdrawalsSnapshot, 'ads');
+    const withdrawalsData = processSnapshot(withdrawalsSnapshot, 'main');
+    const adsWithdrawalsData = processSnapshot(adsWithdrawalsSnapshot, 'ads');
 
-      setAllWithdrawals(withdrawalsData);
-      setAdsWithdrawals(adsWithdrawalsData);
-    } catch (error) {
-      console.error('Error fetching withdrawals:', error);
-      setError(error);
-    }
-  }, []);
+    setAllWithdrawals(withdrawalsData);
+    setAdsWithdrawals(adsWithdrawalsData);
+  } catch (error) {
+    console.error('Error fetching withdrawals:', error);
+    setError(error);
+  }
+}, []);
 
   // Update withdrawal status
   const updateWithdrawalStatus = useCallback(async (id, status, isAdsWithdrawal = false) => {
@@ -533,6 +639,9 @@ export const UserProvider = ({ children }) => {
         setLastAdTimestamp(userData.lastAdTimestamp?.toDate() || null);
         setLastVideoTime(userData.lastVideoTime?.toDate() || null);
         setAdHistory(userData.adHistory || []);
+        setClaimedVideos(userData.claimedVideos || []);
+        setLastDailyReward(userData.lastDailyReward?.toDate() || null);
+        setLastVideoClaim(userData.lastVideoClaim?.toDate() || null);
 
         // Set premium status
         setIsPremium(userData.isPremium || false);
@@ -682,7 +791,10 @@ export const UserProvider = ({ children }) => {
           videoWatched: 0,
           lastAdTimestamp: null,
           lastVideoTime: null,
+          lastVideoClaim: null,
+          lastDailyReward: null,
           adHistory: [],
+          claimedVideos: [],
           lastActive: Timestamp.now(),
           refereeId: referrerId || null,
           referrals: [],
@@ -749,10 +861,10 @@ export const UserProvider = ({ children }) => {
           if (lastCheckInDate) {
             const lastCheckInLocal = new Date(lastCheckInDate.getTime() + lastCheckInDate.getTimezoneOffset() * 60000);
             lastCheckInLocal.setHours(0, 0, 0, 0);
-
+            
             const todayMidnight = new Date(now);
             todayMidnight.setHours(0, 0, 0, 0);
-
+            
             const daysSinceLastCheckIn = Math.floor((todayMidnight - lastCheckInLocal) / (1000 * 60 * 60 * 24));
 
             if (daysSinceLastCheckIn === 0) {
@@ -854,6 +966,9 @@ export const UserProvider = ({ children }) => {
       isProcessingWithdrawal,
       isPremium,
       adsConfig,
+      claimedVideos,
+      lastDailyReward,
+      lastVideoClaim,
 
       // State setters
       setBalance, 
@@ -911,6 +1026,9 @@ export const UserProvider = ({ children }) => {
       setIsProcessingWithdrawal,
       setIsPremium,
       setAdsConfig,
+      setClaimedVideos,
+      setLastDailyReward,
+      setLastVideoClaim,
 
       // Components
       YoutubeTasks,
@@ -928,7 +1046,8 @@ export const UserProvider = ({ children }) => {
       updateAdsConfig,
       recordAdWatch,
       getAdStats,
-      checkAndResetDailyAds
+      checkAndResetDailyAds,
+      claimDailyReward
     }}>
       {children}
     </UserContext.Provider>
