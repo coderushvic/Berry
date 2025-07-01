@@ -417,6 +417,7 @@ const AdTask = () => {
     const now = new Date();
     
     try {
+      // First update the counter in a transaction
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, "telegramUsers", id);
         const userDoc = await transaction.get(userRef);
@@ -434,9 +435,13 @@ const AdTask = () => {
         }
         
         transaction.update(userRef, {
-          adsWatchedToday: increment(1),
-          lastAdTimestamp: now // Using client timestamp instead of serverTimestamp()
+          adsWatchedToday: increment(1)
         });
+      });
+
+      // Then update the timestamp separately
+      await updateDoc(doc(db, "telegramUsers", id), {
+        lastAdTimestamp: now
       });
       
       setUserAdData(prev => ({
