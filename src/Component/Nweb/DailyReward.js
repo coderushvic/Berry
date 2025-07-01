@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
-import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // Removed unused imports
 import { db } from '../../firebase/firestore';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
@@ -197,19 +197,21 @@ const generateConfetti = () => {
 };
 
 const DailyReward = () => {
-  const { id, addRewards, loading } = useUser();
+  const { id, claimDailyReward, loading } = useUser();
   const [lastClaimed, setLastClaimed] = useState(null);
   const [canClaimToday, setCanClaimToday] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCheckingClaim, setIsCheckingClaim] = useState(true);
   const [nextClaimDate, setNextClaimDate] = useState(null);
+  const [error, setError] = useState(null);
   const DAILY_REWARD_AMOUNT = 5;
 
   useEffect(() => {
     const checkRewardStatus = async () => {
       if (!id) return;
       setIsCheckingClaim(true);
+      setError(null);
 
       try {
         const userDoc = await getDoc(doc(db, 'telegramUsers', id));
@@ -243,6 +245,7 @@ const DailyReward = () => {
         }
       } catch (error) {
         console.error('Error checking reward status:', error);
+        setError('Failed to check reward status');
       } finally {
         setIsCheckingClaim(false);
       }
@@ -270,19 +273,16 @@ const DailyReward = () => {
     if (!canClaimToday || isClaiming) return;
 
     setIsClaiming(true);
+    setError(null);
+    
     try {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2000);
 
-      const now = new Date();
-      const result = await addRewards(DAILY_REWARD_AMOUNT, 'main');
+      const result = await claimDailyReward(DAILY_REWARD_AMOUNT);
       
-      if (result.success) {
-        const userRef = doc(db, 'telegramUsers', id);
-        await updateDoc(userRef, {
-          lastDailyReward: serverTimestamp()
-        });
-
+      if (result?.success) {
+        const now = new Date();
         setLastClaimed(now);
         setCanClaimToday(false);
         
@@ -290,9 +290,12 @@ const DailyReward = () => {
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(0, 0, 0, 0);
         setNextClaimDate(tomorrow);
+      } else {
+        throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
+      setError(error.message);
     } finally {
       setIsClaiming(false);
     }
@@ -373,6 +376,12 @@ const DailyReward = () => {
             {isClaiming ? 'Processing...' : canClaimToday ? 'Claim Your Reward' : 'Already Claimed Today'}
           </ClaimButton>
           
+          {error && (
+            <StatusMessage className="waiting">
+              <FaClock /> {error}
+            </StatusMessage>
+          )}
+
           {!canClaimToday && nextClaimDate && (
             <StatusMessage className="waiting">
               <FaClock />
