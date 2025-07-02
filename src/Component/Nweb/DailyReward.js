@@ -205,7 +205,7 @@ const DailyReward = () => {
   const [isCheckingClaim, setIsCheckingClaim] = useState(true);
   const [nextClaimDate, setNextClaimDate] = useState(null);
   const [error, setError] = useState(null);
-  const DAILY_REWARD_AMOUNT = 5;
+  const DAILY_REWARD_AMOUNT = 0;
 
   useEffect(() => {
     const checkRewardStatus = async () => {
