@@ -80,7 +80,7 @@ export const UserProvider = ({ children }) => {
 
   // Ad tracking configuration
   const [adsConfig, setAdsConfig] = useState({
-    pointsBonus: 0,
+    pointsBonus: 1,
     dollarBonus: 1,
     dailyLimit: 50,
     premiumDailyLimit: 100,
