@@ -301,7 +301,7 @@ const PremiumTag = styled.div`
 // Default configuration
 const defaultConfig = {
   pointsBonus: 0,
-  dollarBonus: 10.001,
+  dollarBonus: 1.000,
   dailyLimit: 50,
   premiumDailyLimit: 100,
   cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
