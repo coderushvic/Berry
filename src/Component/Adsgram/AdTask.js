@@ -334,12 +334,26 @@ const AdTask = () => {
     dailyResetDate: null,
     lastClaimDate: null
   });
-  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState("00 : 00 : 00");
 
   const activeAd = useMemo(() => 
     localAdsConfig.ads.find(ad => ad.active) || localAdsConfig.ads[0],
     [localAdsConfig]
   );
+
+  // Format time as HH : MM : SS
+  const formatTime = (ms) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    return [
+      hours.toString().padStart(2, '0'),
+      minutes.toString().padStart(2, '0'),
+      seconds.toString().padStart(2, '0')
+    ].join(" : ");
+  };
 
   useEffect(() => {
     const loadUserAdDataAndCheckReset = async () => {
@@ -396,7 +410,7 @@ const AdTask = () => {
   useEffect(() => {
     const updateCooldown = () => {
       if (!userAdData.lastAdTimestamp) {
-        setCooldownRemaining(0);
+        setCooldownRemaining("00 : 00 : 00");
         return;
       }
       
@@ -404,8 +418,7 @@ const AdTask = () => {
       const timePassed = now - userAdData.lastAdTimestamp;
       const remainingMs = Math.max(0, localAdsConfig.cooldown - timePassed);
       
-      const remainingMinutes = (remainingMs / 60000).toFixed(1);
-      setCooldownRemaining(remainingMinutes);
+      setCooldownRemaining(formatTime(remainingMs));
     };
 
     updateCooldown();
@@ -587,8 +600,7 @@ const AdTask = () => {
         const timeSinceLastAd = now - userAdData.lastAdTimestamp;
         if (timeSinceLastAd < localAdsConfig.cooldown) {
           const remainingTime = localAdsConfig.cooldown - timeSinceLastAd;
-          const waitMinutes = (remainingTime / 60000).toFixed(1);
-          showCooldownNotification(`Please wait ${waitMinutes} minute${waitMinutes === '1.0' ? '' : 's'} before watching another ad.`);
+          showCooldownNotification(`Please wait ${formatTime(remainingTime)} before watching another ad.`);
           return;
         }
       }
@@ -685,7 +697,7 @@ const AdTask = () => {
         <ActionButtons>
           <ActionButton
             onClick={showAd}
-            disabled={cooldownRemaining > 0 || isAdLoading || userAdData.adsWatchedToday >= (isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit)}
+            disabled={cooldownRemaining !== "00 : 00 : 00" || isAdLoading || userAdData.adsWatchedToday >= (isPremium ? localAdsConfig.premiumDailyLimit : localAdsConfig.dailyLimit)}
             $bgColor={berryTheme.colors.primary}
             $hoverColor={berryTheme.colors.primaryDark}
             $shadowColor="rgba(227, 11, 92, 0.3)"
@@ -696,8 +708,8 @@ const AdTask = () => {
                 <Spinner />
                 Loading
               </>
-            ) : cooldownRemaining > 0 ? (
-              `${cooldownRemaining}m`
+            ) : cooldownRemaining !== "00 : 00 : 00" ? (
+              cooldownRemaining
             ) : (
               <>
                 <IoSparkles /> Show Ad
