@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // Removed unused imports
 import { db } from '../../firebase/firestore';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
@@ -205,7 +205,6 @@ const DailyReward = () => {
   const [isCheckingClaim, setIsCheckingClaim] = useState(true);
   const [nextClaimDate, setNextClaimDate] = useState(null);
   const [error, setError] = useState(null);
-  const [rewardAmount, setRewardAmount] = useState(0);
 
   useEffect(() => {
     const checkRewardStatus = async () => {
@@ -241,11 +240,6 @@ const DailyReward = () => {
           } else {
             setCanClaimToday(true);
             setNextClaimDate(null);
-          }
-
-          // Set initial reward amount from user data if available
-          if (data.dailyRewardAmount) {
-            setRewardAmount(data.dailyRewardAmount);
           }
         }
       } catch (error) {
@@ -290,11 +284,6 @@ const DailyReward = () => {
         const now = new Date();
         setLastClaimed(now);
         setCanClaimToday(false);
-        
-        // Update the reward amount from the response
-        if (result.amount) {
-          setRewardAmount(result.amount);
-        }
         
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -373,10 +362,10 @@ const DailyReward = () => {
           </RewardIcon>
           
           <RewardTitle>Daily Reward</RewardTitle>
-          <RewardAmount>${rewardAmount}</RewardAmount>
+          <RewardAmount>$5</RewardAmount>
           
           <RewardDescription>
-            Claim your daily ${rewardAmount} reward. Available once per calendar day.
+            Claim your daily $5 reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
