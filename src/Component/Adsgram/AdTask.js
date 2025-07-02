@@ -317,7 +317,7 @@ const AdTask = () => {
     id,
     isPremium,
     adsConfig = defaultConfig,
-    setBalance,
+    setAdsBalance,
   } = useUser();
 
   const [adWatched, setAdWatched] = useState(false);
@@ -341,6 +341,7 @@ const AdTask = () => {
     [localAdsConfig]
   );
 
+  // Format time as HH : MM : SS
   const formatTime = (ms) => {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -527,7 +528,7 @@ const AdTask = () => {
     setClaiming(true);
     
     try {
-      await runTransaction(db, async (transaction) => {
+      const rewardData = await runTransaction(db, async (transaction) => {
         const userRef = doc(db, "telegramUsers", id);
         const userDoc = await transaction.get(userRef);
         
@@ -547,13 +548,20 @@ const AdTask = () => {
           throw new Error("Please wait at least 1 minute between claims");
         }
         
+        const newAdsBalance = (userData.adsBalance || 0) + localAdsConfig.dollarBonus;
+        
         transaction.update(userRef, {
-          balance: increment(localAdsConfig.dollarBonus),
+          adsBalance: newAdsBalance,
           lastClaimDate: serverTimestamp()
         });
+        
+        return {
+          dollars: localAdsConfig.dollarBonus,
+          newAdsBalance: newAdsBalance
+        };
       });
 
-      setBalance(prev => prev + localAdsConfig.dollarBonus);
+      setAdsBalance(rewardData.newAdsBalance);
       
       setUserAdData(prev => ({
         ...prev,
@@ -571,7 +579,7 @@ const AdTask = () => {
     } finally {
       setClaiming(false);
     }
-  }, [adWatched, claiming, id, localAdsConfig, setBalance]);
+  }, [adWatched, claiming, id, localAdsConfig, setAdsBalance]);
 
   const showAd = useCallback(async () => {
     if (isAdLoading) return;
