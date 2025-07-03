@@ -352,7 +352,7 @@ export default function WithdrawForm() {
     setAdsBalance,
     setDollarBalance2,
     setCheckinRewards,
-    setTotalReferralEarnings
+    setRefBonus
   } = useUser();
 
   // Calculate total referral earnings
@@ -363,9 +363,12 @@ export default function WithdrawForm() {
   
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
-  // Calculate total available balance
-  const totalAvailableBalance = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
-                               parseFloat(checkinRewards) + totalReferralEarnings;
+  // Calculate total available balance (converting points to dollars)
+  const totalAvailableBalance = (parseFloat(balance) / 1000) + 
+                               parseFloat(adsBalance) + 
+                               parseFloat(dollarBalance2) + 
+                               parseFloat(checkinRewards) + 
+                               totalReferralEarnings;
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -426,41 +429,60 @@ export default function WithdrawForm() {
     try {
       const userRef = doc(db, 'telegramUsers', id);
       
+      // Calculate how much to deduct from each balance source
       let remainingAmount = totalAmount;
-      let updates = {};
-      
-      if (adsBalance > 0) {
+      const updates = {};
+      const balanceDeductions = {
+        adsBalance: 0,
+        dollarBalance2: 0,
+        checkinRewards: 0,
+        refBonus: 0,
+        balance: 0
+      };
+
+      // Deduct from ads balance first
+      if (adsBalance > 0 && remainingAmount > 0) {
         const deductFromAds = Math.min(adsBalance, remainingAmount);
         updates.adsBalance = increment(-deductFromAds);
+        balanceDeductions.adsBalance = deductFromAds;
         remainingAmount -= deductFromAds;
       }
       
-      if (remainingAmount > 0 && dollarBalance2 > 0) {
+      // Then deduct from dollar balance
+      if (dollarBalance2 > 0 && remainingAmount > 0) {
         const deductFromDollar = Math.min(dollarBalance2, remainingAmount);
         updates.dollarBalance2 = increment(-deductFromDollar);
+        balanceDeductions.dollarBalance2 = deductFromDollar;
         remainingAmount -= deductFromDollar;
       }
       
-      if (remainingAmount > 0 && checkinRewards > 0) {
+      // Then deduct from checkin rewards
+      if (checkinRewards > 0 && remainingAmount > 0) {
         const deductFromCheckin = Math.min(checkinRewards, remainingAmount);
         updates.checkinRewards = increment(-deductFromCheckin);
+        balanceDeductions.checkinRewards = deductFromCheckin;
         remainingAmount -= deductFromCheckin;
       }
       
-      if (remainingAmount > 0 && totalReferralEarnings > 0) {
+      // Then deduct from referral earnings
+      if (totalReferralEarnings > 0 && remainingAmount > 0) {
         const deductFromReferrals = Math.min(totalReferralEarnings, remainingAmount);
-        updates.totalReferralEarnings = increment(-deductFromReferrals);
+        updates.refBonus = increment(-deductFromReferrals);
+        balanceDeductions.refBonus = deductFromReferrals;
         remainingAmount -= deductFromReferrals;
       }
       
-      if (remainingAmount > 0 && balance > 0) {
+      // Finally deduct from main balance (converted to points)
+      if (remainingAmount > 0) {
         const pointsToDeduct = remainingAmount * 1000;
-        const deductFromBalance = Math.min(balance, pointsToDeduct);
-        updates.balance = increment(-deductFromBalance);
+        updates.balance = increment(-pointsToDeduct);
+        balanceDeductions.balance = pointsToDeduct;
       }
 
+      // Update all balances in a single transaction
       await updateDoc(userRef, updates);
 
+      // Create withdrawal record
       const withdrawalRef = collection(db, 'withdrawalRequests');
       const withdrawalData = {
         userId: id,
@@ -473,19 +495,18 @@ export default function WithdrawForm() {
         network: formData.network,
         status: 'pending',
         createdAt: serverTimestamp(),
-        balanceType: 'combined'
+        balanceType: 'combined',
+        balanceDeductions // Store how much was deducted from each balance
       };
       
       const docRef = await addDoc(withdrawalRef, withdrawalData);
 
-      setAdsBalance(prev => Math.max(0, prev - (totalAmount > prev ? prev : totalAmount)));
-      setDollarBalance2(prev => Math.max(0, prev - (totalAmount > adsBalance ? (totalAmount - adsBalance > prev ? prev : totalAmount - adsBalance) : 0)));
-      setCheckinRewards(prev => Math.max(0, prev - (totalAmount > adsBalance + dollarBalance2 ? (totalAmount - adsBalance - dollarBalance2 > prev ? prev : totalAmount - adsBalance - dollarBalance2) : 0)));
-      setTotalReferralEarnings(prev => Math.max(0, prev - (totalAmount > adsBalance + dollarBalance2 + checkinRewards ? (totalAmount - adsBalance - dollarBalance2 - checkinRewards > prev ? prev : totalAmount - adsBalance - dollarBalance2 - checkinRewards) : 0)));
-      setBalance(prev => {
-        const remainingAfterOther = totalAmount - adsBalance - dollarBalance2 - checkinRewards - totalReferralEarnings;
-        return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
-      });
+      // Update local state to reflect the deductions
+      setAdsBalance(prev => Math.max(0, prev - balanceDeductions.adsBalance));
+      setDollarBalance2(prev => Math.max(0, prev - balanceDeductions.dollarBalance2));
+      setCheckinRewards(prev => Math.max(0, prev - balanceDeductions.checkinRewards));
+      setRefBonus(prev => Math.max(0, prev - balanceDeductions.refBonus));
+      setBalance(prev => Math.max(0, prev - balanceDeductions.balance));
 
       setSuccess('Withdrawal request submitted!');
       
@@ -496,7 +517,8 @@ export default function WithdrawForm() {
         total: totalAmount.toFixed(3),
         wallet: formData.walletAddress.trim(),
         network: networks.find(n => n.id === formData.network)?.name || formData.network,
-        date: new Date().toLocaleString()
+        date: new Date().toLocaleString(),
+        deductions: balanceDeductions
       });
       setShowSuccessReceipt(true);
       setFormData({ amount: '', walletAddress: '', network: '' });
@@ -508,10 +530,10 @@ export default function WithdrawForm() {
   };
 
   const handleMaxClick = () => {
-    const maxAmount = totalAvailableBalance / (1 + (FEE_PERCENTAGE / 100));
+    const maxAmount = Math.max(0, (totalAvailableBalance / (1 + (FEE_PERCENTAGE / 100)) - 0.001)); // Subtract small amount to account for floating point
     setFormData(prev => ({
       ...prev,
-      amount: maxAmount.toFixed(3)
+      amount: Math.max(MIN_WITHDRAWAL, maxAmount).toFixed(3)
     }));
   };
 
@@ -745,6 +767,18 @@ export default function WithdrawForm() {
               <ReceiptRow>
                 <ReceiptLabel>Date:</ReceiptLabel>
                 <ReceiptValue>{receiptData.date}</ReceiptValue>
+              </ReceiptRow>
+              <ReceiptRow>
+                <ReceiptLabel>Deductions:</ReceiptLabel>
+                <ReceiptValue>
+                  {Object.entries(receiptData.deductions)
+                    .filter(([_, value]) => value > 0)
+                    .map(([key, value]) => (
+                      <div key={key}>
+                        {key}: ${key === 'balance' ? (value / 1000).toFixed(3) : value.toFixed(3)}
+                      </div>
+                    ))}
+                </ReceiptValue>
               </ReceiptRow>
             </ReceiptContent>
             <ReceiptFooter>
