@@ -6,7 +6,7 @@ import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
-    user, // Added user object from context
+    user,
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
@@ -23,16 +23,16 @@ export default function WithdrawalHistory() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedTx, setExpandedTx] = useState(null);
 
-  // Calculate total referral earnings
-const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-  return total + (parseFloat(referral.refBonus) || 0);
-}, 0);
+  // Calculate total referral earnings - FIXED SYNTAX
+  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+    return total + (parseFloat(referral.refBonus) || 0);
+  }, 0);
   
   const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
   
   // Calculate total revenue (sum of all balance types)
   const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
-                     parseFloat(checkinRewards) + totalReferralEarnings;
+                       parseFloat(checkinRewards) + totalReferralEarnings;
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -54,55 +54,66 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user) return; // Only load if user exists
+      if (!user) return;
       setRefreshing(true);
       await fetchWithdrawals();
       setRefreshing(false);
     };
     loadData();
-  }, [user, fetchWithdrawals]); // Added user to dependencies
+  }, [user, fetchWithdrawals]);
 
   useEffect(() => {
-    if (!user) return; // Only process if user exists
+    if (!user) return;
 
     const combined = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w && typeof w === 'object' && w.userId === user.id) // Ensure withdrawal belongs to current user
+      .filter(w => w && typeof w === 'object' && w.userId === user.id)
       .map(w => {
         const txId = w.txId || w.transactionId || w.hash || null;
         const date = w.createdAt?.toDate?.() || new Date(w.createdAt || w.date || w.timestamp);
+        
+        // FIXED TERNARY OPERATOR SYNTAX
+       const balanceType = w.balanceType || (adsWithdrawals.some(aw => aw.id === w.id) ? 'ads' : 'main');
         
         return {
           ...w,
           status: w.status?.toLowerCase() || 'pending',
           createdAt: date,
-          balanceType: w.balanceType || (adsWithdrawals.some(aw => aw.id === w.id) ? 'ads' : 'main'),
+          balanceType,
           txId,
-          formattedDate: formatDate(date)
+          formattedDate: formatDate(date),
+          amount: parseFloat(w.amount) || 0,
+          fee: parseFloat(w.fee) || 0
         };
       })
       .sort((a, b) => b.createdAt - a.createdAt);
 
     setFormattedWithdrawals(combined);
-  }, [user, allWithdrawals, adsWithdrawals]); // Added user to dependencies
+  }, [user, allWithdrawals, adsWithdrawals]);
 
   const statusConfig = {
     'completed': {
-      icon: <FiCheckCircle className={styles.completed} />
+      icon: <FiCheckCircle className={styles.completed} />,
+      color: styles.completed
     },
     'approved': {
-      icon: <FiCheckCircle className={styles.completed} />
+      icon: <FiCheckCircle className={styles.completed} />,
+      color: styles.completed
     },
     'pending': {
-      icon: <FiClock className={styles.pending} />
+      icon: <FiClock className={styles.pending} />,
+      color: styles.pending
     },
     'failed': {
-      icon: <FiXCircle className={styles.failed} />
+      icon: <FiXCircle className={styles.failed} />,
+      color: styles.failed
     },
     'rejected': {
-      icon: <FiXCircle className={styles.failed} />
+      icon: <FiXCircle className={styles.failed} />,
+      color: styles.failed
     },
     'processing': {
-      icon: <FiRefreshCw className={`${styles.processing} ${styles.skeletonPulse}`} />
+      icon: <FiRefreshCw className={`${styles.processing} ${styles.skeletonPulse}`} />,
+      color: styles.processing
     }
   };
 
@@ -111,7 +122,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
   };
 
   const handleRefresh = async () => {
-    if (!user) return; // Only refresh if user exists
+    if (!user) return;
     setRefreshing(true);
     await fetchWithdrawals();
     setRefreshing(false);
@@ -144,7 +155,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Withdrawal History</h1>
-          <p className={styles.subtitle}>Your personal withdrawal requests</p> {/* Updated subtitle */}
+          <p className={styles.subtitle}>Your personal withdrawal requests</p>
         </div>
         
         <div className={styles.amountContainer}>
@@ -156,7 +167,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
           )}
           <button 
             onClick={handleRefresh}
-            disabled={refreshing || !user} // Disable if no user
+            disabled={refreshing || !user}
             className={styles.refreshButton}
           >
             <FiRefreshCw className={`${refreshing ? styles.skeletonPulse : ''}`} />
@@ -180,7 +191,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
 
             return (
               <motion.div 
-                key={`${withdrawal.id}-${user.id}`} // Include user id in key for uniqueness
+                key={`${withdrawal.id}-${user.id}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
@@ -191,13 +202,13 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
                   onClick={() => toggleExpand(withdrawal.id)}
                 >
                   <div className={styles.amountContainer}>
-                    <div className={`${styles.statusIcon} ${styles[status]}`}>
-                      <FiDollarSign className={styles[status]} />
+                    <div className={`${styles.statusIcon} ${statusInfo.color}`}>
+                      <FiDollarSign className={statusInfo.color} />
                     </div>
                     <div>
                       <div className={styles.amountContainer}>
                         <p className={styles.detailValue}>
-                          ${withdrawal.amount?.toFixed(isAdsWithdrawal ? 3 : 2)}
+                          ${withdrawal.amount.toFixed(isAdsWithdrawal ? 3 : 2)}
                         </p>
                         {isAdsWithdrawal && (
                           <span className={styles.adsBadge}>
@@ -210,7 +221,7 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
                       </p>
                     </div>
                   </div>
-                  <div className={`${styles.statusBadge} ${styles[status]}`}>
+                  <div className={`${styles.statusBadge} ${statusInfo.color}`}>
                     {statusInfo.icon}
                     <span className="ml-2 capitalize">{status}</span>
                   </div>
@@ -223,6 +234,12 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
                     transition={{ duration: 0.2 }}
                     className={styles.detailsContainer}
                   >
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Status:</span>
+                      <span className={`${styles.detailValue} ${statusInfo.color}`}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </span>
+                    </div>
                     <div className={styles.detailRow}>
                       <span className={styles.detailLabel}>Network:</span>
                       <span className={styles.detailValue}>{withdrawal.network || 'N/A'}</span>
@@ -249,9 +266,21 @@ const referralEarningsFromProcessed = processedReferrals.reduce((total, referral
                     <div className={styles.detailRow}>
                       <span className={styles.detailLabel}>Fee:</span>
                       <span className={styles.detailValue}>
-                        ${withdrawal.fee?.toFixed(3) || '0.000'}
+                        ${withdrawal.fee.toFixed(3)}
                       </span>
                     </div>
+                    <div className={styles.detailRow}>
+                      <span className={styles.detailLabel}>Total Deducted:</span>
+                      <span className={styles.detailValue}>
+                        ${(withdrawal.amount + withdrawal.fee).toFixed(3)}
+                      </span>
+                    </div>
+                    {withdrawal.note && (
+                      <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Note:</span>
+                        <span className={styles.detailValue}>{withdrawal.note}</span>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </motion.div>
