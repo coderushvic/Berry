@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
-import { FiCheckCircle, FiAlertCircle, FiArrowLeft, FiX, FiInfo, FiDollarSign } from 'react-icons/fi';
-import { db } from '../../firebase/firestore';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { berryTheme } from '../../Theme';
-import styled, { keyframes } from 'styled-components';
-import NavBar from '../Nweb/NavBar';
+import { FiDollarSign,FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiInfo } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
+import { useState, useEffect } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { berryTheme } from '../../Theme';
+import { db } from '../../firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+
+// Animation for shimmer effect
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -793,8 +794,6 @@ export default function WithdrawForm() {
           </ReceiptCard>
         </ModalOverlay>
       )}
-
-      <NavBar />
     </Container>
   );
 }
