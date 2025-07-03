@@ -6,7 +6,7 @@ import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
-    user, // Added user object to get the current user's ID
+    id, // Using id directly from user context
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
@@ -41,14 +41,15 @@ export default function WithdrawalHistory() {
       await fetchWithdrawals();
       setRefreshing(false);
     };
-    loadData();
-  }, [fetchWithdrawals]);
+    
+    if (id) { // Only load data if we have a user ID
+      loadData();
+    }
+  }, [fetchWithdrawals, id]); // Added id to dependencies
 
   useEffect(() => {
-    if (!user?.id) return; // Don't process if we don't have a user ID
-
+    // Combine and format withdrawals - no need to filter by user ID anymore
     const combined = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w && typeof w === 'object' && w.userId === user.id) // Only include withdrawals for current user
       .map(w => {
         const txId = w.txId || w.transactionId || w.hash || null;
         const date = w.createdAt?.toDate?.() || new Date(w.createdAt || w.date || w.timestamp);
@@ -69,7 +70,7 @@ export default function WithdrawalHistory() {
       .sort((a, b) => b.createdAt - a.createdAt);
 
     setFormattedWithdrawals(combined);
-  }, [user, allWithdrawals, adsWithdrawals]); // Added user to dependencies
+  }, [allWithdrawals, adsWithdrawals]); // Removed user from dependencies
 
   const statusConfig = {
     'completed': {
@@ -103,6 +104,7 @@ export default function WithdrawalHistory() {
   };
 
   const handleRefresh = async () => {
+    if (!id) return; // Don't refresh if no user ID
     setRefreshing(true);
     await fetchWithdrawals();
     setRefreshing(false);
@@ -131,7 +133,7 @@ export default function WithdrawalHistory() {
         <div className={styles.amountContainer}>
           <button 
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || !id} // Disable if no user ID
             className={styles.refreshButton}
           >
             <FiRefreshCw className={`${refreshing ? styles.skeletonPulse : ''}`} />
@@ -142,8 +144,12 @@ export default function WithdrawalHistory() {
       {formattedWithdrawals.length === 0 ? (
         <div className={styles.emptyState}>
           <FiDollarSign className={styles.emptyIcon} />
-          <h3 className={styles.emptyTitle}>No withdrawal history yet</h3>
-          <p className={styles.emptyDescription}>Your withdrawal requests will appear here</p>
+          <h3 className={styles.emptyTitle}>
+            {id ? 'No withdrawal history yet' : 'Please sign in to view withdrawals'}
+          </h3>
+          <p className={styles.emptyDescription}>
+            {id ? 'Your withdrawal requests will appear here' : 'Sign in to see your transaction history'}
+          </p>
         </div>
       ) : (
         <div className={styles.withdrawalList}>
