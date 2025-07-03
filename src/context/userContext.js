@@ -374,31 +374,30 @@ export const UserProvider = ({ children }) => {
 
       // Update local state
       switch (type) {
-  case 'main':
-    setBalance(prev => prev + (amount * 1000));
-    setDollarBalance2(prev => +(prev + amount).toFixed(2));
-    break;
-  case 'ads':
-    setAdsBalance(prev => +(prev + amount).toFixed(6));
-    setAdsWatched(prev => prev + 1);
-    setLastAdTimestamp(now);
-    break;
-  case 'video':
-    setDollarBalance2(prev => +(prev + amount).toFixed(3));
-    setVideoWatched(prev => prev + 1);
-    setLastVideoTime(now);
-    setBalance(prev => prev + (amount * 1000));
-    
-    if (options.videoId) {
-      setClaimedVideos(prev => [...prev, options.videoId]);
-      setLastVideoClaim(now);
-    }
-    break;
-  default:
-    // Handle unexpected reward types
-    console.error(`Unknown reward type: ${type}`);
-    throw new Error(`Invalid reward type: ${type}`);
-}
+        case 'main':
+          setBalance(prev => prev + (amount * 1000));
+          setDollarBalance2(prev => +(prev + amount).toFixed(2));
+          break;
+        case 'ads':
+          setAdsBalance(prev => +(prev + amount).toFixed(6));
+          setAdsWatched(prev => prev + 1);
+          setLastAdTimestamp(now);
+          break;
+        case 'video':
+          setDollarBalance2(prev => +(prev + amount).toFixed(3));
+          setVideoWatched(prev => prev + 1);
+          setLastVideoTime(now);
+          setBalance(prev => prev + (amount * 1000));
+          
+          if (options.videoId) {
+            setClaimedVideos(prev => [...prev, options.videoId]);
+            setLastVideoClaim(now);
+          }
+          break;
+        default:
+          console.error(`Unknown reward type: ${type}`);
+          throw new Error(`Invalid reward type: ${type}`);
+      }
 
       return result;
     } catch (error) {
@@ -527,36 +526,45 @@ export const UserProvider = ({ children }) => {
     }
   }, [id]);
 
-  // Fetch withdrawal history
+  // Fetch withdrawal history - UPDATED VERSION
   const fetchWithdrawals = useCallback(async () => {
-  try {
-    // Corrected Promise.all destructuring syntax
-    const [
-      withdrawalsSnapshot,
-      adsWithdrawalsSnapshot
-    ] = await Promise.all([
-      getDocs(query(collection(db, 'withdrawalRequests'), orderBy('createdAt', 'desc'))),
-      getDocs(query(collection(db, 'adsWithdrawalRequests'), orderBy('createdAt', 'desc')))
-    ]);
+    try {
+      if (!id) return; // Don't fetch if we don't have a user ID
+      
+      const [
+        withdrawalsSnapshot,
+        adsWithdrawalsSnapshot
+      ] = await Promise.all([
+        getDocs(query(
+          collection(db, 'withdrawalRequests'),
+          where('userId', '==', id),
+          orderBy('createdAt', 'desc')
+        )),
+        getDocs(query(
+          collection(db, 'adsWithdrawalRequests'),
+          where('userId', '==', id),
+          orderBy('createdAt', 'desc')
+        ))
+      ]);
 
-    const processSnapshot = (snapshot, type) => snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      balanceType: type,
-      createdAt: doc.data().createdAt?.toDate(),
-      updatedAt: doc.data().updatedAt?.toDate()
-    }));
+      const processSnapshot = (snapshot, type) => snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        balanceType: type,
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }));
 
-    const withdrawalsData = processSnapshot(withdrawalsSnapshot, 'main');
-    const adsWithdrawalsData = processSnapshot(adsWithdrawalsSnapshot, 'ads');
+      const withdrawalsData = processSnapshot(withdrawalsSnapshot, 'main');
+      const adsWithdrawalsData = processSnapshot(adsWithdrawalsSnapshot, 'ads');
 
-    setAllWithdrawals(withdrawalsData);
-    setAdsWithdrawals(adsWithdrawalsData);
-  } catch (error) {
-    console.error('Error fetching withdrawals:', error);
-    setError(error);
-  }
-}, []);
+      setAllWithdrawals(withdrawalsData);
+      setAdsWithdrawals(adsWithdrawalsData);
+    } catch (error) {
+      console.error('Error fetching withdrawals:', error);
+      setError(error);
+    }
+  }, [id]);
 
   // Update withdrawal status
   const updateWithdrawalStatus = useCallback(async (id, status, isAdsWithdrawal = false) => {
