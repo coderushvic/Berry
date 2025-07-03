@@ -4,7 +4,6 @@
 
 import { useUser } from '../../context/userContext';
 import BalanceCard from '../../Component/user/balanceCard';
-import WithdrawalHistory from '../../Component/user/withdrawalHistory';
 import NavBar from '../../Component/Nweb/NavBar';
 import { berryTheme } from '../../Theme';
 import styled from 'styled-components';
