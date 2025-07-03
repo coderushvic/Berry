@@ -530,7 +530,7 @@ export default function WithdrawForm() {
   };
 
   const handleMaxClick = () => {
-    const maxAmount = Math.max(0, (totalAvailableBalance / (1 + (FEE_PERCENTAGE / 100)) - 0.001)); // Subtract small amount to account for floating point
+    const maxAmount = Math.max(0, (totalAvailableBalance / (1 + (FEE_PERCENTAGE / 100))) - 0.001);
     setFormData(prev => ({
       ...prev,
       amount: Math.max(MIN_WITHDRAWAL, maxAmount).toFixed(3)
