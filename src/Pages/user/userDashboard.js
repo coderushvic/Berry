@@ -86,7 +86,6 @@ export default function UserDashboard() {
             
             {/* Bottom Section - Withdrawal History */}
             <div style={styles.bottomSection}>
-              <WithdrawalHistory />
             </div>
           </DashboardContent>
         )}
