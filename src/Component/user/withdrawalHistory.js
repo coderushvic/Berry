@@ -6,6 +6,7 @@ import styles from './WithdrawalHistory.module.css';
 
 export default function WithdrawalHistory() {
   const { 
+    user, // Added user object to get the current user's ID
     allWithdrawals = [],
     adsWithdrawals = [],
     loading,
@@ -44,8 +45,10 @@ export default function WithdrawalHistory() {
   }, [fetchWithdrawals]);
 
   useEffect(() => {
+    if (!user?.id) return; // Don't process if we don't have a user ID
+
     const combined = [...allWithdrawals, ...adsWithdrawals]
-      .filter(w => w && typeof w === 'object')
+      .filter(w => w && typeof w === 'object' && w.userId === user.id) // Only include withdrawals for current user
       .map(w => {
         const txId = w.txId || w.transactionId || w.hash || null;
         const date = w.createdAt?.toDate?.() || new Date(w.createdAt || w.date || w.timestamp);
@@ -66,7 +69,7 @@ export default function WithdrawalHistory() {
       .sort((a, b) => b.createdAt - a.createdAt);
 
     setFormattedWithdrawals(combined);
-  }, [allWithdrawals, adsWithdrawals]);
+  }, [user, allWithdrawals, adsWithdrawals]); // Added user to dependencies
 
   const statusConfig = {
     'completed': {
