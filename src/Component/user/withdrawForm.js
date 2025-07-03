@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
-import { FiCheckCircle, FiAlertCircle, FiArrowLeft, FiX, FiInfo } from 'react-icons/fi';
+import { FiCheckCircle, FiAlertCircle, FiArrowLeft, FiX, FiInfo, FiDollarSign } from 'react-icons/fi';
 import { db } from '../../firebase/firestore';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { berryTheme } from '../../Theme';
 import styled, { keyframes } from 'styled-components';
 import NavBar from '../Nweb/NavBar';
+import { motion } from 'framer-motion';
+import CountUp from 'react-countup';
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -49,7 +51,7 @@ const MainContent = styled.div`
   width: 100%;
 `;
 
-const BackButton = styled.button`
+const BackButton = styled(motion.button)`
   position: absolute;
   left: 24px;
   padding: 8px;
@@ -65,7 +67,7 @@ const BackButton = styled.button`
   }
 `;
 
-const FormCard = styled.div`
+const FormCard = styled(motion.div)`
   background: white;
   border-radius: 16px;
   padding: 24px;
@@ -74,7 +76,7 @@ const FormCard = styled.div`
   margin-bottom: 24px;
 `;
 
-const BalanceCard = styled.div`
+const BalanceCard = styled(motion.div)`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -89,6 +91,9 @@ const BalanceLabel = styled.p`
   font-size: 0.875rem;
   color: ${berryTheme.colors.primary};
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 `;
 
 const BalanceAmount = styled.p`
@@ -129,7 +134,7 @@ const Input = styled.input`
   outline: none;
 `;
 
-const MaxButton = styled.button`
+const MaxButton = styled(motion.button)`
   padding: 0 16px;
   background: transparent;
   border: none;
@@ -149,7 +154,7 @@ const MaxButton = styled.button`
   }
 `;
 
-const FeeBreakdown = styled.div`
+const FeeBreakdown = styled(motion.div)`
   background: ${berryTheme.colors.grey50};
   padding: 16px;
   border-radius: 12px;
@@ -188,7 +193,7 @@ const Select = styled.select`
   }
 `;
 
-const Alert = styled.div`
+const Alert = styled(motion.div)`
   display: flex;
   align-items: center;
   padding: 12px 16px;
@@ -209,7 +214,7 @@ const Alert = styled.div`
   }
 `;
 
-const SubmitButton = styled.button`
+const SubmitButton = styled(motion.button)`
   width: 100%;
   padding: 16px;
   background: ${berryTheme.colors.primary};
@@ -244,7 +249,7 @@ const Spinner = styled.span`
   margin-right: 8px;
 `;
 
-const ModalOverlay = styled.div`
+const ModalOverlay = styled(motion.div)`
   position: fixed;
   top: 0;
   left: 0;
@@ -258,7 +263,7 @@ const ModalOverlay = styled.div`
   padding: 16px;
 `;
 
-const ReceiptCard = styled.div`
+const ReceiptCard = styled(motion.div)`
   background: white;
   border-radius: 16px;
   width: 100%;
@@ -316,7 +321,7 @@ const ReceiptFooter = styled.div`
   justify-content: center;
 `;
 
-const DoneButton = styled.button`
+const DoneButton = styled(motion.button)`
   padding: 12px 24px;
   background: ${berryTheme.colors.primary};
   color: white;
@@ -333,8 +338,12 @@ const DoneButton = styled.button`
 
 export default function WithdrawForm() {
   const { 
-    getTotalBalance,
-    balanceDetails,
+    balance = 0,
+    adsBalance = 0,
+    dollarBalance2 = 0,
+    checkinRewards = 0,
+    refBonus = 0,
+    processedReferrals = [],
     id,
     username,
     fullName,
@@ -346,7 +355,18 @@ export default function WithdrawForm() {
     setTotalReferralEarnings
   } = useUser();
 
-  const totalAvailableBalance = getTotalBalance();
+  // Calculate total referral earnings
+  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
+    const bonus = parseFloat(referral.refBonus) || 0;
+    return total + bonus;
+  }, 0);
+  
+  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
+  
+  // Calculate total available balance
+  const totalAvailableBalance = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2) + 
+                               parseFloat(checkinRewards) + totalReferralEarnings;
+
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     amount: '',
@@ -409,33 +429,33 @@ export default function WithdrawForm() {
       let remainingAmount = totalAmount;
       let updates = {};
       
-      if (balanceDetails.ads > 0) {
-        const deductFromAds = Math.min(balanceDetails.ads, remainingAmount);
+      if (adsBalance > 0) {
+        const deductFromAds = Math.min(adsBalance, remainingAmount);
         updates.adsBalance = increment(-deductFromAds);
         remainingAmount -= deductFromAds;
       }
       
-      if (remainingAmount > 0 && balanceDetails.available > 0) {
-        const deductFromDollar = Math.min(balanceDetails.available, remainingAmount);
+      if (remainingAmount > 0 && dollarBalance2 > 0) {
+        const deductFromDollar = Math.min(dollarBalance2, remainingAmount);
         updates.dollarBalance2 = increment(-deductFromDollar);
         remainingAmount -= deductFromDollar;
       }
       
-      if (remainingAmount > 0 && balanceDetails.checkinRewards > 0) {
-        const deductFromCheckin = Math.min(balanceDetails.checkinRewards, remainingAmount);
+      if (remainingAmount > 0 && checkinRewards > 0) {
+        const deductFromCheckin = Math.min(checkinRewards, remainingAmount);
         updates.checkinRewards = increment(-deductFromCheckin);
         remainingAmount -= deductFromCheckin;
       }
       
-      if (remainingAmount > 0 && balanceDetails.referralEarnings > 0) {
-        const deductFromReferrals = Math.min(balanceDetails.referralEarnings, remainingAmount);
+      if (remainingAmount > 0 && totalReferralEarnings > 0) {
+        const deductFromReferrals = Math.min(totalReferralEarnings, remainingAmount);
         updates.totalReferralEarnings = increment(-deductFromReferrals);
         remainingAmount -= deductFromReferrals;
       }
       
-      if (remainingAmount > 0 && balanceDetails.points > 0) {
+      if (remainingAmount > 0 && balance > 0) {
         const pointsToDeduct = remainingAmount * 1000;
-        const deductFromBalance = Math.min(balanceDetails.points, pointsToDeduct);
+        const deductFromBalance = Math.min(balance, pointsToDeduct);
         updates.balance = increment(-deductFromBalance);
       }
 
@@ -459,11 +479,11 @@ export default function WithdrawForm() {
       const docRef = await addDoc(withdrawalRef, withdrawalData);
 
       setAdsBalance(prev => Math.max(0, prev - (totalAmount > prev ? prev : totalAmount)));
-      setDollarBalance2(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads ? (totalAmount - balanceDetails.ads > prev ? prev : totalAmount - balanceDetails.ads) : 0)));
-      setCheckinRewards(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available ? (totalAmount - balanceDetails.ads - balanceDetails.available > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available) : 0)));
-      setTotalReferralEarnings(prev => Math.max(0, prev - (totalAmount > balanceDetails.ads + balanceDetails.available + balanceDetails.checkinRewards ? (totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards > prev ? prev : totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards) : 0)));
+      setDollarBalance2(prev => Math.max(0, prev - (totalAmount > adsBalance ? (totalAmount - adsBalance > prev ? prev : totalAmount - adsBalance) : 0)));
+      setCheckinRewards(prev => Math.max(0, prev - (totalAmount > adsBalance + dollarBalance2 ? (totalAmount - adsBalance - dollarBalance2 > prev ? prev : totalAmount - adsBalance - dollarBalance2) : 0)));
+      setTotalReferralEarnings(prev => Math.max(0, prev - (totalAmount > adsBalance + dollarBalance2 + checkinRewards ? (totalAmount - adsBalance - dollarBalance2 - checkinRewards > prev ? prev : totalAmount - adsBalance - dollarBalance2 - checkinRewards) : 0)));
       setBalance(prev => {
-        const remainingAfterOther = totalAmount - balanceDetails.ads - balanceDetails.available - balanceDetails.checkinRewards - balanceDetails.referralEarnings;
+        const remainingAfterOther = totalAmount - adsBalance - dollarBalance2 - checkinRewards - totalReferralEarnings;
         return remainingAfterOther > 0 ? Math.max(0, prev - (remainingAfterOther * 1000)) : prev;
       });
 
@@ -504,7 +524,11 @@ export default function WithdrawForm() {
   return (
     <Container>
       <PageHeader>
-        <BackButton onClick={() => navigate(-1)}>
+        <BackButton 
+          onClick={() => navigate(-1)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
           <FiArrowLeft size={20} color={berryTheme.colors.textDark} />
         </BackButton>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
@@ -512,13 +536,35 @@ export default function WithdrawForm() {
       </PageHeader>
 
       <MainContent>
-        <FormCard>
-          <BalanceCard>
+        <FormCard
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <BalanceCard
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
             <div>
-              <BalanceLabel>Available for Withdrawal</BalanceLabel>
-              <BalanceAmount>${totalAvailableBalance.toFixed(3)}</BalanceAmount>
+              <BalanceLabel>
+                <FiDollarSign size={16} />
+                Available for Withdrawal
+              </BalanceLabel>
+              <BalanceAmount>
+                <CountUp
+                  end={totalAvailableBalance || 0}
+                  decimals={totalAvailableBalance < 1 ? 3 : 2}
+                  prefix="$"
+                  duration={0.8}
+                  separator=","
+                />
+              </BalanceAmount>
             </div>
-            <FiInfo size={20} color={berryTheme.colors.primary} />
+            <FiInfo 
+              size={20} 
+              color={berryTheme.colors.primary} 
+              title="Combined balance from all earnings sources"
+            />
           </BalanceCard>
 
           <form onSubmit={handleSubmit}>
@@ -538,6 +584,8 @@ export default function WithdrawForm() {
                 <MaxButton 
                   onClick={handleMaxClick}
                   disabled={!totalAvailableBalance || totalAvailableBalance < MIN_WITHDRAWAL}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   MAX
                 </MaxButton>
@@ -554,7 +602,11 @@ export default function WithdrawForm() {
               )}
             </FormGroup>
 
-            <FeeBreakdown>
+            <FeeBreakdown
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
               <FeeRow>
                 <span>Amount:</span>
                 <span>${formData.amount ? parseFloat(formData.amount).toFixed(3) : '0.000'}</span>
@@ -597,14 +649,24 @@ export default function WithdrawForm() {
             </FormGroup>
 
             {error && (
-              <Alert className="error">
+              <Alert
+                className="error"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
                 <FiAlertCircle style={{ marginRight: '8px' }} />
                 {error}
               </Alert>
             )}
 
             {success && (
-              <Alert className="success">
+              <Alert
+                className="success"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
                 <FiCheckCircle style={{ marginRight: '8px' }} />
                 {success}
               </Alert>
@@ -613,6 +675,8 @@ export default function WithdrawForm() {
             <SubmitButton
               type="submit"
               disabled={isSubmitDisabled}
+              whileHover={!isSubmitDisabled ? { scale: 1.02 } : {}}
+              whileTap={!isSubmitDisabled ? { scale: 0.98 } : {}}
             >
               {loading ? (
                 <>
@@ -628,8 +692,15 @@ export default function WithdrawForm() {
       </MainContent>
 
       {showSuccessReceipt && receiptData && (
-        <ModalOverlay>
-          <ReceiptCard>
+        <ModalOverlay
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <ReceiptCard
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+          >
             <ReceiptHeader>
               <ReceiptTitle>Withdrawal Receipt</ReceiptTitle>
               <button 
@@ -677,7 +748,11 @@ export default function WithdrawForm() {
               </ReceiptRow>
             </ReceiptContent>
             <ReceiptFooter>
-              <DoneButton onClick={() => setShowSuccessReceipt(false)}>
+              <DoneButton
+                onClick={() => setShowSuccessReceipt(false)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
                 Done
               </DoneButton>
             </ReceiptFooter>
