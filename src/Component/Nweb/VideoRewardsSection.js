@@ -167,7 +167,7 @@ function VideoRewardsSection() {
             <FaPlay />
           </PlayButton>
           <RewardTag>
-            <FaDollarSign /> $1.00
+            <FaDollarSign /> $10.00
           </RewardTag>
         </VideoContainer>
         
