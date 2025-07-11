@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaGem, FaGamepad, FaAd } from 'react-icons/fa';
+import { FaGem,FaAd } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/userContext';
 
@@ -143,6 +143,7 @@ function TaskSection() {
       iconColor: '#FF9F43',
       path: '/DailyReward'
     },
+    
     { 
       icon: <FaAd />, 
       name: 'Watch Ads', 
