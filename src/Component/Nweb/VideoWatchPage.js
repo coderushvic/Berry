@@ -319,7 +319,6 @@ const BalanceAmount = styled.div`
   -webkit-text-fill-color: transparent;
 `;
 
-
 const VideoContainer = styled.div`
   background: white;
   border-radius: 20px;
@@ -580,7 +579,6 @@ const PromptButton = styled.button`
 `;
 
 const VideoWatchPage = () => {
-  // Use the user context with all balance sources
   const { 
     id, 
     addRewards, 
@@ -590,19 +588,16 @@ const VideoWatchPage = () => {
     loading: userLoading 
   } = useUser();
   
-  // Calculate total referral earnings in dollars (100 points = $1)
   const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
     return total + (referral.refBonus || 0) * 0.01;
   }, 0);
 
-  // Calculate total available balance from all sources
   const totalAvailableBalance = (
-    (balance || 0) +          // Main balance (dollars)
-    (adsBalance || 0) +       // Ads balance (dollars)
-    totalReferralEarnings     // Referral earnings (converted to dollars)
+    (balance || 0) + 
+    (adsBalance || 0) + 
+    totalReferralEarnings
   );
 
-  // State management
   const [currentVideo, setCurrentVideo] = useState(null);
   const [watchedTime, setWatchedTime] = useState(0);
   const [hasQualified, setHasQualified] = useState(false);
@@ -620,7 +615,6 @@ const VideoWatchPage = () => {
   const hasQualifiedRef = useRef();
   hasQualifiedRef.current = hasQualified;
 
-  // Mock videos data
   const mockVideos = useMemo(() => [
     {
       id: 'vid1',
@@ -640,7 +634,6 @@ const VideoWatchPage = () => {
     }
   ], []);
 
-  // Load initial video
   useEffect(() => {
     if (mockVideos.length > 0 && !userLoading) {
       setCurrentVideo(mockVideos[0]);
@@ -648,11 +641,9 @@ const VideoWatchPage = () => {
     }
   }, [mockVideos, userLoading]);
 
-  // Timer logic
   useEffect(() => {
     if (!currentVideo || userLoading) return;
 
-    // Reset state for new video (except claimed status)
     setWatchedTime(0);
     setHasQualified(false);
     setVideoEnded(false);
@@ -660,7 +651,6 @@ const VideoWatchPage = () => {
     setShowClaimPrompt(false);
     setIsClaiming(false);
 
-    // Check if this video has already been claimed
     const alreadyClaimed = claimedVideos.includes(currentVideo.id);
     if (alreadyClaimed) {
       setHasClaimed(true);
@@ -672,13 +662,11 @@ const VideoWatchPage = () => {
       setWatchedTime(prev => {
         const newTime = prev + 1;
         
-        // Check if qualified for reward (15 seconds) and not already claimed
         if (newTime >= 15 && !hasQualifiedRef.current && !alreadyClaimed) {
           setHasQualified(true);
           setShowClaimPrompt(true);
         }
 
-        // Check if video ended
         if (newTime >= currentVideo.duration) {
           clearInterval(timerRef.current);
           setVideoEnded(true);
@@ -694,19 +682,17 @@ const VideoWatchPage = () => {
     };
   }, [currentVideo, userLoading, claimedVideos]);
 
-  // Claim reward function with duplicate prevention
   const handleClaimReward = async (e) => {
     if (e) e.stopPropagation();
     
-    // Prevent claiming if already claimed or in process
     if (hasClaimed || isClaiming || !id || !currentVideo) return;
 
     setIsClaiming(true);
 
     try {
-      // Add the video to claimed list first to prevent duplicates
       setClaimedVideos(prev => [...prev, currentVideo.id]);
       
+      // Ensure only $2.00 is added by using currentVideo.rewardAmount
       const result = await addRewards(currentVideo.rewardAmount, 'video');
       
       if (result?.success) {
@@ -718,19 +704,16 @@ const VideoWatchPage = () => {
           setShowConfetti(false);
         }, 5000);
       } else {
-        // If reward failed, remove from claimed videos
         setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
       }
     } catch (err) {
       console.error('Error claiming reward:', err);
-      // Remove from claimed videos if error occurs
       setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
     } finally {
       setIsClaiming(false);
     }
   };
 
-  // Next video handler
   const handleNextVideo = () => {
     if (!currentVideo) return;
     
@@ -741,7 +724,6 @@ const VideoWatchPage = () => {
     setShowNextPrompt(false);
   };
 
-  // Cleanup
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
@@ -777,7 +759,6 @@ const VideoWatchPage = () => {
 
   return (
     <Container>
-      {/* Confetti Celebration */}
       {showConfetti && (
         <ConfettiOverlay>
           <Confetti />
@@ -788,7 +769,6 @@ const VideoWatchPage = () => {
         </ConfettiOverlay>
       )}
 
-      {/* Reward Claim Prompt */}
       {showClaimPrompt && !hasClaimed && (
         <RewardPopup onClick={() => setShowClaimPrompt(false)}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
@@ -811,7 +791,6 @@ const VideoWatchPage = () => {
         </RewardPopup>
       )}
 
-      {/* Next Video Prompt */}
       {showNextPrompt && (
         <NextVideoPrompt>
           <PromptContent>
@@ -831,7 +810,6 @@ const VideoWatchPage = () => {
         </NextVideoPrompt>
       )}
 
-      {/* Main Content */}
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
         <LogoText>berry</LogoText>
