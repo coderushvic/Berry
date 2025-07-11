@@ -1,6 +1,6 @@
 import { useUser } from '../../context/userContext';
 import { useNavigate } from 'react-router-dom';
-import { FiDollarSign,FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiInfo } from 'react-icons/fi';
+import { FiDollarSign, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiInfo } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
 import { useState, useEffect } from 'react';
@@ -8,8 +8,6 @@ import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { db } from '../../firebase/firestore';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-
-// Animation for shimmer effect
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -343,7 +341,6 @@ export default function WithdrawForm() {
     adsBalance = 0,
     dollarBalance2 = 0,
     checkinRewards = 0,
-    refBonus = 0,
     processedReferrals = [],
     id,
     username,
@@ -356,20 +353,19 @@ export default function WithdrawForm() {
     setRefBonus
   } = useUser();
 
-  // Calculate total referral earnings
-  const referralEarningsFromProcessed = processedReferrals.reduce((total, referral) => {
-    const bonus = parseFloat(referral.refBonus) || 0;
-    return total + bonus;
+  // Calculate total referral earnings in dollars (100 points = $1)
+  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
+    return total + (referral.refBonus || 0) * 0.01;
   }, 0);
-  
-  const totalReferralEarnings = (parseFloat(refBonus) || 0) + referralEarningsFromProcessed;
-  
-  // Calculate total available balance (converting points to dollars)
-  const totalAvailableBalance = (parseFloat(balance) / 1000) + 
-                               parseFloat(adsBalance) + 
-                               parseFloat(dollarBalance2) + 
-                               parseFloat(checkinRewards) + 
-                               totalReferralEarnings;
+
+  // Calculate total available balance from all sources
+  const totalAvailableBalance = (
+    (balance || 0) / 1000 + // Convert points to dollars
+    (adsBalance || 0) + 
+    (dollarBalance2 || 0) + 
+    (checkinRewards || 0) + 
+    totalReferralEarnings
+  );
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -441,7 +437,7 @@ export default function WithdrawForm() {
         balance: 0
       };
 
-      // Deduct from ads balance first
+      // 1. Deduct from ads balance first
       if (adsBalance > 0 && remainingAmount > 0) {
         const deductFromAds = Math.min(adsBalance, remainingAmount);
         updates.adsBalance = increment(-deductFromAds);
@@ -449,7 +445,7 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromAds;
       }
       
-      // Then deduct from dollar balance
+      // 2. Then deduct from dollar balance
       if (dollarBalance2 > 0 && remainingAmount > 0) {
         const deductFromDollar = Math.min(dollarBalance2, remainingAmount);
         updates.dollarBalance2 = increment(-deductFromDollar);
@@ -457,7 +453,7 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromDollar;
       }
       
-      // Then deduct from checkin rewards
+      // 3. Then deduct from checkin rewards
       if (checkinRewards > 0 && remainingAmount > 0) {
         const deductFromCheckin = Math.min(checkinRewards, remainingAmount);
         updates.checkinRewards = increment(-deductFromCheckin);
@@ -465,19 +461,20 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromCheckin;
       }
       
-      // Then deduct from referral earnings
+      // 4. Then deduct from referral earnings (convert to points first)
       if (totalReferralEarnings > 0 && remainingAmount > 0) {
         const deductFromReferrals = Math.min(totalReferralEarnings, remainingAmount);
-        updates.refBonus = increment(-deductFromReferrals);
+        const referralPointsToDeduct = deductFromReferrals * 100; // Convert dollars to points (1$ = 100pts)
+        updates.refBonus = increment(-referralPointsToDeduct);
         balanceDeductions.refBonus = deductFromReferrals;
         remainingAmount -= deductFromReferrals;
       }
       
-      // Finally deduct from main balance (converted to points)
+      // 5. Finally deduct from main balance (converted to points)
       if (remainingAmount > 0) {
         const pointsToDeduct = remainingAmount * 1000;
         updates.balance = increment(-pointsToDeduct);
-        balanceDeductions.balance = pointsToDeduct;
+        balanceDeductions.balance = remainingAmount;
       }
 
       // Update all balances in a single transaction
@@ -497,7 +494,7 @@ export default function WithdrawForm() {
         status: 'pending',
         createdAt: serverTimestamp(),
         balanceType: 'combined',
-        balanceDeductions // Store how much was deducted from each balance
+        balanceDeductions
       };
       
       const docRef = await addDoc(withdrawalRef, withdrawalData);
@@ -506,8 +503,8 @@ export default function WithdrawForm() {
       setAdsBalance(prev => Math.max(0, prev - balanceDeductions.adsBalance));
       setDollarBalance2(prev => Math.max(0, prev - balanceDeductions.dollarBalance2));
       setCheckinRewards(prev => Math.max(0, prev - balanceDeductions.checkinRewards));
-      setRefBonus(prev => Math.max(0, prev - balanceDeductions.refBonus));
-      setBalance(prev => Math.max(0, prev - balanceDeductions.balance));
+      setRefBonus(prev => Math.max(0, prev - (balanceDeductions.refBonus * 100)));
+      setBalance(prev => Math.max(0, prev - (balanceDeductions.balance * 1000)));
 
       setSuccess('Withdrawal request submitted!');
       
