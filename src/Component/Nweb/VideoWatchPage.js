@@ -319,25 +319,6 @@ const BalanceAmount = styled.div`
   -webkit-text-fill-color: transparent;
 `;
 
-const RewardNotification = styled.div`
-  font-size: 1rem;
-  color: #28C76F;
-  font-weight: 700;
-  background: rgba(40, 199, 111, 0.1);
-  padding: 8px 15px;
-  border-radius: 20px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 10px;
-  animation: pulse 2s infinite;
-  
-  @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-  }
-`;
 
 const VideoContainer = styled.div`
   background: white;
@@ -626,13 +607,13 @@ const VideoWatchPage = () => {
   const [watchedTime, setWatchedTime] = useState(0);
   const [hasQualified, setHasQualified] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
-  const [rewardEarned, setRewardEarned] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
   const [showClaimPrompt, setShowClaimPrompt] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [claimedVideos, setClaimedVideos] = useState([]);
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
@@ -646,14 +627,16 @@ const VideoWatchPage = () => {
       youtubeId: 'dQw4w9WgXcQ',
       title: 'Premium Content',
       duration: 30,
-      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+      rewardAmount: 2.00
     },
     {
       id: 'vid2',
       youtubeId: 'JGwWNGJdvx8',
       title: 'Special Bonus',
       duration: 45,
-      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg'
+      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg',
+      rewardAmount: 2.00
     }
   ], []);
 
@@ -669,21 +652,28 @@ const VideoWatchPage = () => {
   useEffect(() => {
     if (!currentVideo || userLoading) return;
 
-    // Reset state for new video
+    // Reset state for new video (except claimed status)
     setWatchedTime(0);
     setHasQualified(false);
-    setHasClaimed(false);
     setVideoEnded(false);
     setShowNextPrompt(false);
     setShowClaimPrompt(false);
     setIsClaiming(false);
 
+    // Check if this video has already been claimed
+    const alreadyClaimed = claimedVideos.includes(currentVideo.id);
+    if (alreadyClaimed) {
+      setHasClaimed(true);
+    } else {
+      setHasClaimed(false);
+    }
+
     timerRef.current = setInterval(() => {
       setWatchedTime(prev => {
         const newTime = prev + 1;
         
-        // Check if qualified for reward (15 seconds)
-        if (newTime >= 15 && !hasQualifiedRef.current) {
+        // Check if qualified for reward (15 seconds) and not already claimed
+        if (newTime >= 15 && !hasQualifiedRef.current && !alreadyClaimed) {
           setHasQualified(true);
           setShowClaimPrompt(true);
         }
@@ -702,22 +692,24 @@ const VideoWatchPage = () => {
     return () => {
       clearInterval(timerRef.current);
     };
-  }, [currentVideo, userLoading]);
+  }, [currentVideo, userLoading, claimedVideos]);
 
-  // Claim reward function with double-claim prevention
+  // Claim reward function with duplicate prevention
   const handleClaimReward = async (e) => {
     if (e) e.stopPropagation();
     
     // Prevent claiming if already claimed or in process
-    if (hasClaimed || isClaiming || !id) return;
+    if (hasClaimed || isClaiming || !id || !currentVideo) return;
 
     setIsClaiming(true);
 
     try {
-      const result = await addRewards(4.00, 'video');
+      // Add the video to claimed list first to prevent duplicates
+      setClaimedVideos(prev => [...prev, currentVideo.id]);
+      
+      const result = await addRewards(currentVideo.rewardAmount, 'video');
       
       if (result?.success) {
-        setRewardEarned(2.00);
         setHasClaimed(true);
         setShowConfetti(true);
         setShowClaimPrompt(false);
@@ -725,9 +717,14 @@ const VideoWatchPage = () => {
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
+      } else {
+        // If reward failed, remove from claimed videos
+        setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
       }
     } catch (err) {
       console.error('Error claiming reward:', err);
+      // Remove from claimed videos if error occurs
+      setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
     } finally {
       setIsClaiming(false);
     }
@@ -785,7 +782,7 @@ const VideoWatchPage = () => {
         <ConfettiOverlay>
           <Confetti />
           <RewardMessage>
-            <FaDollarSign /> +4.00 Added to Your Balance!
+            <FaDollarSign /> +{currentVideo.rewardAmount.toFixed(2)} Added to Your Balance!
           </RewardMessage>
           <OkButton onClick={() => setShowConfetti(false)}>OK</OkButton>
         </ConfettiOverlay>
@@ -798,7 +795,7 @@ const VideoWatchPage = () => {
             <FaCheckCircle size={60} color="#4CAF50" />
             <PopupTitle>Reward Available!</PopupTitle>
             <PopupText>
-              You've watched <strong>15 seconds</strong> and earned <strong>$4.00</strong>!
+              You've watched <strong>15 seconds</strong> and earned <strong>${currentVideo.rewardAmount.toFixed(2)}</strong>!
               <br /><br />
               Click the button below to claim your reward.
             </PopupText>
@@ -808,7 +805,7 @@ const VideoWatchPage = () => {
             >
               {isClaiming ? 'Processing...' : 
                hasClaimed ? 'Reward Claimed' : 
-               'Claim $4.00 Reward'}
+               `Claim $${currentVideo.rewardAmount.toFixed(2)} Reward`}
             </ClaimButton>
           </PopupContent>
         </RewardPopup>
@@ -844,11 +841,6 @@ const VideoWatchPage = () => {
         <BalanceCard>
           <BalanceLabel>Total Available Balance</BalanceLabel>
           <BalanceAmount>${totalAvailableBalance.toFixed(2)}</BalanceAmount>
-          {rewardEarned > 0 && (
-            <RewardNotification>
-              <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
-            </RewardNotification>
-          )}
         </BalanceCard>
         
         <VideoContainer>
@@ -866,7 +858,7 @@ const VideoWatchPage = () => {
             <ProgressFill $progress={(watchedTime / currentVideo.duration) * 100} />
             {hasQualified && (
               <QualifiedMarker $position={(15 / currentVideo.duration) * 100}>
-                <QualifiedTooltip>Earn $4.00 here!</QualifiedTooltip>
+                <QualifiedTooltip>Earn ${currentVideo.rewardAmount.toFixed(2)} here!</QualifiedTooltip>
               </QualifiedMarker>
             )}
           </ProgressBar>
@@ -877,7 +869,7 @@ const VideoWatchPage = () => {
               <QualifyText $claimed={hasClaimed}>
                 {hasClaimed ? 'Reward claimed!' : 
                  hasQualified ? 'Reward available - click to claim!' : 
-                 'Watch 15s to earn $4.00'}
+                 `Watch 15s to earn $${currentVideo.rewardAmount.toFixed(2)}`}
               </QualifyText>
             </TimeDisplay>
             
