@@ -339,8 +339,6 @@ export default function WithdrawForm() {
   const { 
     balance = 0,
     adsBalance = 0,
-    dollarBalance2 = 0,
-    checkinRewards = 0,
     processedReferrals = [],
     id,
     username,
@@ -348,8 +346,6 @@ export default function WithdrawForm() {
     loading,
     setBalance,
     setAdsBalance,
-    setDollarBalance2,
-    setCheckinRewards,
     setRefBonus
   } = useUser();
 
@@ -360,11 +356,9 @@ export default function WithdrawForm() {
 
   // Calculate total available balance from all sources
   const totalAvailableBalance = (
-    (balance || 0) / 1000 + // Convert points to dollars
-    (adsBalance || 0) + 
-    (dollarBalance2 || 0) + 
-    (checkinRewards || 0) + 
-    totalReferralEarnings
+    (balance || 0) +          // Main balance (dollars)
+    (adsBalance || 0) +       // Ads balance (dollars)
+    totalReferralEarnings     // Referral earnings (converted to dollars)
   );
 
   const navigate = useNavigate();
@@ -431,8 +425,6 @@ export default function WithdrawForm() {
       const updates = {};
       const balanceDeductions = {
         adsBalance: 0,
-        dollarBalance2: 0,
-        checkinRewards: 0,
         refBonus: 0,
         balance: 0
       };
@@ -445,23 +437,7 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromAds;
       }
       
-      // 2. Then deduct from dollar balance
-      if (dollarBalance2 > 0 && remainingAmount > 0) {
-        const deductFromDollar = Math.min(dollarBalance2, remainingAmount);
-        updates.dollarBalance2 = increment(-deductFromDollar);
-        balanceDeductions.dollarBalance2 = deductFromDollar;
-        remainingAmount -= deductFromDollar;
-      }
-      
-      // 3. Then deduct from checkin rewards
-      if (checkinRewards > 0 && remainingAmount > 0) {
-        const deductFromCheckin = Math.min(checkinRewards, remainingAmount);
-        updates.checkinRewards = increment(-deductFromCheckin);
-        balanceDeductions.checkinRewards = deductFromCheckin;
-        remainingAmount -= deductFromCheckin;
-      }
-      
-      // 4. Then deduct from referral earnings (convert to points first)
+      // 2. Then deduct from referral earnings (convert dollars to points)
       if (totalReferralEarnings > 0 && remainingAmount > 0) {
         const deductFromReferrals = Math.min(totalReferralEarnings, remainingAmount);
         const referralPointsToDeduct = deductFromReferrals * 100; // Convert dollars to points (1$ = 100pts)
@@ -470,10 +446,9 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromReferrals;
       }
       
-      // 5. Finally deduct from main balance (converted to points)
+      // 3. Finally deduct from main balance
       if (remainingAmount > 0) {
-        const pointsToDeduct = remainingAmount * 1000;
-        updates.balance = increment(-pointsToDeduct);
+        updates.balance = increment(-remainingAmount);
         balanceDeductions.balance = remainingAmount;
       }
 
@@ -501,10 +476,8 @@ export default function WithdrawForm() {
 
       // Update local state to reflect the deductions
       setAdsBalance(prev => Math.max(0, prev - balanceDeductions.adsBalance));
-      setDollarBalance2(prev => Math.max(0, prev - balanceDeductions.dollarBalance2));
-      setCheckinRewards(prev => Math.max(0, prev - balanceDeductions.checkinRewards));
       setRefBonus(prev => Math.max(0, prev - (balanceDeductions.refBonus * 100)));
-      setBalance(prev => Math.max(0, prev - (balanceDeductions.balance * 1000)));
+      setBalance(prev => Math.max(0, prev - balanceDeductions.balance));
 
       setSuccess('Withdrawal request submitted!');
       
@@ -773,7 +746,7 @@ export default function WithdrawForm() {
                     .filter(([_, value]) => value > 0)
                     .map(([key, value]) => (
                       <div key={key}>
-                        {key}: ${key === 'balance' ? (value / 1000).toFixed(3) : value.toFixed(3)}
+                        {key}: ${value.toFixed(3)}
                       </div>
                     ))}
                 </ReceiptValue>
