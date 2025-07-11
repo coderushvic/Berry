@@ -599,9 +599,28 @@ const PromptButton = styled.button`
 `;
 
 const VideoWatchPage = () => {
-  // Use the user context
-  const { id, addRewards, balance, loading: userLoading } = useUser();
+  // Use the user context with all balance sources
+  const { 
+    id, 
+    addRewards, 
+    balance = 0,
+    adsBalance = 0,
+    processedReferrals = [],
+    loading: userLoading 
+  } = useUser();
   
+  // Calculate total referral earnings in dollars (100 points = $1)
+  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
+    return total + (referral.refBonus || 0) * 0.01;
+  }, 0);
+
+  // Calculate total available balance from all sources
+  const totalAvailableBalance = (
+    (balance || 0) +          // Main balance (dollars)
+    (adsBalance || 0) +       // Ads balance (dollars)
+    totalReferralEarnings     // Referral earnings (converted to dollars)
+  );
+
   // State management
   const [currentVideo, setCurrentVideo] = useState(null);
   const [watchedTime, setWatchedTime] = useState(0);
@@ -695,10 +714,10 @@ const VideoWatchPage = () => {
     setIsClaiming(true);
 
     try {
-      const result = await addRewards(1.00, 'video');
+      const result = await addRewards(2.00, 'video');
       
       if (result?.success) {
-        setRewardEarned(1.00);
+        setRewardEarned(2.00);
         setHasClaimed(true);
         setShowConfetti(true);
         setShowClaimPrompt(false);
@@ -764,7 +783,7 @@ const VideoWatchPage = () => {
       {/* Confetti Celebration */}
       {showConfetti && (
         <ConfettiOverlay>
-          <Confetti src="/celebrating.gif" alt="Confetti celebration" />
+          <Confetti />
           <RewardMessage>
             <FaDollarSign /> +2.00 Added to Your Balance!
           </RewardMessage>
@@ -823,8 +842,8 @@ const VideoWatchPage = () => {
       
       <Content>
         <BalanceCard>
-          <BalanceLabel>Video Earnings Balance</BalanceLabel>
-          <BalanceAmount>${balance.toFixed(2)}</BalanceAmount>
+          <BalanceLabel>Total Available Balance</BalanceLabel>
+          <BalanceAmount>${totalAvailableBalance.toFixed(2)}</BalanceAmount>
           {rewardEarned > 0 && (
             <RewardNotification>
               <FaDollarSign /> +{rewardEarned.toFixed(2)} earned!
