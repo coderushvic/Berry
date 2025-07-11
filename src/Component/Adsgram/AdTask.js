@@ -658,13 +658,14 @@ const AdTask = () => {
         
         <RewardBadges>
           <RewardBadge
-            $bgColor={berryTheme.colors.successLight}
-            $textColor={berryTheme.colors.successDark}
-            $shadowColor="rgba(46, 204, 113, 0.1)"
-            whileHover={{ scale: 1.05 }}
-          >
-            <FaGem size={16} /> ${localAdsConfig.dollarBonus.toFixed(3)} USD
-          </RewardBadge>
+  $bgColor={berryTheme.colors.successLight}
+  $textColor={berryTheme.colors.successDark}
+  $shadowColor="rgba(46, 204, 113, 0.1)"
+  whileHover={{ scale: 1.05 }}
+>
+  <FaGem size={16} /> 
+  {localAdsConfig.dollarBonus ? `${localAdsConfig.dollarBonus.toFixed(3)} USD` : "2 USD"}
+</RewardBadge>
         </RewardBadges>
         
         <ProgressContainer>
