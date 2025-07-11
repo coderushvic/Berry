@@ -174,8 +174,8 @@ function VideoRewardsSection() {
         <CardContent>
           <CardTitle>Premium Video Content</CardTitle>
           <CardText>
-            Watch this 2-minute video and earn $1.00 instantly. 
-            Complete 5 videos to unlock bonus rewards!
+            Watch this 2-minute plus + video and earn $10.00 instantly. 
+            Complete videos to unlock bonus rewards!
           </CardText>
           <ActionButton onClick={handleWatchVideo}>
             Start Watching Now
