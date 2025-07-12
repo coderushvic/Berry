@@ -317,7 +317,7 @@ const AdTask = () => {
     id,
     isPremium,
     adsConfig = defaultConfig,
-    addRewards
+    setAdsBalance
   } = useUser();
 
   const [adWatched, setAdWatched] = useState(false);
@@ -528,23 +528,40 @@ const AdTask = () => {
     setClaiming(true);
     
     try {
-      const result = await addRewards(localAdsConfig.dollarBonus, 'ads', {
-        preventDuplicate: false,
-        adId: activeAd.id
-      });
-      
-      if (result?.success) {
-        setUserAdData(prev => ({
-          ...prev,
-          lastClaimDate: new Date()
-        }));
+      const result = await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "telegramUsers", id);
+        const userDoc = await transaction.get(userRef);
         
-        setAdWatched(false);
-        setCongrats(true);
-        setTimeout(() => setCongrats(false), 4000);
-      } else {
-        throw new Error(result?.error || "Failed to claim reward");
-      }
+        if (!userDoc.exists()) {
+          throw new Error("User document doesn't exist");
+        }
+
+        const currentAdsBalance = userDoc.data().adsBalance || 0;
+        const newAdsBalance = currentAdsBalance + localAdsConfig.dollarBonus;
+
+        transaction.update(userRef, {
+          adsBalance: newAdsBalance,
+          lastClaimDate: serverTimestamp(),
+          adsWatched: increment(1)
+        });
+
+        return {
+          success: true,
+          newAdsBalance
+        };
+      });
+
+      setAdsBalance(result.newAdsBalance);
+      
+      setUserAdData(prev => ({
+        ...prev,
+        lastClaimDate: new Date()
+      }));
+      
+      setAdWatched(false);
+      setCongrats(true);
+      setTimeout(() => setCongrats(false), 4000);
+      
     } catch (error) {
       console.error("Error claiming reward:", error);
       setAdError(error.message);
@@ -552,7 +569,7 @@ const AdTask = () => {
     } finally {
       setClaiming(false);
     }
-  }, [adWatched, claiming, localAdsConfig, activeAd, addRewards]);
+  }, [adWatched, claiming, localAdsConfig, id, setAdsBalance]);
 
   const showAd = useCallback(async () => {
     if (isAdLoading) return;
