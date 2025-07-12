@@ -582,22 +582,11 @@ const VideoWatchPage = () => {
   const { 
     id, 
     addRewards, 
-    balance = 0,
-    adsBalance = 0,
-    processedReferrals = [],
+    dollarBalance2 = 0,
+    claimedVideos: contextClaimedVideos = [],
     loading: userLoading 
   } = useUser();
   
-  const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
-    return total + (referral.refBonus || 0) * 0.01;
-  }, 0);
-
-  const totalAvailableBalance = (
-    (balance || 0) + 
-    (adsBalance || 0) + 
-    totalReferralEarnings
-  );
-
   const [currentVideo, setCurrentVideo] = useState(null);
   const [watchedTime, setWatchedTime] = useState(0);
   const [hasQualified, setHasQualified] = useState(false);
@@ -608,7 +597,6 @@ const VideoWatchPage = () => {
   const [videoLoading, setVideoLoading] = useState(true);
   const [showClaimPrompt, setShowClaimPrompt] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
-  const [claimedVideos, setClaimedVideos] = useState([]);
 
   const timerRef = useRef(null);
   const confettiTimeoutRef = useRef(null);
@@ -651,7 +639,7 @@ const VideoWatchPage = () => {
     setShowClaimPrompt(false);
     setIsClaiming(false);
 
-    const alreadyClaimed = claimedVideos.includes(currentVideo.id);
+    const alreadyClaimed = contextClaimedVideos.includes(currentVideo.id);
     if (alreadyClaimed) {
       setHasClaimed(true);
     } else {
@@ -680,7 +668,7 @@ const VideoWatchPage = () => {
     return () => {
       clearInterval(timerRef.current);
     };
-  }, [currentVideo, userLoading, claimedVideos]);
+  }, [currentVideo, userLoading, contextClaimedVideos]);
 
   const handleClaimReward = async (e) => {
     if (e) e.stopPropagation();
@@ -690,10 +678,10 @@ const VideoWatchPage = () => {
     setIsClaiming(true);
 
     try {
-      setClaimedVideos(prev => [...prev, currentVideo.id]);
-      
-      // Ensure only $2.00 is added by using currentVideo.rewardAmount
-      const result = await addRewards(currentVideo.rewardAmount, 'video');
+      const result = await addRewards(currentVideo.rewardAmount, 'video', {
+        videoId: currentVideo.id,
+        preventDuplicate: true
+      });
       
       if (result?.success) {
         setHasClaimed(true);
@@ -703,12 +691,9 @@ const VideoWatchPage = () => {
         confettiTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
         }, 5000);
-      } else {
-        setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
       }
     } catch (err) {
       console.error('Error claiming reward:', err);
-      setClaimedVideos(prev => prev.filter(id => id !== currentVideo.id));
     } finally {
       setIsClaiming(false);
     }
@@ -817,8 +802,8 @@ const VideoWatchPage = () => {
       
       <Content>
         <BalanceCard>
-          <BalanceLabel>Total Available Balance</BalanceLabel>
-          <BalanceAmount>${totalAvailableBalance.toFixed(2)}</BalanceAmount>
+          <BalanceLabel>Video Earnings Balance</BalanceLabel>
+          <BalanceAmount>${dollarBalance2.toFixed(2)}</BalanceAmount>
         </BalanceCard>
         
         <VideoContainer>
