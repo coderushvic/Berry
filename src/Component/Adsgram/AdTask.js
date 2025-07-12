@@ -299,7 +299,7 @@ const PremiumTag = styled.div`
 `;
 
 const defaultConfig = {
-  dollarBonus: 2.000,
+  dollarBonus: 1.000,
   dailyLimit: 50,
   premiumDailyLimit: 100,
   cooldown: 20 * 60 * 1000, // 20 minutes in milliseconds
