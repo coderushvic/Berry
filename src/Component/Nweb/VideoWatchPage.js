@@ -619,6 +619,14 @@ const VideoWatchPage = () => {
       duration: 45,
       thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg',
       rewardAmount: 2.00
+    },
+    {
+      id: 'vid3',
+      youtubeId: 'JGwWNGJdvx8',
+      title: 'Special Bonus',
+      duration: 45,
+      thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg',
+      rewardAmount: 4.00
     }
   ], []);
 
