@@ -167,14 +167,14 @@ function VideoRewardsSection() {
             <FaPlay />
           </PlayButton>
           <RewardTag>
-            <FaDollarSign /> $10.00
+            <FaDollarSign /> EARN
           </RewardTag>
         </VideoContainer>
         
         <CardContent>
           <CardTitle>Premium Video Content</CardTitle>
           <CardText>
-            Watch this 2-minute plus + video and earn $10.00 instantly. 
+            Watch this 2-minute plus + video and earn instantly. 
             Complete videos to unlock bonus rewards!
           </CardText>
           <ActionButton onClick={handleWatchVideo}>
