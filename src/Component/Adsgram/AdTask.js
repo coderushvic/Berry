@@ -654,7 +654,7 @@ const AdTask = () => {
             whileHover={{ scale: 1.05 }}
           >
             <FaGem size={16} /> 
-            {localAdsConfig.dollarBonus ? `${localAdsConfig.dollarBonus.toFixed(3)} USD` : "2 USD"}
+            {localAdsConfig.dollarBonus ? `${localAdsConfig.dollarBonus.toFixed(3)} USD` : "1 USD"}
           </RewardBadge>
         </RewardBadges>
         
