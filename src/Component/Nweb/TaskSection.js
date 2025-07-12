@@ -138,7 +138,7 @@ function TaskSection() {
     { 
       icon: <FaGem />, 
       name: 'Daily Bonus', 
-      reward: '$10',
+      reward: '$5',
       accentColor: '#FF9F43',
       iconColor: '#FF9F43',
       path: '/DailyReward'
@@ -147,7 +147,7 @@ function TaskSection() {
     { 
       icon: <FaAd />, 
       name: 'Watch Ads', 
-      reward: '$2/ad',
+      reward: '$1/ad',
       accentColor: '#28C76F',
       iconColor: '#28C76F',
       path: '/AdsPage',
