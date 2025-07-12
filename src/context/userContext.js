@@ -80,7 +80,7 @@ export const UserProvider = ({ children }) => {
 
   // Ad configuration
   const [adsConfig, setAdsConfig] = useState({
-    dollarBonus: 1.00,
+    dollarBonus: 0.00,
     dailyLimit: 50,
     premiumDailyLimit: 100,
     cooldown: 20 * 60 * 1000,
