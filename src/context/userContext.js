@@ -321,59 +321,48 @@ export const UserProvider = ({ children }) => {
     return false;
   }, [lastAdTimestamp]);
 
-  // NEW: Dedicated function for ad rewards only
-  const addAdRewards = useCallback(async (amount, options = {}) => {
-    if (!id) throw new Error('User not authenticated');
-    
-    try {
-      const userRef = doc(db, 'telegramUsers', id);
-      const now = new Date();
-      
-      const result = await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) throw new Error("User does not exist");
-
-        const claimId = options.claimId || `ad-${now.getTime()}`;
-        
-        if (options.preventDuplicate && userDoc.data().processedAdClaims?.includes(claimId)) {
-          throw new Error("Ad reward already claimed");
-        }
-
-        transaction.update(userRef, {
-          adsBalance: increment(amount),
-          adsWatched: increment(1),
-          lastAdTimestamp: serverTimestamp(),
-          processedAdClaims: options.preventDuplicate ? arrayUnion(claimId) : undefined
-        });
-
-        return {
-          success: true,
-          amount
-        };
-      });
-
-      setAdsBalance(prev => +(prev + amount).toFixed(6));
-      setAdsWatched(prev => prev + 1);
-      setLastAdTimestamp(now);
-      
-      return result;
-    } catch (error) {
-      console.error('Error adding ad rewards:', error);
-      return { success: false, error: error.message };
-    }
-  }, [id]);
-
   const recordAdWatch = useCallback(async (adData) => {
     if (!id) throw new Error('User not authenticated');
     
     checkAndResetDailyAds();
     
     const now = new Date();
+    const userRef = doc(db, 'telegramUsers', id);
     
     try {
-      const result = await addAdRewards(adsConfig.dollarBonus, {
-        adId: adData.adId,
-        preventDuplicate: true
+      const result = await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User does not exist");
+        
+        const userData = userDoc.data();
+        const currentDailyCount = userData.dailyAdsWatched || 0;
+        const dailyLimit = userData.isPremium ? 
+          adsConfig.premiumDailyLimit : adsConfig.dailyLimit;
+        
+        if (currentDailyCount >= dailyLimit) {
+          throw new Error("Daily ad limit reached");
+        }
+        
+        const newAdEntry = {
+          adId: adData.adId,
+          timestamp: serverTimestamp(),
+          dollarsEarned: adsConfig.dollarBonus,
+          status: 'completed'
+        };
+        
+        transaction.update(userRef, {
+          adsWatched: increment(1),
+          dailyAdsWatched: increment(1),
+          lastAdTimestamp: serverTimestamp(),
+          adHistory: arrayUnion(newAdEntry),
+          adsBalance: increment(adsConfig.dollarBonus)
+        });
+
+        return {
+          success: true,
+          amount: adsConfig.dollarBonus,
+          dailyCount: currentDailyCount + 1
+        };
       });
       
       setAdsWatched(prev => prev + 1);
@@ -385,13 +374,14 @@ export const UserProvider = ({ children }) => {
         dollarsEarned: adsConfig.dollarBonus,
         status: 'completed'
       }]);
+      setAdsBalance(prev => +(prev + adsConfig.dollarBonus).toFixed(6));
       
       return result;
     } catch (error) {
       console.error("Error recording ad watch:", error);
       throw error;
     }
-  }, [id, adsConfig, checkAndResetDailyAds, addAdRewards]);
+  }, [id, adsConfig, checkAndResetDailyAds]);
 
   const watchVideo = useCallback(async (videoId) => {
     if (!id) throw new Error('User not authenticated');
@@ -533,7 +523,10 @@ export const UserProvider = ({ children }) => {
             updateData.dollarBalance2 = increment(amount);
             break;
           case 'ads':
-            throw new Error("Use addAdRewards for ad rewards");
+            updateData.adsBalance = increment(amount);
+            updateData.adsWatched = increment(1);
+            updateData.lastAdTimestamp = serverTimestamp();
+            break;
           case 'video':
             updateData.dollarBalance2 = increment(amount);
             updateData.videoWatched = increment(1);
@@ -567,6 +560,11 @@ export const UserProvider = ({ children }) => {
       switch (type) {
         case 'main':
           setDollarBalance2(prev => +(prev + amount).toFixed(2));
+          break;
+        case 'ads':
+          setAdsBalance(prev => +(prev + amount).toFixed(6));
+          setAdsWatched(prev => prev + 1);
+          setLastAdTimestamp(now);
           break;
         case 'video':
           setDollarBalance2(prev => +(prev + amount).toFixed(2));
@@ -988,7 +986,6 @@ export const UserProvider = ({ children }) => {
       sendUserData,
       handleReferral,
       addRewards,
-      addAdRewards,
       watchVideo,
       fetchWithdrawals,
       recordAdWatch,
