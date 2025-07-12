@@ -317,7 +317,7 @@ const AdTask = () => {
     id,
     isPremium,
     adsConfig = defaultConfig,
-    setAdsBalance,
+    addRewards
   } = useUser();
 
   const [adWatched, setAdWatched] = useState(false);
@@ -528,50 +528,23 @@ const AdTask = () => {
     setClaiming(true);
     
     try {
-      const rewardData = await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, "telegramUsers", id);
-        const userDoc = await transaction.get(userRef);
-        
-        if (!userDoc.exists()) {
-          throw new Error("User document doesn't exist");
-        }
-        
-        const userData = userDoc.data();
-        const lastAdTime = userData.lastAdTimestamp?.toDate();
-        
-        if (!lastAdTime || (new Date() - lastAdTime) > localAdsConfig.cooldown * 3) {
-          throw new Error("No valid ad watch recorded. Please watch an ad first.");
-        }
-        
-        const lastClaimTime = userData.lastClaimDate?.toDate();
-        if (lastClaimTime && (new Date() - lastClaimTime) < 60000) {
-          throw new Error("Please wait at least 1 minute between claims");
-        }
-        
-        const newAdsBalance = (userData.adsBalance || 0) + localAdsConfig.dollarBonus;
-        
-        transaction.update(userRef, {
-          adsBalance: newAdsBalance,
-          lastClaimDate: serverTimestamp()
-        });
-        
-        return {
-          dollars: localAdsConfig.dollarBonus,
-          newAdsBalance: newAdsBalance
-        };
+      const result = await addRewards(localAdsConfig.dollarBonus, 'ads', {
+        preventDuplicate: false,
+        adId: activeAd.id
       });
-
-      setAdsBalance(rewardData.newAdsBalance);
       
-      setUserAdData(prev => ({
-        ...prev,
-        lastClaimDate: new Date()
-      }));
-      
-      setAdWatched(false);
-      setCongrats(true);
-      setTimeout(() => setCongrats(false), 4000);
-      
+      if (result?.success) {
+        setUserAdData(prev => ({
+          ...prev,
+          lastClaimDate: new Date()
+        }));
+        
+        setAdWatched(false);
+        setCongrats(true);
+        setTimeout(() => setCongrats(false), 4000);
+      } else {
+        throw new Error(result?.error || "Failed to claim reward");
+      }
     } catch (error) {
       console.error("Error claiming reward:", error);
       setAdError(error.message);
@@ -579,7 +552,7 @@ const AdTask = () => {
     } finally {
       setClaiming(false);
     }
-  }, [adWatched, claiming, id, localAdsConfig, setAdsBalance]);
+  }, [adWatched, claiming, localAdsConfig, activeAd, addRewards]);
 
   const showAd = useCallback(async () => {
     if (isAdLoading) return;
@@ -658,14 +631,14 @@ const AdTask = () => {
         
         <RewardBadges>
           <RewardBadge
-  $bgColor={berryTheme.colors.successLight}
-  $textColor={berryTheme.colors.successDark}
-  $shadowColor="rgba(46, 204, 113, 0.1)"
-  whileHover={{ scale: 1.05 }}
->
-  <FaGem size={16} /> 
-  {localAdsConfig.dollarBonus ? `${localAdsConfig.dollarBonus.toFixed(3)} USD` : "2 USD"}
-</RewardBadge>
+            $bgColor={berryTheme.colors.successLight}
+            $textColor={berryTheme.colors.successDark}
+            $shadowColor="rgba(46, 204, 113, 0.1)"
+            whileHover={{ scale: 1.05 }}
+          >
+            <FaGem size={16} /> 
+            {localAdsConfig.dollarBonus ? `${localAdsConfig.dollarBonus.toFixed(3)} USD` : "2 USD"}
+          </RewardBadge>
         </RewardBadges>
         
         <ProgressContainer>
