@@ -1,7 +1,7 @@
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaUserFriends, FaPlayCircle, FaTasks } from 'react-icons/fa';
+import { FaWallet, FaUserFriends, FaPlayCircle, FaTasks } from 'react-icons/fa';
 import { FiRefreshCw } from 'react-icons/fi';
 import { useUser } from "../../context/userContext";
 
@@ -189,27 +189,34 @@ const ReferralHeader = styled.h4`
   font-weight: 600;
 `;
 
-function BalanceCard({ cardType = 'referral' }) {
+function BalanceCard({ cardType = 'balance' }) {
   const { 
-    adsBalance = 0,
-    dollarBalance2 = 0,
-    checkinRewards = 0,
-    refBonus = 0,
-    processedReferrals = []
+    adsBalance = 0,            // Ad earnings
+    dollarBalance2 = 0,        // Video and other earnings
+    checkinRewards = 0,        // Daily check-in rewards
+    refBonus = 0,              // Referral earnings
+    processedReferrals = []    // Array of referral transactions
   } = useUser();
 
-  // Calculate detailed referral earnings
+  // Calculate total balance as sum of all earnings
+  const totalBalance = adsBalance + dollarBalance2 + checkinRewards + refBonus;
+
+  // Calculate detailed referral earnings from processedReferrals
   const detailedReferralEarnings = processedReferrals.reduce((total, referral) => {
     return total + (referral.refBonus || 0);
   }, 0);
 
   // Use the more accurate refBonus if available, otherwise fallback to calculated value
   const totalReferralEarnings = refBonus || detailedReferralEarnings;
-  
-  // Other earnings components
-  const totalVideoEarnings = dollarBalance2;
-  const totalAdEarnings = adsBalance;
-  const totalDailyRewards = checkinRewards;
+
+  // For non-balance cards, show specific earnings
+  const displayAmount = cardType === 'balance' ? 
+    totalBalance :
+    cardType === 'referral' ? totalReferralEarnings :
+    cardType === 'video' ? dollarBalance2 :
+    cardType === 'ads' ? adsBalance :
+    cardType === 'daily' ? checkinRewards :
+    0;
 
   const getIcon = () => {
     switch(cardType) {
@@ -224,7 +231,7 @@ function BalanceCard({ cardType = 'referral' }) {
       case 'daily':
         return <FaTasks />;
       default:
-        return <ReferralIcon />;
+        return <FaWallet />;
     }
   };
 
@@ -241,15 +248,9 @@ function BalanceCard({ cardType = 'referral' }) {
       case 'daily':
         return 'Daily Rewards';
       default:
-        return 'Referral Earnings';
+        return 'Total Balance';
     }
   };
-
-  const displayAmount = cardType === 'referral' ? totalReferralEarnings :
-                      cardType === 'video' ? totalVideoEarnings :
-                      cardType === 'ads' ? totalAdEarnings :
-                      cardType === 'daily' ? totalDailyRewards :
-                      0;
 
   return (
     <Card $borderColor={
@@ -258,7 +259,7 @@ function BalanceCard({ cardType = 'referral' }) {
       cardType === 'task' ? berryTheme.colors.primaryDark :
       cardType === 'ads' ? berryTheme.colors.accent :
       cardType === 'daily' ? berryTheme.colors.secondaryLight :
-      berryTheme.colors.primaryLight
+      berryTheme.colors.primary
     }>
       <Content>
         <CardTitle>
@@ -266,6 +267,27 @@ function BalanceCard({ cardType = 'referral' }) {
           {getTitle()}
         </CardTitle>
         <BalanceAmount>${displayAmount.toFixed(2)}</BalanceAmount>
+        
+        {cardType === 'balance' && (
+          <BreakdownSection>
+            <BreakdownItem>
+              <span>Video Rewards:</span>
+              <span>${dollarBalance2.toFixed(2)}</span>
+            </BreakdownItem>
+            <BreakdownItem>
+              <span>Ad Rewards:</span>
+              <span>${adsBalance.toFixed(2)}</span>
+            </BreakdownItem>
+            <BreakdownItem>
+              <span>Referral Earnings:</span>
+              <span>${totalReferralEarnings.toFixed(2)}</span>
+            </BreakdownItem>
+            <BreakdownItem>
+              <span>Daily Rewards:</span>
+              <span>${checkinRewards.toFixed(2)}</span>
+            </BreakdownItem>
+          </BreakdownSection>
+        )}
         
         {cardType === 'referral' && processedReferrals.length > 0 && (
           <BreakdownSection>
@@ -281,14 +303,16 @@ function BalanceCard({ cardType = 'referral' }) {
 
         <ButtonGroup>
           <ActionButton>
-            {cardType === 'referral' ? 'Invite Friends' :
+            {cardType === 'balance' ? 'Withdraw' : 
+             cardType === 'referral' ? 'Invite Friends' :
              cardType === 'video' ? 'Watch Videos' : 
              cardType === 'ads' ? 'View Ads' :
              cardType === 'daily' ? 'Check In' :
              'View Tasks'}
           </ActionButton>
           <ActionButton>
-            {cardType === 'referral' ? 'View Rewards' :
+            {cardType === 'balance' ? 'Deposit' : 
+             cardType === 'referral' ? 'View Rewards' :
              cardType === 'video' ? 'Claim Rewards' : 
              cardType === 'ads' ? 'Ad History' :
              cardType === 'daily' ? 'Streak Info' :
