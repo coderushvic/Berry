@@ -204,11 +204,13 @@ const ProfilePage = () => {
     username = '',
     videoWatched = 0,
     processedReferrals = [],
-    balance = 0,
     adsBalance = 0,
     dollarBalance2 = 0,
+    checkinRewards = 0,
+    refBonus = 0,
     walletAddress = '',
-    isPremium
+    isPremium,
+    adsConfig
   } = useUser();
 
   useEffect(() => {
@@ -229,9 +231,8 @@ const ProfilePage = () => {
         const userDoc = await getDoc(doc(db, "telegramUsers", id));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          // Get current ads watched counts
-          setAdsWatchedToday(data.adsWatchedToday || 0);
-          setTotalAdsWatched(data.totalAdsWatched || data.adsWatchedToday || 0);
+          setAdsWatchedToday(data.dailyAdsWatched || 0);
+          setTotalAdsWatched(data.adsWatched || 0);
         }
       } catch (error) {
         console.error("Error loading ads data:", error);
@@ -243,10 +244,15 @@ const ProfilePage = () => {
 
   // Calculate stats
   const referralCount = processedReferrals?.length || 0;
-  const totalRevenue = parseFloat(balance) + parseFloat(adsBalance) + parseFloat(dollarBalance2);
+  
+  // Calculate total balance as sum of all earnings
+  const totalBalance = parseFloat(adsBalance) + 
+                      parseFloat(dollarBalance2) + 
+                      parseFloat(checkinRewards) + 
+                      parseFloat(refBonus);
 
   // Calculate daily progress
-  const dailyLimit = isPremium ? 100 : 50;
+  const dailyLimit = isPremium ? adsConfig?.premiumDailyLimit || 100 : adsConfig?.dailyLimit || 50;
   const dailyProgress = Math.min(100, (adsWatchedToday / dailyLimit) * 100);
 
   const copyUserId = () => {
@@ -357,7 +363,7 @@ const ProfilePage = () => {
         <StatCard $borderColor="#7367F0">
           <StatValue>
             <FaMoneyBillWave />
-            ${totalRevenue.toFixed(2)}
+            ${totalBalance.toFixed(2)}
           </StatValue>
           <StatLabel>Total Earnings</StatLabel>
         </StatCard>
