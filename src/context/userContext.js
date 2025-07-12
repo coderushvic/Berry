@@ -14,8 +14,7 @@ const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
 
 export const UserProvider = ({ children }) => {
-  // State declarations
-  const [balance, setBalance] = useState(0);
+  // State declarations (removed balance related states)
   const [adsBalance, setAdsBalance] = useState(0);
   const [dollarBalance2, setDollarBalance2] = useState(0);
   const [id, setId] = useState("");
@@ -119,7 +118,7 @@ export const UserProvider = ({ children }) => {
       }
 
       const usersRef = collection(db, 'telegramUsers');
-      const q = query(usersRef, orderBy('balance', 'desc'), limit(100));
+      const q = query(usersRef, orderBy('dollarBalance2', 'desc'), limit(100));
       const querySnapshot = await getDocs(q);
 
       const users = querySnapshot.docs.map(doc => ({
@@ -174,12 +173,10 @@ export const UserProvider = ({ children }) => {
           refBonus: refBonus,
         }),
         refBonus: increment(refBonus),
-        balance: increment(refBonus * 1000),
         dollarBalance2: increment(refBonus)
       });
 
       if (referrerId === id) {
-        setBalance(prev => prev + (refBonus * 1000));
         setDollarBalance2(prev => +(prev + refBonus).toFixed(6));
         setRefBonus(prev => prev + refBonus);
       }
@@ -228,19 +225,18 @@ export const UserProvider = ({ children }) => {
     }
   }, [id]);
 
-  // Balance functions
+  // Balance functions (updated to use dollarBalance2 as primary balance)
   const getDisplayBalance = useCallback(() => {
     return {
-      total: balance.toFixed(2),
-      available: dollarBalance2.toFixed(2),
+      total: dollarBalance2.toFixed(2),
       ads: adsBalance.toFixed(2),
-      points: balance
+      points: dollarBalance2
     };
-  }, [balance, adsBalance, dollarBalance2]);
+  }, [adsBalance, dollarBalance2]);
 
   const getTotalBalance = useCallback(() => {
-    return parseFloat(balance.toFixed(2));
-  }, [balance]);
+    return parseFloat(dollarBalance2.toFixed(2));
+  }, [dollarBalance2]);
 
   // Ad statistics function
   const getAdStats = useCallback(() => {
@@ -305,7 +301,7 @@ export const UserProvider = ({ children }) => {
     }
   }, [allWithdrawals, adsWithdrawals]);
 
-  // Reward functions
+  // Reward functions (updated to remove balance updates)
   const checkAndResetDailyAds = useCallback(() => {
     const now = new Date();
     const lastMidnight = new Date(
@@ -355,8 +351,7 @@ export const UserProvider = ({ children }) => {
           dailyAdsWatched: increment(1),
           lastAdTimestamp: serverTimestamp(),
           adHistory: arrayUnion(newAdEntry),
-          adsBalance: increment(adsConfig.dollarBonus),
-          balance: increment(adsConfig.dollarBonus)
+          adsBalance: increment(adsConfig.dollarBonus)
         });
 
         return {
@@ -366,7 +361,6 @@ export const UserProvider = ({ children }) => {
         };
       });
       
-      setBalance(prev => prev + adsConfig.dollarBonus);
       setAdsWatched(prev => prev + 1);
       setDailyAdsWatched(prev => prev + 1);
       setLastAdTimestamp(now);
@@ -413,7 +407,6 @@ export const UserProvider = ({ children }) => {
 
         transaction.update(userRef, {
           dollarBalance2: increment(rewardAmount),
-          balance: increment(rewardAmount),
           videoWatched: increment(1),
           lastVideoTime: serverTimestamp(),
           claimedVideos: arrayUnion(videoId),
@@ -427,7 +420,6 @@ export const UserProvider = ({ children }) => {
         };
       });
 
-      setBalance(prev => prev + rewardAmount);
       setDollarBalance2(prev => +(prev + rewardAmount).toFixed(2));
       setVideoWatched(prev => prev + 1);
       setLastVideoTime(new Date());
@@ -478,7 +470,6 @@ export const UserProvider = ({ children }) => {
 
         transaction.update(userRef, {
           dollarBalance2: increment(rewardAmount),
-          balance: increment(rewardAmount),
           lastDailyReward: serverTimestamp(),
           checkinRewards: increment(rewardAmount),
           checkInDays: arrayUnion(now.toISOString().split('T')[0])
@@ -492,7 +483,6 @@ export const UserProvider = ({ children }) => {
         };
       });
 
-      setBalance(prev => prev + rewardAmount);
       setDollarBalance2(prev => +(prev + rewardAmount).toFixed(2));
       setLastDailyReward(now);
       setCheckinRewards(prev => prev + rewardAmount);
@@ -527,17 +517,14 @@ export const UserProvider = ({ children }) => {
         switch (type) {
           case 'main':
             updateData.dollarBalance2 = increment(amount);
-            updateData.balance = increment(amount);
             break;
           case 'ads':
             updateData.adsBalance = increment(amount);
-            updateData.balance = increment(amount);
             updateData.adsWatched = increment(1);
             updateData.lastAdTimestamp = serverTimestamp();
             break;
           case 'video':
             updateData.dollarBalance2 = increment(amount);
-            updateData.balance = increment(amount);
             updateData.videoWatched = increment(1);
             updateData.lastVideoTime = serverTimestamp();
             
@@ -566,8 +553,6 @@ export const UserProvider = ({ children }) => {
         };
       });
 
-      setBalance(prev => prev + amount);
-      
       switch (type) {
         case 'main':
           setDollarBalance2(prev => +(prev + amount).toFixed(2));
@@ -599,7 +584,7 @@ export const UserProvider = ({ children }) => {
     }
   }, [id]);
 
-  // Data fetching
+  // Data fetching (updated to remove balance calculation)
   const fetchData = useCallback(async (userId) => {
     if (!userId) return;
 
@@ -610,15 +595,7 @@ export const UserProvider = ({ children }) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         
-        // Calculate total balance from all earnings sources
-        const totalBalance = 
-          (userData.adsBalance || 0) + 
-          (userData.dollarBalance2 || 0) + 
-          (userData.checkinRewards || 0) + 
-          (userData.refBonus || 0);
-        
-        // Set all states
-        setBalance(totalBalance);
+        // Set all states (removed balance calculation)
         setAdsBalance(userData.adsBalance || 0);
         setDollarBalance2(userData.dollarBalance2 || 0);
         setAdsWatched(userData.adsWatched || 0);
@@ -674,7 +651,7 @@ export const UserProvider = ({ children }) => {
 
         const usersAboveQuery = query(
           collection(db, 'telegramUsers'),
-          where('balance', '>', userData.balance || 0)
+          where('dollarBalance2', '>', userData.dollarBalance2 || 0)
         );
         const querySnapshot = await getDocs(usersAboveQuery);
         setActiveUserRank(querySnapshot.size + 1);
@@ -752,7 +729,6 @@ export const UserProvider = ({ children }) => {
           tonTasks: false,
           taskPoints: 0,
           checkinRewards: 0,
-          balance: welcomeBonus,
           adsBalance: 0,
           dollarBalance2: welcomeBonus,
           adsWatched: 0,
@@ -805,15 +781,15 @@ export const UserProvider = ({ children }) => {
     }
   }, [telegramUser, fetchData, handleReferral]);
 
-  // Effects
+  // Effects (updated to use dollarBalance2 instead of balance)
   useEffect(() => {
     if (id) {
       const visited = localStorage.getItem('hasVisitedBefore');
-      setHasVisitedBefore((balance > 0) && !!visited);
-      setChecker(!((balance > 0) && !!visited));
+      setHasVisitedBefore((dollarBalance2 > 0) && !!visited);
+      setChecker(!((dollarBalance2 > 0) && !!visited));
       if (!visited) localStorage.setItem('hasVisitedBefore', 'true');
     }
-  }, [id, balance]);
+  }, [id, dollarBalance2]);
 
   useEffect(() => {
     const checkLastCheckIn = async () => {
@@ -873,10 +849,8 @@ export const UserProvider = ({ children }) => {
 
   return (
     <UserContext.Provider value={{
-      // State values
-      balance: getTotalBalance(),
+      // State values (removed balance related values)
       balanceDetails: getDisplayBalance(),
-      rawBalance: balance,
       adsBalance,
       dollarBalance2,
       id,
@@ -935,8 +909,7 @@ export const UserProvider = ({ children }) => {
       lastVideoClaim,
       adsConfig,
 
-      // State setters
-      setBalance,
+      // State setters (removed setBalance)
       setAdsBalance,
       setDollarBalance2,
       setId,
