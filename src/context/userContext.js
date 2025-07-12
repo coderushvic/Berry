@@ -231,7 +231,7 @@ export const UserProvider = ({ children }) => {
   // Balance functions
   const getDisplayBalance = useCallback(() => {
     return {
-      total: (adsBalance + dollarBalance2).toFixed(2),
+      total: balance.toFixed(2),
       available: dollarBalance2.toFixed(2),
       ads: adsBalance.toFixed(2),
       points: balance
@@ -239,8 +239,8 @@ export const UserProvider = ({ children }) => {
   }, [balance, adsBalance, dollarBalance2]);
 
   const getTotalBalance = useCallback(() => {
-    return parseFloat(getDisplayBalance().total);
-  }, [getDisplayBalance]);
+    return parseFloat(balance.toFixed(2));
+  }, [balance]);
 
   // Ad statistics function
   const getAdStats = useCallback(() => {
@@ -355,7 +355,8 @@ export const UserProvider = ({ children }) => {
           dailyAdsWatched: increment(1),
           lastAdTimestamp: serverTimestamp(),
           adHistory: arrayUnion(newAdEntry),
-          adsBalance: increment(adsConfig.dollarBonus)
+          adsBalance: increment(adsConfig.dollarBonus),
+          balance: increment(adsConfig.dollarBonus)
         });
 
         return {
@@ -365,6 +366,7 @@ export const UserProvider = ({ children }) => {
         };
       });
       
+      setBalance(prev => prev + adsConfig.dollarBonus);
       setAdsWatched(prev => prev + 1);
       setDailyAdsWatched(prev => prev + 1);
       setLastAdTimestamp(now);
@@ -411,6 +413,7 @@ export const UserProvider = ({ children }) => {
 
         transaction.update(userRef, {
           dollarBalance2: increment(rewardAmount),
+          balance: increment(rewardAmount),
           videoWatched: increment(1),
           lastVideoTime: serverTimestamp(),
           claimedVideos: arrayUnion(videoId),
@@ -424,6 +427,7 @@ export const UserProvider = ({ children }) => {
         };
       });
 
+      setBalance(prev => prev + rewardAmount);
       setDollarBalance2(prev => +(prev + rewardAmount).toFixed(2));
       setVideoWatched(prev => prev + 1);
       setLastVideoTime(new Date());
@@ -474,6 +478,7 @@ export const UserProvider = ({ children }) => {
 
         transaction.update(userRef, {
           dollarBalance2: increment(rewardAmount),
+          balance: increment(rewardAmount),
           lastDailyReward: serverTimestamp(),
           checkinRewards: increment(rewardAmount),
           checkInDays: arrayUnion(now.toISOString().split('T')[0])
@@ -487,6 +492,7 @@ export const UserProvider = ({ children }) => {
         };
       });
 
+      setBalance(prev => prev + rewardAmount);
       setDollarBalance2(prev => +(prev + rewardAmount).toFixed(2));
       setLastDailyReward(now);
       setCheckinRewards(prev => prev + rewardAmount);
@@ -521,14 +527,17 @@ export const UserProvider = ({ children }) => {
         switch (type) {
           case 'main':
             updateData.dollarBalance2 = increment(amount);
+            updateData.balance = increment(amount);
             break;
           case 'ads':
             updateData.adsBalance = increment(amount);
+            updateData.balance = increment(amount);
             updateData.adsWatched = increment(1);
             updateData.lastAdTimestamp = serverTimestamp();
             break;
           case 'video':
             updateData.dollarBalance2 = increment(amount);
+            updateData.balance = increment(amount);
             updateData.videoWatched = increment(1);
             updateData.lastVideoTime = serverTimestamp();
             
@@ -557,6 +566,8 @@ export const UserProvider = ({ children }) => {
         };
       });
 
+      setBalance(prev => prev + amount);
+      
       switch (type) {
         case 'main':
           setDollarBalance2(prev => +(prev + amount).toFixed(2));
@@ -599,8 +610,15 @@ export const UserProvider = ({ children }) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         
+        // Calculate total balance from all earnings sources
+        const totalBalance = 
+          (userData.adsBalance || 0) + 
+          (userData.dollarBalance2 || 0) + 
+          (userData.checkinRewards || 0) + 
+          (userData.refBonus || 0);
+        
         // Set all states
-        setBalance(userData.balance || 0);
+        setBalance(totalBalance);
         setAdsBalance(userData.adsBalance || 0);
         setDollarBalance2(userData.dollarBalance2 || 0);
         setAdsWatched(userData.adsWatched || 0);
@@ -734,9 +752,9 @@ export const UserProvider = ({ children }) => {
           tonTasks: false,
           taskPoints: 0,
           checkinRewards: 0,
-          balance: 0,
+          balance: welcomeBonus,
           adsBalance: 0,
-          dollarBalance2: 0,
+          dollarBalance2: welcomeBonus,
           adsWatched: 0,
           dailyAdsWatched: 0,
           videoWatched: 0,
