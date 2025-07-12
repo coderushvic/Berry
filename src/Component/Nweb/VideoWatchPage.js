@@ -612,8 +612,16 @@ const VideoWatchPage = () => {
       thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
       rewardAmount: 2.00
     },
-    {
+      {
       id: 'vid2',
+      youtubeId: 'dQw4w9WgXcQ',
+      title: 'Premium Content',
+      duration: 30,
+      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+      rewardAmount: 2.00
+    },
+    {
+      id: 'vid3',
       youtubeId: 'JGwWNGJdvx8',
       title: 'Special Bonus',
       duration: 45,
@@ -621,7 +629,7 @@ const VideoWatchPage = () => {
       rewardAmount: 2.00
     },
     {
-      id: 'vid3',
+      id: 'vid4',
       youtubeId: 'JGwWNGJdvx8',
       title: 'Special Bonus',
       duration: 45,
