@@ -362,10 +362,10 @@ const DailyReward = () => {
           </RewardIcon>
           
           <RewardTitle>Daily Reward</RewardTitle>
-          <RewardAmount>$10</RewardAmount>
+          <RewardAmount>$5</RewardAmount>
           
           <RewardDescription>
-            Claim your daily $10 reward. Available once per calendar day.
+            Claim your daily $5 reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
