@@ -337,35 +337,38 @@ const DoneButton = styled(motion.button)`
 
 export default function WithdrawForm() {
   const { 
-    balance = 0,
+    dollarBalance2 = 0,
     adsBalance = 0,
+    checkinRewards = 0,
     processedReferrals = [],
     id,
     username,
     fullName,
     loading,
-    setBalance,
+    setDollarBalance2,
     setAdsBalance,
+    setCheckinRewards,
     setRefBonus
   } = useUser();
 
   // Calculate total referral earnings in dollars (100 points = $1)
   const totalReferralEarnings = processedReferrals.reduce((total, referral) => {
-    return total + (referral.refBonus || 0) * 0.01;
-  }, 0);
+    return total + (referral.refBonus || 0);
+  }, 0) / 100;
 
   // Calculate total available balance from all sources
   const totalAvailableBalance = (
-    (balance || 0) +          // Main balance (dollars)
-    (adsBalance || 0) +       // Ads balance (dollars)
-    totalReferralEarnings     // Referral earnings (converted to dollars)
+    (dollarBalance2 || 0) +    // Main balance (dollars)
+    (adsBalance || 0) +        // Ads balance (dollars)
+    (checkinRewards || 0) +    // Check-in rewards (dollars)
+    totalReferralEarnings      // Referral earnings (converted to dollars)
   );
 
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     amount: '',
     walletAddress: '',
-    network: ''
+    network: 'TON'
   });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -378,9 +381,10 @@ export default function WithdrawForm() {
   const FEE_PERCENTAGE = 1;
 
   const networks = [
-    { id: 'LTC', name: 'Litecoin (LTC)' },
-    { id: 'DGB', name: 'DigiByte (DGB)' },
-    { id: 'DASH', name: 'Dash (DASH)' },
+    { id: 'TON', name: 'TON (The Open Network)' },
+    { id: 'ETH', name: 'Ethereum (ERC-20)' },
+    { id: 'BSC', name: 'Binance Smart Chain (BEP-20)' },
+    { id: 'TRX', name: 'Tron (TRC-20)' }
   ];
 
   useEffect(() => {
@@ -426,7 +430,8 @@ export default function WithdrawForm() {
       const balanceDeductions = {
         adsBalance: 0,
         refBonus: 0,
-        balance: 0
+        checkinRewards: 0,
+        dollarBalance2: 0
       };
 
       // 1. Deduct from ads balance first
@@ -437,19 +442,27 @@ export default function WithdrawForm() {
         remainingAmount -= deductFromAds;
       }
       
-      // 2. Then deduct from referral earnings (convert dollars to points)
+      // 2. Then deduct from check-in rewards
+      if (checkinRewards > 0 && remainingAmount > 0) {
+        const deductFromCheckins = Math.min(checkinRewards, remainingAmount);
+        updates.checkinRewards = increment(-deductFromCheckins);
+        balanceDeductions.checkinRewards = deductFromCheckins;
+        remainingAmount -= deductFromCheckins;
+      }
+      
+      // 3. Then deduct from referral earnings (convert dollars to points)
       if (totalReferralEarnings > 0 && remainingAmount > 0) {
         const deductFromReferrals = Math.min(totalReferralEarnings, remainingAmount);
-        const referralPointsToDeduct = deductFromReferrals * 100; // Convert dollars to points (1$ = 100pts)
+        const referralPointsToDeduct = deductFromReferrals * 100;
         updates.refBonus = increment(-referralPointsToDeduct);
         balanceDeductions.refBonus = deductFromReferrals;
         remainingAmount -= deductFromReferrals;
       }
       
-      // 3. Finally deduct from main balance
+      // 4. Finally deduct from main balance
       if (remainingAmount > 0) {
-        updates.balance = increment(-remainingAmount);
-        balanceDeductions.balance = remainingAmount;
+        updates.dollarBalance2 = increment(-remainingAmount);
+        balanceDeductions.dollarBalance2 = remainingAmount;
       }
 
       // Update all balances in a single transaction
@@ -476,8 +489,9 @@ export default function WithdrawForm() {
 
       // Update local state to reflect the deductions
       setAdsBalance(prev => Math.max(0, prev - balanceDeductions.adsBalance));
+      setCheckinRewards(prev => Math.max(0, prev - balanceDeductions.checkinRewards));
       setRefBonus(prev => Math.max(0, prev - (balanceDeductions.refBonus * 100)));
-      setBalance(prev => Math.max(0, prev - balanceDeductions.balance));
+      setDollarBalance2(prev => Math.max(0, prev - balanceDeductions.dollarBalance2));
 
       setSuccess('Withdrawal request submitted!');
       
@@ -492,7 +506,7 @@ export default function WithdrawForm() {
         deductions: balanceDeductions
       });
       setShowSuccessReceipt(true);
-      setFormData({ amount: '', walletAddress: '', network: '' });
+      setFormData({ amount: '', walletAddress: '', network: 'TON' });
       
     } catch (err) {
       console.error('Withdrawal error:', err);
@@ -632,7 +646,6 @@ export default function WithdrawForm() {
                 value={formData.network}
                 onChange={handleChange}
               >
-                <option value="">Select network</option>
                 {networks.map(network => (
                   <option key={network.id} value={network.id}>
                     {network.name}
@@ -746,7 +759,10 @@ export default function WithdrawForm() {
                     .filter(([_, value]) => value > 0)
                     .map(([key, value]) => (
                       <div key={key}>
-                        {key}: ${value.toFixed(3)}
+                        {key === 'refBonus' ? 'Referral Bonus' : 
+                         key === 'dollarBalance2' ? 'Main Balance' : 
+                         key === 'adsBalance' ? 'Ad Rewards' : 
+                         key === 'checkinRewards' ? 'Check-in Rewards' : key}: ${value.toFixed(3)}
                       </div>
                     ))}
                 </ReceiptValue>
