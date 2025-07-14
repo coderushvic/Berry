@@ -196,12 +196,16 @@ const generateConfetti = () => {
   ));
 };
 
+const getSafeDate = (firebaseDate) => {
+  if (!firebaseDate) return null;
+  return firebaseDate instanceof Date ? firebaseDate : firebaseDate.toDate();
+};
+
 const DailyReward = () => {
   const { 
     id,
     checkinRewards,
     setCheckinRewards,
-    setDollarBalance2,
     claimDailyReward,
     loading
   } = useUser();
@@ -224,19 +228,19 @@ const DailyReward = () => {
         if (userDoc.exists()) {
           const data = userDoc.data();
           const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           
           if (data.checkinRewards?.lastClaim) {
-            const lastClaimDate = data.checkinRewards.lastClaim.toDate();
+            const lastClaimDate = getSafeDate(data.checkinRewards.lastClaim);
+            const lastClaimDay = new Date(
+              lastClaimDate.getFullYear(), 
+              lastClaimDate.getMonth(), 
+              lastClaimDate.getDate()
+            );
             
-            const lastClaimDay = new Date(lastClaimDate);
-            lastClaimDay.setHours(0, 0, 0, 0);
-            
-            const currentDay = new Date(now);
-            currentDay.setHours(0, 0, 0, 0);
-            
-            if (lastClaimDay.getTime() === currentDay.getTime()) {
+            if (lastClaimDay.getTime() === today.getTime()) {
               setCanClaimToday(false);
-              const tomorrow = new Date(currentDay);
+              const tomorrow = new Date(today);
               tomorrow.setDate(tomorrow.getDate() + 1);
               setNextClaimDate(tomorrow);
             } else {
@@ -277,6 +281,24 @@ const DailyReward = () => {
   const handleClaimReward = async () => {
     if (!canClaimToday || isClaiming) return;
 
+    // Double-check eligibility
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    if (checkinRewards?.lastClaim) {
+      const lastClaimDate = getSafeDate(checkinRewards.lastClaim);
+      const lastClaimDay = new Date(
+        lastClaimDate.getFullYear(), 
+        lastClaimDate.getMonth(), 
+        lastClaimDate.getDate()
+      );
+      
+      if (lastClaimDay.getTime() === today.getTime()) {
+        setError('Daily reward already claimed today');
+        return;
+      }
+    }
+
     setIsClaiming(true);
     setError(null);
     
@@ -285,34 +307,31 @@ const DailyReward = () => {
       setTimeout(() => setShowConfetti(false), 2000);
 
       const rewardAmount = 5;
-      const now = new Date();
+      const claimTime = new Date();
       
-      // Optimistically update local state
-      setDollarBalance2(prev => prev + rewardAmount);
+      // Single update to checkinRewards
       setCheckinRewards(prev => ({
         ...prev,
-        lastClaim: now,
+        lastClaim: claimTime,
         totalEarned: (prev?.totalEarned || 0) + rewardAmount,
         history: [...(prev?.history || []), {
           amount: rewardAmount,
-          date: now,
+          date: claimTime,
           type: 'daily'
         }]
       }));
       
       setCanClaimToday(false);
       
-      const tomorrow = new Date();
+      const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
       setNextClaimDate(tomorrow);
 
-      // Update backend
+      // Backend update
       const result = await claimDailyReward(rewardAmount);
       
       if (!result?.success) {
-        // Revert changes if backend fails
-        setDollarBalance2(prev => prev - rewardAmount);
+        // Single rollback update
         setCheckinRewards(prev => ({
           ...prev,
           lastClaim: prev?.lastClaim,
@@ -324,6 +343,8 @@ const DailyReward = () => {
     } catch (error) {
       console.error('Error claiming reward:', error);
       setError(error.message);
+      setCanClaimToday(true);
+      setNextClaimDate(null);
     } finally {
       setIsClaiming(false);
     }
@@ -347,7 +368,7 @@ const DailyReward = () => {
   const formatLastClaimed = () => {
     if (!checkinRewards?.lastClaim) return 'Never claimed';
     
-    const lastClaimDate = checkinRewards.lastClaim.toDate();
+    const lastClaimDate = getSafeDate(checkinRewards.lastClaim);
     const options = { 
       weekday: 'long', 
       year: 'numeric', 
