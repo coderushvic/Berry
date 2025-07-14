@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // Removed unused imports
 import { db } from '../../firebase/firestore';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
@@ -196,20 +196,9 @@ const generateConfetti = () => {
   ));
 };
 
-const getSafeDate = (firebaseDate) => {
-  if (!firebaseDate) return null;
-  return firebaseDate instanceof Date ? firebaseDate : firebaseDate.toDate();
-};
-
 const DailyReward = () => {
-  const { 
-    id,
-    checkinRewards,
-    setCheckinRewards,
-    claimDailyReward,
-    loading
-  } = useUser();
-
+  const { id, claimDailyReward, loading } = useUser();
+  const [lastClaimed, setLastClaimed] = useState(null);
   const [canClaimToday, setCanClaimToday] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -228,19 +217,20 @@ const DailyReward = () => {
         if (userDoc.exists()) {
           const data = userDoc.data();
           const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           
-          if (data.checkinRewards?.lastClaim) {
-            const lastClaimDate = getSafeDate(data.checkinRewards.lastClaim);
-            const lastClaimDay = new Date(
-              lastClaimDate.getFullYear(), 
-              lastClaimDate.getMonth(), 
-              lastClaimDate.getDate()
-            );
+          if (data.lastDailyReward) {
+            const lastClaimDate = data.lastDailyReward.toDate();
+            setLastClaimed(lastClaimDate);
             
-            if (lastClaimDay.getTime() === today.getTime()) {
+            const lastClaimDay = new Date(lastClaimDate);
+            lastClaimDay.setHours(0, 0, 0, 0);
+            
+            const currentDay = new Date(now);
+            currentDay.setHours(0, 0, 0, 0);
+            
+            if (lastClaimDay.getTime() === currentDay.getTime()) {
               setCanClaimToday(false);
-              const tomorrow = new Date(today);
+              const tomorrow = new Date(currentDay);
               tomorrow.setDate(tomorrow.getDate() + 1);
               setNextClaimDate(tomorrow);
             } else {
@@ -261,7 +251,7 @@ const DailyReward = () => {
     };
 
     checkRewardStatus();
-  }, [id, checkinRewards]);
+  }, [id]);
 
   useEffect(() => {
     if (!nextClaimDate) return;
@@ -281,24 +271,6 @@ const DailyReward = () => {
   const handleClaimReward = async () => {
     if (!canClaimToday || isClaiming) return;
 
-    // Double-check eligibility
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    if (checkinRewards?.lastClaim) {
-      const lastClaimDate = getSafeDate(checkinRewards.lastClaim);
-      const lastClaimDay = new Date(
-        lastClaimDate.getFullYear(), 
-        lastClaimDate.getMonth(), 
-        lastClaimDate.getDate()
-      );
-      
-      if (lastClaimDay.getTime() === today.getTime()) {
-        setError('Daily reward already claimed today');
-        return;
-      }
-    }
-
     setIsClaiming(true);
     setError(null);
     
@@ -306,45 +278,23 @@ const DailyReward = () => {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2000);
 
-      const rewardAmount = 5;
-      const claimTime = new Date();
+      const result = await claimDailyReward();
       
-      // Single update to checkinRewards
-      setCheckinRewards(prev => ({
-        ...prev,
-        lastClaim: claimTime,
-        totalEarned: (prev?.totalEarned || 0) + rewardAmount,
-        history: [...(prev?.history || []), {
-          amount: rewardAmount,
-          date: claimTime,
-          type: 'daily'
-        }]
-      }));
-      
-      setCanClaimToday(false);
-      
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setNextClaimDate(tomorrow);
-
-      // Backend update
-      const result = await claimDailyReward(rewardAmount);
-      
-      if (!result?.success) {
-        // Single rollback update
-        setCheckinRewards(prev => ({
-          ...prev,
-          lastClaim: prev?.lastClaim,
-          totalEarned: (prev?.totalEarned || 0) - rewardAmount,
-          history: prev?.history?.slice(0, -1) || []
-        }));
+      if (result?.success) {
+        const now = new Date();
+        setLastClaimed(now);
+        setCanClaimToday(false);
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        setNextClaimDate(tomorrow);
+      } else {
         throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
       setError(error.message);
-      setCanClaimToday(true);
-      setNextClaimDate(null);
     } finally {
       setIsClaiming(false);
     }
@@ -366,9 +316,8 @@ const DailyReward = () => {
   };
 
   const formatLastClaimed = () => {
-    if (!checkinRewards?.lastClaim) return 'Never claimed';
+    if (!lastClaimed) return 'Never claimed';
     
-    const lastClaimDate = getSafeDate(checkinRewards.lastClaim);
     const options = { 
       weekday: 'long', 
       year: 'numeric', 
@@ -377,11 +326,7 @@ const DailyReward = () => {
       hour: '2-digit',
       minute: '2-digit'
     };
-    return lastClaimDate.toLocaleDateString(undefined, options);
-  };
-
-  const getTotalCheckinEarnings = () => {
-    return checkinRewards?.totalEarned || 0;
+    return lastClaimed.toLocaleDateString(undefined, options);
   };
 
   if (isCheckingClaim) {
@@ -416,13 +361,11 @@ const DailyReward = () => {
             {canClaimToday ? <FaGift /> : <FaCheckCircle />}
           </RewardIcon>
           
-          <RewardTitle>Daily Check-In Reward</RewardTitle>
+          <RewardTitle>Daily Reward</RewardTitle>
           <RewardAmount>$5</RewardAmount>
           
           <RewardDescription>
-            Claim your daily $5 check-in reward. Available once per calendar day.
-            <br />
-            Total earned from check-ins: ${getTotalCheckinEarnings()}
+            Claim your daily $5 reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
@@ -448,7 +391,7 @@ const DailyReward = () => {
           {canClaimToday && (
             <StatusMessage className="claimed">
               <FaCheckCircle />
-              Daily check-in reward available!
+              Daily reward available!
             </StatusMessage>
           )}
 
