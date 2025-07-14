@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import NavBar from '../Nweb/NavBar';
 
+// Animation keyframes
 const pulse = keyframes`
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
@@ -16,6 +17,7 @@ const confetti = keyframes`
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 `;
 
+// Styled components
 const Container = styled.div`
   min-height: 100vh;
   display: flex;
@@ -173,6 +175,7 @@ const Confetti = styled.div`
   ${css`animation: ${confetti} 2s ease-out forwards`};
 `;
 
+// Confetti generator function
 const generateConfetti = () => {
   const colors = [
     berryTheme.colors.primary,
@@ -195,24 +198,33 @@ const generateConfetti = () => {
 };
 
 const DailyReward = () => {
-  const { 
-    claimDailyReward, 
-    loading, 
+  const {
+    id,
+    claimDailyReward,
+    loading,
     lastDailyReward,
+    checkinRewards,
     streak,
     canClaimDailyReward,
-    nextDailyRewardTime
+    nextDailyRewardTime,
+    error: contextError
   } = useUser();
   
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [error, setError] = useState(null);
+  const [localError, setLocalError] = useState(null);
+
+  useEffect(() => {
+    if (contextError) {
+      setLocalError(contextError);
+    }
+  }, [contextError]);
 
   const handleClaimReward = async () => {
     if (!canClaimDailyReward || isClaiming) return;
 
     setIsClaiming(true);
-    setError(null);
+    setLocalError(null);
     
     try {
       setShowConfetti(true);
@@ -225,7 +237,7 @@ const DailyReward = () => {
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
-      setError(error.message);
+      setLocalError(error.message);
     } finally {
       setIsClaiming(false);
     }
@@ -260,6 +272,23 @@ const DailyReward = () => {
     return lastDailyReward.toLocaleDateString(undefined, options);
   };
 
+  if (loading) {
+    return (
+      <Container>
+        <PageHeader>
+          <LogoImage src='/Berry.png' alt="Berry Logo" />
+          <LogoText>berry</LogoText>
+        </PageHeader>
+        <MainContent>
+          <RewardCard>
+            <RewardDescription>Loading reward information...</RewardDescription>
+          </RewardCard>
+        </MainContent>
+        <NavBar />
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <PageHeader>
@@ -280,6 +309,11 @@ const DailyReward = () => {
           
           <RewardDescription>
             Claim your daily $5 reward. Current streak: {streak} days
+            {checkinRewards > 0 && (
+              <span style={{ display: 'none' }}>
+                Total rewards claimed: ${checkinRewards.toFixed(2)}
+              </span>
+            )}
           </RewardDescription>
           
           <ClaimButton 
@@ -289,9 +323,9 @@ const DailyReward = () => {
             {isClaiming ? 'Processing...' : canClaimDailyReward ? 'Claim Your Reward' : 'Already Claimed Today'}
           </ClaimButton>
           
-          {error && (
+          {localError && (
             <StatusMessage className="waiting">
-              <FaClock /> {error}
+              <FaClock /> {localError}
             </StatusMessage>
           )}
 
@@ -311,6 +345,7 @@ const DailyReward = () => {
 
           <LastClaimed>
             Last claimed: {formatLastClaimed()}
+            {id && <span style={{ display: 'none' }}>User ID: {id}</span>}
           </LastClaimed>
         </RewardCard>
       </MainContent>
