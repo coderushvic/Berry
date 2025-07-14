@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../context/userContext';
 import { FaGift, FaCheckCircle, FaClock } from 'react-icons/fa';
+import { doc, getDoc } from 'firebase/firestore'; // Removed unused imports
+import { db } from '../../firebase/firestore';
 import styled, { keyframes, css } from 'styled-components';
 import { berryTheme } from '../../Theme';
 import NavBar from '../Nweb/NavBar';
 
-// Animation keyframes
 const pulse = keyframes`
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
@@ -17,7 +18,6 @@ const confetti = keyframes`
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 `;
 
-// Styled components
 const Container = styled.div`
   min-height: 100vh;
   display: flex;
@@ -175,7 +175,6 @@ const Confetti = styled.div`
   ${css`animation: ${confetti} 2s ease-out forwards`};
 `;
 
-// Confetti generator function
 const generateConfetti = () => {
   const colors = [
     berryTheme.colors.primary,
@@ -198,33 +197,82 @@ const generateConfetti = () => {
 };
 
 const DailyReward = () => {
-  const {
-    id,
-    claimDailyReward,
-    loading,
-    lastDailyReward,
-    checkinRewards,
-    streak,
-    canClaimDailyReward,
-    nextDailyRewardTime,
-    error: contextError
-  } = useUser();
-  
+  const { id, claimDailyReward, loading } = useUser();
+  const [lastClaimed, setLastClaimed] = useState(null);
+  const [canClaimToday, setCanClaimToday] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [localError, setLocalError] = useState(null);
+  const [isCheckingClaim, setIsCheckingClaim] = useState(true);
+  const [nextClaimDate, setNextClaimDate] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (contextError) {
-      setLocalError(contextError);
-    }
-  }, [contextError]);
+    const checkRewardStatus = async () => {
+      if (!id) return;
+      setIsCheckingClaim(true);
+      setError(null);
+
+      try {
+        const userDoc = await getDoc(doc(db, 'telegramUsers', id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const now = new Date();
+          
+          if (data.lastDailyReward) {
+            const lastClaimDate = data.lastDailyReward.toDate();
+            setLastClaimed(lastClaimDate);
+            
+            const lastClaimDay = new Date(lastClaimDate);
+            lastClaimDay.setHours(0, 0, 0, 0);
+            
+            const currentDay = new Date(now);
+            currentDay.setHours(0, 0, 0, 0);
+            
+            if (lastClaimDay.getTime() === currentDay.getTime()) {
+              setCanClaimToday(false);
+              const tomorrow = new Date(currentDay);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              setNextClaimDate(tomorrow);
+            } else {
+              setCanClaimToday(true);
+              setNextClaimDate(null);
+            }
+          } else {
+            setCanClaimToday(true);
+            setNextClaimDate(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking reward status:', error);
+        setError('Failed to check reward status');
+      } finally {
+        setIsCheckingClaim(false);
+      }
+    };
+
+    checkRewardStatus();
+  }, [id]);
+
+  useEffect(() => {
+    if (!nextClaimDate) return;
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      if (now >= nextClaimDate) {
+        setCanClaimToday(true);
+        setNextClaimDate(null);
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [nextClaimDate]);
 
   const handleClaimReward = async () => {
-    if (!canClaimDailyReward || isClaiming) return;
+    if (!canClaimToday || isClaiming) return;
 
     setIsClaiming(true);
-    setLocalError(null);
+    setError(null);
     
     try {
       setShowConfetti(true);
@@ -232,22 +280,31 @@ const DailyReward = () => {
 
       const result = await claimDailyReward();
       
-      if (!result?.success) {
+      if (result?.success) {
+        const now = new Date();
+        setLastClaimed(now);
+        setCanClaimToday(false);
+        
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        setNextClaimDate(tomorrow);
+      } else {
         throw new Error(result?.error || 'Failed to claim reward');
       }
     } catch (error) {
       console.error('Error claiming reward:', error);
-      setLocalError(error.message);
+      setError(error.message);
     } finally {
       setIsClaiming(false);
     }
   };
 
   const getTimeUntilNextClaim = () => {
-    if (!nextDailyRewardTime) return '00:00:00';
+    if (!nextClaimDate) return '00:00:00';
     
     const now = new Date();
-    const diff = nextDailyRewardTime - now;
+    const diff = nextClaimDate - now;
     
     if (diff <= 0) return '00:00:00';
     
@@ -259,7 +316,7 @@ const DailyReward = () => {
   };
 
   const formatLastClaimed = () => {
-    if (!lastDailyReward) return 'Never claimed';
+    if (!lastClaimed) return 'Never claimed';
     
     const options = { 
       weekday: 'long', 
@@ -269,10 +326,10 @@ const DailyReward = () => {
       hour: '2-digit',
       minute: '2-digit'
     };
-    return lastDailyReward.toLocaleDateString(undefined, options);
+    return lastClaimed.toLocaleDateString(undefined, options);
   };
 
-  if (loading) {
+  if (isCheckingClaim) {
     return (
       <Container>
         <PageHeader>
@@ -281,7 +338,7 @@ const DailyReward = () => {
         </PageHeader>
         <MainContent>
           <RewardCard>
-            <RewardDescription>Loading reward information...</RewardDescription>
+            <RewardDescription>Checking reward status...</RewardDescription>
           </RewardCard>
         </MainContent>
         <NavBar />
@@ -300,43 +357,38 @@ const DailyReward = () => {
         <RewardCard>
           {showConfetti && generateConfetti()}
           
-          <RewardIcon $claimed={!canClaimDailyReward} $pulse={canClaimDailyReward}>
-            {canClaimDailyReward ? <FaGift /> : <FaCheckCircle />}
+          <RewardIcon $claimed={!canClaimToday} $pulse={canClaimToday}>
+            {canClaimToday ? <FaGift /> : <FaCheckCircle />}
           </RewardIcon>
           
           <RewardTitle>Daily Reward</RewardTitle>
           <RewardAmount>$5</RewardAmount>
           
           <RewardDescription>
-            Claim your daily $5 reward. Current streak: {streak} days
-            {checkinRewards > 0 && (
-              <span style={{ display: 'none' }}>
-                Total rewards claimed: ${checkinRewards.toFixed(2)}
-              </span>
-            )}
+            Claim your daily $5 reward. Available once per calendar day.
           </RewardDescription>
           
           <ClaimButton 
             onClick={handleClaimReward}
-            disabled={!canClaimDailyReward || isClaiming || loading}
+            disabled={!canClaimToday || isClaiming || loading}
           >
-            {isClaiming ? 'Processing...' : canClaimDailyReward ? 'Claim Your Reward' : 'Already Claimed Today'}
+            {isClaiming ? 'Processing...' : canClaimToday ? 'Claim Your Reward' : 'Already Claimed Today'}
           </ClaimButton>
           
-          {localError && (
+          {error && (
             <StatusMessage className="waiting">
-              <FaClock /> {localError}
+              <FaClock /> {error}
             </StatusMessage>
           )}
 
-          {!canClaimDailyReward && nextDailyRewardTime && (
+          {!canClaimToday && nextClaimDate && (
             <StatusMessage className="waiting">
               <FaClock />
-              Next reward available in: <Countdown>{getTimeUntilNextClaim()}</Countdown>
+              Next reward available at midnight: <Countdown>{getTimeUntilNextClaim()}</Countdown>
             </StatusMessage>
           )}
           
-          {canClaimDailyReward && (
+          {canClaimToday && (
             <StatusMessage className="claimed">
               <FaCheckCircle />
               Daily reward available!
@@ -345,7 +397,6 @@ const DailyReward = () => {
 
           <LastClaimed>
             Last claimed: {formatLastClaimed()}
-            {id && <span style={{ display: 'none' }}>User ID: {id}</span>}
           </LastClaimed>
         </RewardCard>
       </MainContent>
