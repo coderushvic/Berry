@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaCoins, FaCrown, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaTimes, FaCheck, FaSpinner } from 'react-icons/fa';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
 import { useUser } from '../../context/userContext';
@@ -249,63 +249,130 @@ const ErrorMessage = styled.div`
   font-size: 0.9rem;
 `;
 
+const VerificationStatus = styled.div`
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: ${berryTheme.colors.grey100};
+  text-align: center;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+`;
+
+const Spinner = styled(FaSpinner)`
+  animation: spin 1s linear infinite;
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
 const AdsPage = () => {
   const { isPremium, setIsPremium } = useUser();
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [isTelegram, setIsTelegram] = useState(false);
+
+  // Check if running in Telegram Mini App
+  useEffect(() => {
+    if (window.Telegram && window.Telegram.WebApp) {
+      setIsTelegram(true);
+      window.Telegram.WebApp.expand(); // Expand the web app to full view
+    }
+  }, []);
 
   const handleUpgradeClick = () => {
     setShowModal(true);
     setError(null);
     setIsSuccess(false);
+    setVerificationMessage('');
   };
 
   const handleCloseModal = () => {
     if (!isProcessing) {
       setShowModal(false);
-      setError(null);
-      setIsSuccess(false);
     }
   };
 
-  const handleConnectWallet = async () => {
+  const handleTelegramPayment = async () => {
     try {
       setIsProcessing(true);
-      setError(null);
+      setVerificationMessage('Opening Telegram Wallet...');
+      
+      const paymentDetails = {
+        to: 'UQDSouCLJk33nCQgW6ugTxIMNLvsuKka1FIAEW8N5TjshjCs',
+        value: '1000000000', // 1 TON in nanoTON
+        text: 'Premium activation payment'
+      };
+
+      // Create Telegram payment URL
+      const paymentUrl = `ton://transfer/${paymentDetails.to}?amount=${paymentDetails.value}&text=${encodeURIComponent(paymentDetails.text)}`;
+      
+      // Open Telegram payment interface
+      window.Telegram.WebApp.openInvoice(paymentUrl, (status) => {
+        if (status === 'paid') {
+          setIsSuccess(true);
+          setIsPremium(true);
+          setVerificationMessage('Payment successful!');
+          
+          setTimeout(() => {
+            setShowModal(false);
+            setIsProcessing(false);
+          }, 3000);
+        } else {
+          setError('Payment was cancelled');
+          setIsProcessing(false);
+        }
+      });
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError(err.message);
+      setIsProcessing(false);
+    }
+  };
+
+  const handleTonWalletPayment = async () => {
+    try {
+      setIsProcessing(true);
+      setVerificationMessage('Connecting to TON Wallet...');
       
       // Check if TonProvider is available
       if (!window.ton) {
-        throw new Error('TON Wallet extension not detected. Please install it first.');
+        throw new Error('TON Wallet extension not detected');
       }
 
       // Request account access
       const accounts = await window.ton.send('ton_requestAccounts');
-      
       if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts found in TON Wallet');
+        throw new Error('No accounts found');
       }
 
-      // Prepare payment details (1 TON)
+      // Prepare payment
       const paymentDetails = {
         to: 'UQDSouCLJk33nCQgW6ugTxIMNLvsuKka1FIAEW8N5TjshjCs',
-        value: '1000000000', // 1 TON in nanoTONs
-        data: 'Premium activation payment', // Optional message
+        value: '1000000000', // 1 TON in nanoTON
+        data: 'Premium activation payment'
       };
 
-      // Send payment
+      setVerificationMessage('Confirm in your wallet...');
       const txHash = await window.ton.send('ton_sendTransaction', [paymentDetails]);
       
       if (!txHash) {
-        throw new Error('Transaction failed or was rejected');
+        throw new Error('Transaction failed');
       }
 
-      // Immediately show success if we get a txHash
       setIsSuccess(true);
       setIsPremium(true);
+      setVerificationMessage('Payment successful!');
       
-      // Close modal after 3 seconds
       setTimeout(() => {
         setShowModal(false);
         setIsProcessing(false);
@@ -315,6 +382,14 @@ const AdsPage = () => {
       console.error('Payment error:', err);
       setError(err.message);
       setIsProcessing(false);
+    }
+  };
+
+  const handleConnectWallet = async () => {
+    if (isTelegram) {
+      await handleTelegramPayment();
+    } else {
+      await handleTonWalletPayment();
     }
   };
 
@@ -368,7 +443,7 @@ const AdsPage = () => {
       
       <NavBar />
 
-      {/* TON Wallet Connection Modal */}
+      {/* Payment Modal */}
       {showModal && (
         <ModalOverlay>
           <ModalContent>
@@ -385,7 +460,7 @@ const AdsPage = () => {
             ) : (
               <>
                 <ModalText>
-                  Connect your TON wallet to complete the payment of 1 TON and activate premium features.
+                  Pay 1 TON to activate premium features.
                 </ModalText>
                 
                 <PaymentAmount>
@@ -394,11 +469,18 @@ const AdsPage = () => {
                 
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 
+                {verificationMessage && (
+                  <VerificationStatus>
+                    {isProcessing && <Spinner />}
+                    {verificationMessage}
+                  </VerificationStatus>
+                )}
+                
                 <ConnectButton 
                   onClick={handleConnectWallet} 
                   disabled={isProcessing}
                 >
-                  {isProcessing ? 'Processing...' : 'Connect TON Wallet & Pay 1 TON'}
+                  {isProcessing ? 'Processing...' : isTelegram ? 'Pay with Telegram Wallet' : 'Connect TON Wallet'}
                 </ConnectButton>
               </>
             )}
