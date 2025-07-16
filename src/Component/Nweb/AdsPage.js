@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaCoins, FaCrown } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaTimes, FaCheck } from 'react-icons/fa';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
+import { useUser } from '../../context/userContext';
 
+// Styled Components
 const AppContainer = styled.div`
   font-family: ${berryTheme.fonts.main};
   background: ${berryTheme.colors.backgroundGradient};
@@ -148,7 +150,174 @@ const UpgradeButton = styled.button`
   }
 `;
 
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: ${berryTheme.shadows.large};
+  position: relative;
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: ${berryTheme.colors.textSecondary};
+`;
+
+const ModalTitle = styled.h2`
+  margin-top: 0;
+  color: ${berryTheme.colors.primaryDark};
+  text-align: center;
+`;
+
+const ModalText = styled.p`
+  color: ${berryTheme.colors.textDark};
+  text-align: center;
+  margin-bottom: 24px;
+`;
+
+const PaymentAmount = styled.div`
+  background: ${berryTheme.colors.grey100};
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  margin: 16px 0;
+  font-weight: bold;
+  color: ${berryTheme.colors.primaryDark};
+`;
+
+const ConnectButton = styled.button`
+  background: ${berryTheme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 24px;
+  font-weight: 600;
+  margin-top: 16px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${berryTheme.colors.primaryDark};
+  }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey300};
+    cursor: not-allowed;
+  }
+`;
+
+const SuccessMessage = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: ${berryTheme.colors.success};
+  margin: 16px 0;
+  font-weight: 600;
+`;
+
+const ErrorMessage = styled.div`
+  color: ${berryTheme.colors.error};
+  text-align: center;
+  margin: 8px 0;
+  font-size: 0.9rem;
+`;
+
 const AdsPage = () => {
+  const { isPremium, setIsPremium } = useUser();
+  const [showModal, setShowModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleUpgradeClick = () => {
+    setShowModal(true);
+    setError(null);
+    setIsSuccess(false);
+  };
+
+  const handleCloseModal = () => {
+    if (!isProcessing) {
+      setShowModal(false);
+      setError(null);
+      setIsSuccess(false);
+    }
+  };
+
+  const handleConnectWallet = async () => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+      
+      // Check if TonProvider is available
+      if (!window.ton) {
+        throw new Error('TON Wallet extension not detected. Please install it first.');
+      }
+
+      // Request account access
+      const accounts = await window.ton.send('ton_requestAccounts');
+      
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found in TON Wallet');
+      }
+
+      // Prepare payment details (1 TON)
+      const paymentDetails = {
+        to: 'UQDSouCLJk33nCQgW6ugTxIMNLvsuKka1FIAEW8N5TjshjCs',
+        value: '1000000000', // 1 TON in nanoTONs
+        data: 'Premium activation payment', // Optional message
+      };
+
+      // Send payment
+      const txHash = await window.ton.send('ton_sendTransaction', [paymentDetails]);
+      
+      if (!txHash) {
+        throw new Error('Transaction failed or was rejected');
+      }
+
+      // Immediately show success if we get a txHash
+      setIsSuccess(true);
+      setIsPremium(true);
+      
+      // Close modal after 3 seconds
+      setTimeout(() => {
+        setShowModal(false);
+        setIsProcessing(false);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError(err.message);
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <AppContainer>
       <Header>
@@ -159,13 +328,13 @@ const AdsPage = () => {
       <Content>
         <StatsCard>
           <StatItem>
-            <StatValue>50</StatValue>
+            <StatValue>{isPremium ? '∞' : '50'}</StatValue>
             <StatLabel>Daily Ads</StatLabel>
           </StatItem>
           <StatItem>
             <StatValue>
               <FaCoins color="#FFD700" />
-              +1000
+              +{isPremium ? '2000' : '1000'}
             </StatValue>
             <StatLabel>Per Ad</StatLabel>
           </StatItem>
@@ -173,29 +342,69 @@ const AdsPage = () => {
         
         <AdTask />
         
-        <PremiumCard>
-          <PremiumContent>
-            <PremiumHeader>
-              <FaCrown color="#FFD700" />
-              <PremiumTitle>Go Premium</PremiumTitle>
-            </PremiumHeader>
-            <PremiumBenefit>
-              <FaCoins color="#FFD700" /> Unlimited daily ads
-            </PremiumBenefit>
-            <PremiumBenefit>
-              <FaCoins color="#FFD700" /> 2x earning rate
-            </PremiumBenefit>
-            <PremiumBenefit>
-              <FaCoins color="#FFD700" /> No waiting time
-            </PremiumBenefit>
-            <UpgradeButton>
-              <FaCrown /> Upgrade Now
-            </UpgradeButton>
-          </PremiumContent>
-        </PremiumCard>
+        {!isPremium && (
+          <PremiumCard>
+            <PremiumContent>
+              <PremiumHeader>
+                <FaCrown color="#FFD700" />
+                <PremiumTitle>Go Premium</PremiumTitle>
+              </PremiumHeader>
+              <PremiumBenefit>
+                <FaCoins color="#FFD700" /> Unlimited daily ads
+              </PremiumBenefit>
+              <PremiumBenefit>
+                <FaCoins color="#FFD700" /> 2x earning rate
+              </PremiumBenefit>
+              <PremiumBenefit>
+                <FaCoins color="#FFD700" /> No waiting time
+              </PremiumBenefit>
+              <UpgradeButton onClick={handleUpgradeClick}>
+                <FaCrown /> Upgrade Now (1 TON)
+              </UpgradeButton>
+            </PremiumContent>
+          </PremiumCard>
+        )}
       </Content>
       
       <NavBar />
+
+      {/* TON Wallet Connection Modal */}
+      {showModal && (
+        <ModalOverlay>
+          <ModalContent>
+            <CloseButton onClick={handleCloseModal} disabled={isProcessing}>
+              <FaTimes />
+            </CloseButton>
+            
+            <ModalTitle>Upgrade to Premium</ModalTitle>
+            
+            {isSuccess ? (
+              <SuccessMessage>
+                <FaCheck /> Payment successful! Premium activated.
+              </SuccessMessage>
+            ) : (
+              <>
+                <ModalText>
+                  Connect your TON wallet to complete the payment of 1 TON and activate premium features.
+                </ModalText>
+                
+                <PaymentAmount>
+                  Payment Amount: <strong>1 TON</strong>
+                </PaymentAmount>
+                
+                {error && <ErrorMessage>{error}</ErrorMessage>}
+                
+                <ConnectButton 
+                  onClick={handleConnectWallet} 
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? 'Processing...' : 'Connect TON Wallet & Pay 1 TON'}
+                </ConnectButton>
+              </>
+            )}
+          </ModalContent>
+        </ModalOverlay>
+      )}
     </AppContainer>
   );
 };
