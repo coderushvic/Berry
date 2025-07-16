@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaCoins, FaCrown, FaTimes, FaCheck, FaSpinner } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
 import { useUser } from '../../context/userContext';
+import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
+import { IoCheckmarkCircleSharp } from 'react-icons/io5';
 
 // Styled Components
 const AppContainer = styled.div`
@@ -232,16 +236,6 @@ const ConnectButton = styled.button`
   }
 `;
 
-const SuccessMessage = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: ${berryTheme.colors.success};
-  margin: 16px 0;
-  font-weight: 600;
-`;
-
 const ErrorMessage = styled.div`
   color: ${berryTheme.colors.error};
   text-align: center;
@@ -249,50 +243,54 @@ const ErrorMessage = styled.div`
   font-size: 0.9rem;
 `;
 
-const VerificationStatus = styled.div`
-  margin: 16px 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: ${berryTheme.colors.grey100};
+const SuccessModalContent = styled.div`
   text-align: center;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  padding: 20px;
 `;
 
-const Spinner = styled(FaSpinner)`
-  animation: spin 1s linear infinite;
-  
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
+const SuccessIcon = styled(IoCheckmarkCircleSharp)`
+  color: ${berryTheme.colors.success};
+  font-size: 48px;
+  margin: 0 auto 16px;
+  display: block;
+`;
+
+const SuccessTitle = styled.h3`
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 16px;
+`;
+
+const SuccessText = styled.p`
+  margin-bottom: 24px;
 `;
 
 const AdsPage = () => {
-  const { isPremium, setIsPremium } = useUser();
+  const { id, isPremium, setIsPremium, dollarBalance2, setDollarBalance2 } = useUser();
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [verificationMessage, setVerificationMessage] = useState('');
-  const [isTelegram, setIsTelegram] = useState(false);
+  const wallet = useTonWallet();
+  const [tonConnectUI] = useTonConnectUI();
 
-  // Check if running in Telegram Mini App
-  useEffect(() => {
-    if (window.Telegram && window.Telegram.WebApp) {
-      setIsTelegram(true);
-      window.Telegram.WebApp.expand(); // Expand the web app to full view
-    }
-  }, []);
+  // Payment details
+  const paymentAmount = '1000000000'; // 1 TON in nanoTON
+  const premiumBonus = 2000; // Bonus points for premium activation
+
+  const transaction = {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [
+      {
+        address: process.env.REACT_APP_TON_WALLET_ADDRESS, // Your wallet address
+        amount: paymentAmount,
+      },
+    ],
+  };
 
   const handleUpgradeClick = () => {
     setShowModal(true);
     setError(null);
-    setIsSuccess(false);
-    setVerificationMessage('');
   };
 
   const handleCloseModal = () => {
@@ -301,96 +299,39 @@ const AdsPage = () => {
     }
   };
 
-  const handleTelegramPayment = async () => {
+  const activatePremium = async () => {
     try {
       setIsProcessing(true);
-      setVerificationMessage('Opening Telegram Wallet...');
+      setError(null);
       
-      const paymentDetails = {
-        to: 'UQDSouCLJk33nCQgW6ugTxIMNLvsuKka1FIAEW8N5TjshjCs',
-        value: '1000000000', // 1 TON in nanoTON
-        text: 'Premium activation payment'
-      };
+      // Send transaction through TonConnect
+      const response = await tonConnectUI.sendTransaction(transaction);
+      console.log('TON transaction successful:', response);
 
-      // Create Telegram payment URL
-      const paymentUrl = `ton://transfer/${paymentDetails.to}?amount=${paymentDetails.value}&text=${encodeURIComponent(paymentDetails.text)}`;
-      
-      // Open Telegram payment interface
-      window.Telegram.WebApp.openInvoice(paymentUrl, (status) => {
-        if (status === 'paid') {
-          setIsSuccess(true);
-          setIsPremium(true);
-          setVerificationMessage('Payment successful!');
-          
-          setTimeout(() => {
-            setShowModal(false);
-            setIsProcessing(false);
-          }, 3000);
-        } else {
-          setError('Payment was cancelled');
-          setIsProcessing(false);
-        }
+      // Update user in Firestore
+      const userRef = doc(db, 'telegramUsers', id.toString());
+      await updateDoc(userRef, {
+        isPremium: true,
+        dollarBalance2: increment(premiumBonus),
+        lastPremiumActivation: new Date(),
       });
 
-    } catch (err) {
-      console.error('Payment error:', err);
-      setError(err.message);
-      setIsProcessing(false);
-    }
-  };
-
-  const handleTonWalletPayment = async () => {
-    try {
-      setIsProcessing(true);
-      setVerificationMessage('Connecting to TON Wallet...');
-      
-      // Check if TonProvider is available
-      if (!window.ton) {
-        throw new Error('TON Wallet extension not detected');
-      }
-
-      // Request account access
-      const accounts = await window.ton.send('ton_requestAccounts');
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts found');
-      }
-
-      // Prepare payment
-      const paymentDetails = {
-        to: 'UQDSouCLJk33nCQgW6ugTxIMNLvsuKka1FIAEW8N5TjshjCs',
-        value: '1000000000', // 1 TON in nanoTON
-        data: 'Premium activation payment'
-      };
-
-      setVerificationMessage('Confirm in your wallet...');
-      const txHash = await window.ton.send('ton_sendTransaction', [paymentDetails]);
-      
-      if (!txHash) {
-        throw new Error('Transaction failed');
-      }
-
-      setIsSuccess(true);
+      // Update local state
       setIsPremium(true);
-      setVerificationMessage('Payment successful!');
+      setDollarBalance2(dollarBalance2 + premiumBonus);
+      setShowSuccess(true);
+      setShowModal(false);
       
-      setTimeout(() => {
-        setShowModal(false);
-        setIsProcessing(false);
-      }, 3000);
-
     } catch (err) {
-      console.error('Payment error:', err);
-      setError(err.message);
+      console.error('TON transaction error:', err);
+      setError('Transaction failed or was cancelled');
+    } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleConnectWallet = async () => {
-    if (isTelegram) {
-      await handleTelegramPayment();
-    } else {
-      await handleTonWalletPayment();
-    }
+  const closeSuccessModal = () => {
+    setShowSuccess(false);
   };
 
   return (
@@ -453,37 +394,44 @@ const AdsPage = () => {
             
             <ModalTitle>Upgrade to Premium</ModalTitle>
             
-            {isSuccess ? (
-              <SuccessMessage>
-                <FaCheck /> Payment successful! Premium activated.
-              </SuccessMessage>
+            <ModalText>
+              Pay 1 TON to activate premium features and get {premiumBonus} bonus points.
+            </ModalText>
+            
+            <PaymentAmount>
+              Payment Amount: <strong>1 TON</strong>
+            </PaymentAmount>
+            
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            
+            {wallet ? (
+              <ConnectButton 
+                onClick={activatePremium} 
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Processing...' : 'Confirm Payment'}
+              </ConnectButton>
             ) : (
-              <>
-                <ModalText>
-                  Pay 1 TON to activate premium features.
-                </ModalText>
-                
-                <PaymentAmount>
-                  Payment Amount: <strong>1 TON</strong>
-                </PaymentAmount>
-                
-                {error && <ErrorMessage>{error}</ErrorMessage>}
-                
-                {verificationMessage && (
-                  <VerificationStatus>
-                    {isProcessing && <Spinner />}
-                    {verificationMessage}
-                  </VerificationStatus>
-                )}
-                
-                <ConnectButton 
-                  onClick={handleConnectWallet} 
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? 'Processing...' : isTelegram ? 'Pay with Telegram Wallet' : 'Connect TON Wallet'}
-                </ConnectButton>
-              </>
+              <TonConnectButton className="ton-connect-button" />
             )}
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {/* Success Modal */}
+      {showSuccess && (
+        <ModalOverlay>
+          <ModalContent>
+            <SuccessModalContent>
+              <SuccessIcon />
+              <SuccessTitle>Premium Activated!</SuccessTitle>
+              <SuccessText>
+                You now have unlimited ads and 2x earning rate!
+              </SuccessText>
+              <ConnectButton onClick={closeSuccessModal}>
+                Continue
+              </ConnectButton>
+            </SuccessModalContent>
           </ModalContent>
         </ModalOverlay>
       )}
