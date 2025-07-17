@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
@@ -265,12 +265,27 @@ const SuccessText = styled.p`
   margin-bottom: 24px;
 `;
 
+const ConnectionStatus = styled.div`
+  padding: 8px;
+  border-radius: 8px;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 0.9rem;
+  background: ${({ connected }) => 
+    connected ? berryTheme.colors.successLight : berryTheme.colors.errorLight
+  };
+  color: ${({ connected }) => 
+    connected ? berryTheme.colors.success : berryTheme.colors.error
+  };
+`;
+
 const AdsPage = () => {
   const { id, isPremium, setIsPremium, dollarBalance2, setDollarBalance2 } = useUser();
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
 
@@ -278,11 +293,45 @@ const AdsPage = () => {
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
   const premiumBonus = 2000; // Bonus points for premium activation
 
+  // Initialize TonConnect
+  useEffect(() => {
+    const initializeTonConnect = async () => {
+      try {
+        // First try with your manifest
+        tonConnectUI.uiOptions = {
+          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
+          language: 'en',
+          uiPreferences: {
+            theme: 'DARK'
+          }
+        };
+
+        // Fallback to demo manifest if needed
+        const timer = setTimeout(() => {
+          if (!wallet) {
+            tonConnectUI.uiOptions = {
+              manifestUrl: 'https://ton-connect.github.io/demo-dapp-with-react/tonconnect-manifest.json'
+            };
+          }
+        }, 3000);
+
+        setConnectionStatus(wallet ? 'Connected' : 'Ready to connect');
+        return () => clearTimeout(timer);
+      } catch (err) {
+        console.error('TON Connect initialization error:', err);
+        setConnectionStatus('Connection failed');
+        setError('Failed to initialize wallet connection');
+      }
+    };
+
+    initializeTonConnect();
+  }, [tonConnectUI, wallet]);
+
   const transaction = {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: process.env.REACT_APP_TON_WALLET_ADDRESS, // Your wallet address
+        address: process.env.REACT_APP_TON_WALLET_ADDRESS,
         amount: paymentAmount,
       },
     ],
@@ -401,6 +450,10 @@ const AdsPage = () => {
             <PaymentAmount>
               Payment Amount: <strong>1 TON</strong>
             </PaymentAmount>
+            
+            <ConnectionStatus connected={!!wallet}>
+              {wallet ? `Connected to ${wallet.device.appName}` : connectionStatus}
+            </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
             
