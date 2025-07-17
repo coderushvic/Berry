@@ -1,8 +1,8 @@
-
 {
-    "url": "https://chic-phoenix-c00482.netlify.app", 
-    "name": "NewCats Airdrop",                   
-    "iconUrl": "https://chic-phoenix-c00482.netlify.app/banner.jpg",          
-    "termsOfUseUrl": "",  
-    "privacyPolicyUrl": ""
+  "url": "https://chic-phoenix-c00482.netlify.app",
+  "name": "NewCats Airdrop",
+  "iconUrl": "https://chic-phoenix-c00482.netlify.app/banner.jpg",
+  "termsOfUseUrl": "https://chic-phoenix-c00482.netlify.app/terms",
+  "privacyPolicyUrl": "https://chic-phoenix-c00482.netlify.app/privacy",
+  "manifestUrl": "https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json"
 }
