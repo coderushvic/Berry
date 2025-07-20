@@ -293,11 +293,10 @@ const AdsPage = () => {
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
   const premiumBonus = 2000; // Bonus points for premium activation
 
-  // Initialize TonConnect
+  // Initialize TonConnect with Berry Ads manifest
   useEffect(() => {
     const initializeTonConnect = async () => {
       try {
-        // First try with your manifest
         tonConnectUI.uiOptions = {
           manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
           language: 'en',
@@ -306,17 +305,7 @@ const AdsPage = () => {
           }
         };
 
-        // Fallback to demo manifest if needed
-        const timer = setTimeout(() => {
-          if (!wallet) {
-            tonConnectUI.uiOptions = {
-              manifestUrl: 'https://ton-connect.github.io/demo-dapp-with-react/tonconnect-manifest.json'
-            };
-          }
-        }, 3000);
-
         setConnectionStatus(wallet ? 'Connected' : 'Ready to connect');
-        return () => clearTimeout(timer);
       } catch (err) {
         console.error('TON Connect initialization error:', err);
         setConnectionStatus('Connection failed');
