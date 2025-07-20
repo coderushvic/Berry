@@ -6,7 +6,7 @@ import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
 import { useUser } from '../../context/userContext';
 import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firestore';
 import { IoCheckmarkCircleSharp } from 'react-icons/io5';
 
@@ -280,7 +280,7 @@ const ConnectionStatus = styled.div`
 `;
 
 const AdsPage = () => {
-  const { id, isPremium, setIsPremium, dollarBalance2, setDollarBalance2 } = useUser();
+  const { id, isPremium, setIsPremium } = useUser();
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -289,11 +289,10 @@ const AdsPage = () => {
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
 
-  // Payment details
+  // Payment details - 1 TON for unlimited access
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
-  const premiumBonus = 2000; // Bonus points for premium activation
 
-  // Initialize TonConnect with Berry Ads manifest
+  // Initialize TonConnect with Berry Ads configuration
   useEffect(() => {
     const initializeTonConnect = async () => {
       try {
@@ -301,15 +300,27 @@ const AdsPage = () => {
           manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
           language: 'en',
           uiPreferences: {
-            theme: 'DARK'
+            theme: 'DARK',
+            colorsSet: {
+              tonconnect: '#4A00E0', // Berry brand color
+              text: '#FFFFFF',
+              background: '#1E1E1E'
+            }
+          },
+          actionsConfiguration: {
+            twaReturnUrl: 'https://t.me/Fuhdhdbot', // Your Telegram bot
+            modals: ['back', 'close']
           }
         };
 
-        setConnectionStatus(wallet ? 'Connected' : 'Ready to connect');
+        setConnectionStatus(wallet ? 
+          `Connected with ${wallet.device.appName}` : 
+          'Connect your wallet to continue'
+        );
       } catch (err) {
         console.error('TON Connect initialization error:', err);
         setConnectionStatus('Connection failed');
-        setError('Failed to initialize wallet connection');
+        setError('Failed to initialize wallet connection. Please refresh the page.');
       }
     };
 
@@ -317,11 +328,12 @@ const AdsPage = () => {
   }, [tonConnectUI, wallet]);
 
   const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 300,
+    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
     messages: [
       {
         address: process.env.REACT_APP_TON_WALLET_ADDRESS,
         amount: paymentAmount,
+        payload: "Berry Ads Premium Subscription"
       },
     ],
   };
@@ -346,23 +358,21 @@ const AdsPage = () => {
       const response = await tonConnectUI.sendTransaction(transaction);
       console.log('TON transaction successful:', response);
 
-      // Update user in Firestore
+      // Update user in Firestore - only premium status
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
-        dollarBalance2: increment(premiumBonus),
         lastPremiumActivation: new Date(),
       });
 
       // Update local state
       setIsPremium(true);
-      setDollarBalance2(dollarBalance2 + premiumBonus);
       setShowSuccess(true);
       setShowModal(false);
       
     } catch (err) {
       console.error('TON transaction error:', err);
-      setError('Transaction failed or was cancelled');
+      setError(err.message || 'Transaction failed or was cancelled. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -376,7 +386,7 @@ const AdsPage = () => {
     <AppContainer>
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
-        <LogoText>berry</LogoText>
+        <LogoText>Berry Ads</LogoText>
       </Header>
       
       <Content>
@@ -388,9 +398,9 @@ const AdsPage = () => {
           <StatItem>
             <StatValue>
               <FaCoins color="#FFD700" />
-              +{isPremium ? '2000' : '1000'}
+              {isPremium ? 'Unlimited' : 'Limited'}
             </StatValue>
-            <StatLabel>Per Ad</StatLabel>
+            <StatLabel>Access</StatLabel>
           </StatItem>
         </StatsCard>
         
@@ -407,10 +417,10 @@ const AdsPage = () => {
                 <FaCoins color="#FFD700" /> Unlimited daily ads
               </PremiumBenefit>
               <PremiumBenefit>
-                <FaCoins color="#FFD700" /> 2x earning rate
+                <FaCoins color="#FFD700" /> No watching limits
               </PremiumBenefit>
               <PremiumBenefit>
-                <FaCoins color="#FFD700" /> No waiting time
+                <FaCoins color="#FFD700" /> Priority support
               </PremiumBenefit>
               <UpgradeButton onClick={handleUpgradeClick}>
                 <FaCrown /> Upgrade Now (1 TON)
@@ -430,10 +440,10 @@ const AdsPage = () => {
               <FaTimes />
             </CloseButton>
             
-            <ModalTitle>Upgrade to Premium</ModalTitle>
+            <ModalTitle>Unlock Premium Access</ModalTitle>
             
             <ModalText>
-              Pay 1 TON to activate premium features and get {premiumBonus} bonus points.
+              Pay 1 TON to activate unlimited ad watching with no daily restrictions.
             </ModalText>
             
             <PaymentAmount>
@@ -441,7 +451,7 @@ const AdsPage = () => {
             </PaymentAmount>
             
             <ConnectionStatus connected={!!wallet}>
-              {wallet ? `Connected to ${wallet.device.appName}` : connectionStatus}
+              {wallet ? `Connected with ${wallet.device.appName}` : connectionStatus}
             </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -451,10 +461,18 @@ const AdsPage = () => {
                 onClick={activatePremium} 
                 disabled={isProcessing}
               >
-                {isProcessing ? 'Processing...' : 'Confirm Payment'}
+                {isProcessing ? 'Processing Payment...' : 'Confirm Payment (1 TON)'}
               </ConnectButton>
             ) : (
-              <TonConnectButton className="ton-connect-button" />
+              <TonConnectButton 
+                className="ton-connect-button"
+                style={{
+                  marginTop: '16px',
+                  width: '100%',
+                  borderRadius: '24px',
+                  padding: '12px 24px'
+                }}
+              />
             )}
           </ModalContent>
         </ModalOverlay>
@@ -466,12 +484,12 @@ const AdsPage = () => {
           <ModalContent>
             <SuccessModalContent>
               <SuccessIcon />
-              <SuccessTitle>Premium Activated!</SuccessTitle>
+              <SuccessTitle>Premium Access Activated!</SuccessTitle>
               <SuccessText>
-                You now have unlimited ads and 2x earning rate!
+                You now have unlimited access to watch ads with no daily limits.
               </SuccessText>
               <ConnectButton onClick={closeSuccessModal}>
-                Continue
+                Start Watching Ads
               </ConnectButton>
             </SuccessModalContent>
           </ModalContent>
