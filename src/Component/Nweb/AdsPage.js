@@ -208,6 +208,34 @@ const ModalContent = styled.div`
   position: relative;
 `;
 
+const WalletSelectionModal = styled(ModalContent)`
+  /* Inherits from ModalContent */
+`;
+
+const WalletOption = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid ${berryTheme.colors.grey200};
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${berryTheme.colors.grey50};
+    border-color: ${berryTheme.colors.primary};
+  }
+`;
+
+const WalletIcon = styled.img`
+  width: 24px;
+  height: 24px;
+`;
+
 const CloseButton = styled.button`
   position: absolute;
   top: 16px;
@@ -326,53 +354,39 @@ const DisconnectButton = styled.button`
   text-decoration: underline;
 `;
 
-const WalletExtensionAlert = styled.p`
-  font-size: 0.8rem;
-  color: ${berryTheme.colors.error};
-  text-align: center;
-  margin-top: 8px;
-`;
-
-const WalletInstallLink = styled.a`
-  color: ${berryTheme.colors.primary};
-  text-decoration: underline;
-  margin-left: 4px;
-`;
-
 const AdsPage = () => {
   const { id, isPremium, setIsPremium } = useUser();
   const [showModal, setShowModal] = useState(false);
+  const [showWalletSelection, setShowWalletSelection] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
   const [walletName, setWalletName] = useState(null);
-  const [isWalletExtensionAvailable, setIsWalletExtensionAvailable] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [walletType, setWalletType] = useState(null); // 'telegram' or 'extension'
+  const [isExtensionAvailable, setIsExtensionAvailable] = useState(false);
 
   // Payment details
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
 
-  // Check for wallet extension on component mount and periodically
+  // Check for wallet extension availability
   useEffect(() => {
-    const checkWalletExtension = () => {
-      const isAvailable = !!window.ton;
-      setIsWalletExtensionAvailable(isAvailable);
-      
-      if (!isAvailable) {
-        setError('TON Wallet extension not detected. Please install Tonkeeper or another TON wallet.');
-      } else {
-        setError(null);
-      }
+    const checkExtension = () => {
+      const available = !!window.ton;
+      setIsExtensionAvailable(available);
     };
 
-    // Initial check
-    checkWalletExtension();
-
-    // Set up periodic checking in case wallet injects slowly
-    const interval = setInterval(checkWalletExtension, 1000);
-    
+    checkExtension();
+    const interval = setInterval(checkExtension, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Initialize Telegram WebApp
+  useEffect(() => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.expand();
+      window.Telegram.WebApp.enableClosingConfirmation();
+    }
   }, []);
 
   // Check for existing wallet connection
@@ -380,9 +394,10 @@ const AdsPage = () => {
     const connectedWallet = localStorage.getItem('berry_connected_wallet');
     if (connectedWallet) {
       try {
-        const { address, name } = JSON.parse(connectedWallet);
+        const { address, name, type } = JSON.parse(connectedWallet);
         setWalletAddress(address);
         setWalletName(name);
+        setWalletType(type);
       } catch (e) {
         console.error('Error parsing wallet data:', e);
         localStorage.removeItem('berry_connected_wallet');
@@ -390,56 +405,72 @@ const AdsPage = () => {
     }
   }, []);
 
-  // Connect to TON wallet
-  const connectWallet = async () => {
+  // Connect to Telegram Wallet
+  const connectTelegramWallet = async () => {
     try {
-      setError(null);
-      setIsConnecting(true);
-      
-      if (!isWalletExtensionAvailable) {
-        throw new Error('TON Wallet extension not detected. Please install Tonkeeper or another TON wallet.');
+      if (!window.Telegram?.WebApp) {
+        throw new Error('Telegram WebApp not available');
       }
 
-      // Additional check in case state wasn't updated
-      if (!window.ton || typeof window.ton.send !== 'function') {
-        throw new Error('Wallet connection not ready. Please try again.');
+      const result = await window.Telegram.WebApp.sendData(JSON.stringify({
+        type: 'connect_wallet'
+      }));
+
+      if (result?.address) {
+        setWalletAddress(result.address);
+        setWalletName('Telegram Wallet');
+        setWalletType('telegram');
+        
+        localStorage.setItem('berry_connected_wallet', JSON.stringify({
+          address: result.address,
+          name: 'Telegram Wallet',
+          type: 'telegram'
+        }));
+        
+        setShowWalletSelection(false);
+      } else {
+        throw new Error('Wallet connection cancelled');
+      }
+    } catch (err) {
+      console.error('Telegram Wallet connection error:', err);
+      setError(err.message || 'Failed to connect Telegram Wallet');
+    }
+  };
+
+  // Connect to Browser Extension Wallet
+  const connectExtensionWallet = async () => {
+    try {
+      if (!isExtensionAvailable) {
+        throw new Error('TON Wallet extension not detected');
       }
 
-      // Request account access
       const accounts = await window.ton.send('ton_requestAccounts');
       
-      if (!accounts || accounts.length === 0) {
+      if (!accounts?.length) {
         throw new Error('No accounts found. Please unlock your wallet.');
       }
 
       const address = accounts[0];
       const walletInfo = await window.ton.send('ton_getWalletInfo');
       
-      if (!walletInfo || !walletInfo.name) {
+      if (!walletInfo?.name) {
         throw new Error('Could not retrieve wallet information');
       }
 
       setWalletAddress(address);
       setWalletName(walletInfo.name);
+      setWalletType('extension');
       
-      // Persist wallet info
       localStorage.setItem('berry_connected_wallet', JSON.stringify({
         address,
-        name: walletInfo.name
+        name: walletInfo.name,
+        type: 'extension'
       }));
-
-    } catch (err) {
-      console.error('Wallet connection error:', err);
-      setError(err.message || 'Failed to connect wallet');
       
-      // Reset connection state if user rejected or canceled
-      if (err.message.includes('rejected') || err.message.includes('canceled')) {
-        setWalletAddress(null);
-        setWalletName(null);
-        localStorage.removeItem('berry_connected_wallet');
-      }
-    } finally {
-      setIsConnecting(false);
+      setShowWalletSelection(false);
+    } catch (err) {
+      console.error('Extension wallet connection error:', err);
+      setError(err.message || 'Failed to connect wallet');
     }
   };
 
@@ -448,13 +479,14 @@ const AdsPage = () => {
     localStorage.removeItem('berry_connected_wallet');
     setWalletAddress(null);
     setWalletName(null);
+    setWalletType(null);
     setError(null);
   };
 
   // Handle premium activation
   const activatePremium = async () => {
-    if (!walletAddress) {
-      setError('Wallet not connected');
+    if (!walletAddress || !walletType) {
+      setError('Wallet not properly connected');
       return;
     }
 
@@ -462,15 +494,25 @@ const AdsPage = () => {
       setIsProcessing(true);
       setError(null);
       
-      // Prepare transaction
-      const tx = {
-        to: process.env.REACT_APP_TON_WALLET_ADDRESS,
-        value: paymentAmount,
-        payload: 'Berry Ads Premium Subscription'
-      };
-
-      // Send transaction
-      const result = await window.ton.send('ton_sendTransaction', [tx]);
+      let result;
+      
+      if (walletType === 'telegram') {
+        // Telegram Wallet payment flow
+        result = await window.Telegram.WebApp.sendData(JSON.stringify({
+          type: 'send_transaction',
+          to: process.env.REACT_APP_TON_WALLET_ADDRESS,
+          value: paymentAmount,
+          payload: 'Berry Ads Premium Subscription'
+        }));
+      } else {
+        // Browser extension payment flow
+        const tx = {
+          to: process.env.REACT_APP_TON_WALLET_ADDRESS,
+          value: paymentAmount,
+          payload: 'Berry Ads Premium Subscription'
+        };
+        result = await window.ton.send('ton_sendTransaction', [tx]);
+      }
       
       if (!result) {
         throw new Error('Transaction failed or was rejected');
@@ -504,6 +546,15 @@ const AdsPage = () => {
 
   const closeSuccessModal = () => {
     setShowSuccess(false);
+  };
+
+  const openWalletSelection = () => {
+    setShowWalletSelection(true);
+    setError(null);
+  };
+
+  const closeWalletSelection = () => {
+    setShowWalletSelection(false);
   };
 
   return (
@@ -548,28 +599,9 @@ const AdsPage = () => {
               </PremiumBenefit>
               
               {!walletAddress ? (
-                <div>
-                  <WalletButton 
-                    onClick={connectWallet}
-                    disabled={!isWalletExtensionAvailable || isConnecting}
-                  >
-                    <FaWallet /> 
-                    {isConnecting ? 'Connecting...' : 
-                     isWalletExtensionAvailable ? 'Connect Wallet' : 'Install Wallet First'}
-                  </WalletButton>
-                  {!isWalletExtensionAvailable && (
-                    <WalletExtensionAlert>
-                      TON Wallet extension not detected.
-                      <WalletInstallLink 
-                        href="https://tonkeeper.com" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        Download Tonkeeper
-                      </WalletInstallLink>
-                    </WalletExtensionAlert>
-                  )}
-                </div>
+                <WalletButton onClick={openWalletSelection}>
+                  <FaWallet /> Connect Wallet
+                </WalletButton>
               ) : (
                 <>
                   <WalletInfo>
@@ -590,6 +622,45 @@ const AdsPage = () => {
       </Content>
       
       <NavBar />
+
+      {/* Wallet Selection Modal */}
+      {showWalletSelection && (
+        <ModalOverlay>
+          <WalletSelectionModal>
+            <CloseButton onClick={closeWalletSelection}>
+              <FaTimes />
+            </CloseButton>
+            
+            <ModalTitle>Select Wallet</ModalTitle>
+            
+            <ModalText>
+              Choose how you want to connect your wallet:
+            </ModalText>
+            
+            {window.Telegram?.WebApp?.platform !== 'unknown' && (
+              <WalletOption onClick={connectTelegramWallet}>
+                <WalletIcon src="/wallet.webp" alt="Telegram" />
+                <span>Telegram Wallet</span>
+              </WalletOption>
+            )}
+            
+            {isExtensionAvailable && (
+              <WalletOption onClick={connectExtensionWallet}>
+                <WalletIcon src="/wallet.webp" alt="TON Wallet" />
+                <span>TON Wallet Extension</span>
+              </WalletOption>
+            )}
+            
+            {!window.Telegram?.WebApp && !isExtensionAvailable && (
+              <ErrorMessage>
+                No wallet options available. Please install a TON wallet extension.
+              </ErrorMessage>
+            )}
+            
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+          </WalletSelectionModal>
+        </ModalOverlay>
+      )}
 
       {/* Payment Confirmation Modal */}
       {showModal && walletAddress && (
