@@ -60,7 +60,7 @@ function App() {
 
   return (
     <UserProvider>
-      <TonConnectUIProvider manifestUrl="https://ltclink.pw/tonconnect-manifest.json">
+      <TonConnectUIProvider manifestUrl="https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json">
         <div className="App">
           <Outlet/>
         </div>
