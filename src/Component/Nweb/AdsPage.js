@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaTimes, FaWallet } from 'react-icons/fa';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
 import { useUser } from '../../context/userContext';
-import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firestore';
 import { IoCheckmarkCircleSharp } from 'react-icons/io5';
@@ -154,6 +153,27 @@ const UpgradeButton = styled.button`
   }
 `;
 
+const WalletButton = styled.button`
+  background: ${berryTheme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 24px;
+  font-weight: 600;
+  margin-top: 16px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${berryTheme.colors.primaryDark};
+  }
+`;
+
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -265,18 +285,29 @@ const SuccessText = styled.p`
   margin-bottom: 24px;
 `;
 
-const ConnectionStatus = styled.div`
-  padding: 8px;
-  border-radius: 8px;
-  margin: 8px 0;
+const WalletInfo = styled.div`
+  margin-bottom: 16px;
   text-align: center;
-  font-size: 0.9rem;
-  background: ${({ connected }) => 
-    connected ? berryTheme.colors.successLight : berryTheme.colors.errorLight
-  };
-  color: ${({ connected }) => 
-    connected ? berryTheme.colors.success : berryTheme.colors.error
-  };
+  padding: 12px;
+  background: ${berryTheme.colors.grey50};
+  border-radius: 8px;
+`;
+
+const WalletAddress = styled.p`
+  font-size: 0.8rem;
+  color: ${berryTheme.colors.textSecondary};
+  word-break: break-all;
+  margin-top: 8px;
+`;
+
+const DisconnectButton = styled.button`
+  background: none;
+  border: none;
+  color: ${berryTheme.colors.error};
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-top: 8px;
+  text-decoration: underline;
 `;
 
 const AdsPage = () => {
@@ -285,80 +316,97 @@ const AdsPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
-  const wallet = useTonWallet();
-  const [tonConnectUI] = useTonConnectUI();
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [walletName, setWalletName] = useState(null);
 
-  // Payment details - 1 TON for unlimited access
+  // Payment details
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
 
-  // Initialize TonConnect with Berry Ads configuration
+  // Check for existing wallet connection on component mount
   useEffect(() => {
-    const initializeTonConnect = async () => {
+    const connectedWallet = localStorage.getItem('berry_connected_wallet');
+    if (connectedWallet) {
       try {
-        tonConnectUI.uiOptions = {
-          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
-          language: 'en',
-          uiPreferences: {
-            theme: 'DARK',
-            colorsSet: {
-              tonconnect: '#4A00E0', // Berry brand color
-              text: '#FFFFFF',
-              background: '#1E1E1E'
-            }
-          },
-          actionsConfiguration: {
-            twaReturnUrl: 'https://t.me/Fuhdhdbot', // Your Telegram bot
-            modals: ['back', 'close']
-          }
-        };
-
-        setConnectionStatus(wallet ? 
-          `Connected with ${wallet.device.appName}` : 
-          'Connect your wallet to continue'
-        );
-      } catch (err) {
-        console.error('TON Connect initialization error:', err);
-        setConnectionStatus('Connection failed');
-        setError('Failed to initialize wallet connection. Please refresh the page.');
+        const { address, name } = JSON.parse(connectedWallet);
+        setWalletAddress(address);
+        setWalletName(name);
+      } catch (e) {
+        console.error('Error parsing wallet data:', e);
+        localStorage.removeItem('berry_connected_wallet');
       }
-    };
+    }
+  }, []);
 
-    initializeTonConnect();
-  }, [tonConnectUI, wallet]);
+  // Connect to TON wallet
+  const connectWallet = async () => {
+    try {
+      if (!window.ton) {
+        throw new Error('TON Wallet extension not found. Please install a TON wallet like Tonkeeper.');
+      }
 
-  const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
-    messages: [
-      {
-        address: process.env.REACT_APP_TON_WALLET_ADDRESS,
-        amount: paymentAmount,
-        payload: "Berry Ads Premium Subscription"
-      },
-    ],
-  };
+      // Request account access
+      const accounts = await window.ton.send('ton_requestAccounts');
+      
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found. Please unlock your wallet.');
+      }
 
-  const handleUpgradeClick = () => {
-    setShowModal(true);
-    setError(null);
-  };
+      const address = accounts[0];
+      const walletInfo = await window.ton.send('ton_getWalletInfo');
+      
+      if (!walletInfo || !walletInfo.name) {
+        throw new Error('Could not retrieve wallet information');
+      }
 
-  const handleCloseModal = () => {
-    if (!isProcessing) {
-      setShowModal(false);
+      setWalletAddress(address);
+      setWalletName(walletInfo.name);
+      
+      // Persist wallet info
+      localStorage.setItem('berry_connected_wallet', JSON.stringify({
+        address,
+        name: walletInfo.name
+      }));
+
+    } catch (err) {
+      console.error('Wallet connection error:', err);
+      setError(err.message || 'Failed to connect wallet');
     }
   };
 
+  // Disconnect wallet
+  const disconnectWallet = () => {
+    localStorage.removeItem('berry_connected_wallet');
+    setWalletAddress(null);
+    setWalletName(null);
+    setError(null);
+  };
+
+  // Handle premium activation
   const activatePremium = async () => {
+    if (!walletAddress) {
+      setError('Wallet not connected');
+      return;
+    }
+
     try {
       setIsProcessing(true);
       setError(null);
       
-      // Send transaction through TonConnect
-      const response = await tonConnectUI.sendTransaction(transaction);
-      console.log('TON transaction successful:', response);
+      // Prepare transaction
+      const tx = {
+        to: process.env.REACT_APP_TON_WALLET_ADDRESS,
+        value: paymentAmount,
+        payload: 'Berry Ads Premium Subscription'
+      };
 
-      // Update user in Firestore - only premium status
+      // Send transaction
+      const result = await window.ton.send('ton_sendTransaction', [tx]);
+      
+      if (!result) {
+        throw new Error('Transaction failed or was rejected');
+      }
+
+      // Update user in Firestore
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
@@ -369,12 +417,18 @@ const AdsPage = () => {
       setIsPremium(true);
       setShowSuccess(true);
       setShowModal(false);
-      
+
     } catch (err) {
-      console.error('TON transaction error:', err);
-      setError(err.message || 'Transaction failed or was cancelled. Please try again.');
+      console.error('Transaction error:', err);
+      setError(err.message || 'Transaction failed. Please try again.');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    if (!isProcessing) {
+      setShowModal(false);
     }
   };
 
@@ -422,9 +476,25 @@ const AdsPage = () => {
               <PremiumBenefit>
                 <FaCoins color="#FFD700" /> Priority support
               </PremiumBenefit>
-              <UpgradeButton onClick={handleUpgradeClick}>
-                <FaCrown /> Upgrade Now (1 TON)
-              </UpgradeButton>
+              
+              {!walletAddress ? (
+                <WalletButton onClick={connectWallet}>
+                  <FaWallet /> Connect Wallet
+                </WalletButton>
+              ) : (
+                <>
+                  <WalletInfo>
+                    <p>Connected with {walletName}</p>
+                    <WalletAddress>{walletAddress}</WalletAddress>
+                    <DisconnectButton onClick={disconnectWallet}>
+                      Disconnect Wallet
+                    </DisconnectButton>
+                  </WalletInfo>
+                  <UpgradeButton onClick={() => setShowModal(true)}>
+                    <FaCrown /> Upgrade Now (1 TON)
+                  </UpgradeButton>
+                </>
+              )}
             </PremiumContent>
           </PremiumCard>
         )}
@@ -432,48 +502,37 @@ const AdsPage = () => {
       
       <NavBar />
 
-      {/* Payment Modal */}
-      {showModal && (
+      {/* Payment Confirmation Modal */}
+      {showModal && walletAddress && (
         <ModalOverlay>
           <ModalContent>
             <CloseButton onClick={handleCloseModal} disabled={isProcessing}>
               <FaTimes />
             </CloseButton>
             
-            <ModalTitle>Unlock Premium Access</ModalTitle>
+            <ModalTitle>Confirm Premium Upgrade</ModalTitle>
             
             <ModalText>
-              Pay 1 TON to activate unlimited ad watching with no daily restrictions.
+              You are about to purchase unlimited ad access for 1 TON.
             </ModalText>
             
             <PaymentAmount>
               Payment Amount: <strong>1 TON</strong>
             </PaymentAmount>
             
-            <ConnectionStatus connected={!!wallet}>
-              {wallet ? `Connected with ${wallet.device.appName}` : connectionStatus}
-            </ConnectionStatus>
+            <WalletInfo>
+              <p>Paying from: {walletName}</p>
+              <WalletAddress>{walletAddress}</WalletAddress>
+            </WalletInfo>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
             
-            {wallet ? (
-              <ConnectButton 
-                onClick={activatePremium} 
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'Processing Payment...' : 'Confirm Payment (1 TON)'}
-              </ConnectButton>
-            ) : (
-              <TonConnectButton 
-                className="ton-connect-button"
-                style={{
-                  marginTop: '16px',
-                  width: '100%',
-                  borderRadius: '24px',
-                  padding: '12px 24px'
-                }}
-              />
-            )}
+            <ConnectButton 
+              onClick={activatePremium} 
+              disabled={isProcessing}
+            >
+              {isProcessing ? 'Processing...' : 'Confirm Payment (1 TON)'}
+            </ConnectButton>
           </ModalContent>
         </ModalOverlay>
       )}
@@ -484,9 +543,9 @@ const AdsPage = () => {
           <ModalContent>
             <SuccessModalContent>
               <SuccessIcon />
-              <SuccessTitle>Premium Access Activated!</SuccessTitle>
+              <SuccessTitle>Premium Activated!</SuccessTitle>
               <SuccessText>
-                You now have unlimited access to watch ads with no daily limits.
+                Thank you for upgrading! You now have unlimited access to watch ads.
               </SuccessText>
               <ConnectButton onClick={closeSuccessModal}>
                 Start Watching Ads
