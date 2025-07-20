@@ -152,6 +152,12 @@ const UpgradeButton = styled.button`
     background: ${berryTheme.colors.primaryDark};
     transform: translateY(-2px);
   }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey300};
+    cursor: not-allowed;
+    transform: none;
+  }
 `;
 
 const ModalOverlay = styled.div`
@@ -186,6 +192,11 @@ const CloseButton = styled.button`
   font-size: 1.2rem;
   cursor: pointer;
   color: ${berryTheme.colors.textSecondary};
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -298,14 +309,23 @@ const AdsPage = () => {
     const initializeTonConnect = async () => {
       try {
         tonConnectUI.uiOptions = {
-          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
+          manifestUrl: 'https://your-berry-ads-domain.com/tonconnect-manifest.json',
           language: 'en',
           uiPreferences: {
-            theme: 'DARK'
+            theme: 'DARK',
+            colorsSet: {
+              tonconnect: berryTheme.colors.primary,
+              text: '#FFFFFF',
+              background: '#1E1E1E'
+            }
+          },
+          actionsConfiguration: {
+            twaReturnUrl: 'https://t.me/YourBerryAdsBot',
+            modals: ['back', 'close']
           }
         };
 
-        setConnectionStatus(wallet ? 'Connected' : 'Ready to connect');
+        setConnectionStatus(wallet ? `Connected to ${wallet.device.appName}` : 'Ready to connect');
       } catch (err) {
         console.error('TON Connect initialization error:', err);
         setConnectionStatus('Connection failed');
@@ -317,11 +337,12 @@ const AdsPage = () => {
   }, [tonConnectUI, wallet]);
 
   const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 300,
+    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
     messages: [
       {
         address: process.env.REACT_APP_TON_WALLET_ADDRESS,
         amount: paymentAmount,
+        payload: "Berry Ads Premium Subscription"
       },
     ],
   };
@@ -362,7 +383,7 @@ const AdsPage = () => {
       
     } catch (err) {
       console.error('TON transaction error:', err);
-      setError('Transaction failed or was cancelled');
+      setError(err.message || 'Transaction failed or was cancelled');
     } finally {
       setIsProcessing(false);
     }
@@ -376,7 +397,7 @@ const AdsPage = () => {
     <AppContainer>
       <Header>
         <LogoImage src='/Berry.png' alt="Berry Logo" />
-        <LogoText>berry</LogoText>
+        <LogoText>Berry Ads</LogoText>
       </Header>
       
       <Content>
@@ -454,7 +475,15 @@ const AdsPage = () => {
                 {isProcessing ? 'Processing...' : 'Confirm Payment'}
               </ConnectButton>
             ) : (
-              <TonConnectButton className="ton-connect-button" />
+              <TonConnectButton 
+                className="ton-connect-button"
+                style={{
+                  marginTop: '16px',
+                  width: '100%',
+                  borderRadius: '24px',
+                  padding: '12px 24px'
+                }}
+              />
             )}
           </ModalContent>
         </ModalOverlay>
