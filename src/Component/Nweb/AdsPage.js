@@ -151,6 +151,12 @@ const UpgradeButton = styled.button`
     background: ${berryTheme.colors.primaryDark};
     transform: translateY(-2px);
   }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey300};
+    cursor: not-allowed;
+    transform: none;
+  }
 `;
 
 const WalletButton = styled.button`
@@ -171,6 +177,11 @@ const WalletButton = styled.button`
 
   &:hover {
     background: ${berryTheme.colors.primaryDark};
+  }
+
+  &:disabled {
+    background: ${berryTheme.colors.grey300};
+    cursor: not-allowed;
   }
 `;
 
@@ -206,6 +217,11 @@ const CloseButton = styled.button`
   font-size: 1.2rem;
   cursor: pointer;
   color: ${berryTheme.colors.textSecondary};
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -310,6 +326,19 @@ const DisconnectButton = styled.button`
   text-decoration: underline;
 `;
 
+const WalletExtensionAlert = styled.p`
+  font-size: 0.8rem;
+  color: ${berryTheme.colors.error};
+  text-align: center;
+  margin-top: 8px;
+`;
+
+const WalletInstallLink = styled.a`
+  color: ${berryTheme.colors.primary};
+  text-decoration: underline;
+  margin-left: 4px;
+`;
+
 const AdsPage = () => {
   const { id, isPremium, setIsPremium } = useUser();
   const [showModal, setShowModal] = useState(false);
@@ -318,11 +347,35 @@ const AdsPage = () => {
   const [error, setError] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
   const [walletName, setWalletName] = useState(null);
+  const [isWalletExtensionAvailable, setIsWalletExtensionAvailable] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Payment details
   const paymentAmount = '1000000000'; // 1 TON in nanoTON
 
-  // Check for existing wallet connection on component mount
+  // Check for wallet extension on component mount and periodically
+  useEffect(() => {
+    const checkWalletExtension = () => {
+      const isAvailable = !!window.ton;
+      setIsWalletExtensionAvailable(isAvailable);
+      
+      if (!isAvailable) {
+        setError('TON Wallet extension not detected. Please install Tonkeeper or another TON wallet.');
+      } else {
+        setError(null);
+      }
+    };
+
+    // Initial check
+    checkWalletExtension();
+
+    // Set up periodic checking in case wallet injects slowly
+    const interval = setInterval(checkWalletExtension, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check for existing wallet connection
   useEffect(() => {
     const connectedWallet = localStorage.getItem('berry_connected_wallet');
     if (connectedWallet) {
@@ -340,8 +393,16 @@ const AdsPage = () => {
   // Connect to TON wallet
   const connectWallet = async () => {
     try {
-      if (!window.ton) {
-        throw new Error('TON Wallet extension not found. Please install a TON wallet like Tonkeeper.');
+      setError(null);
+      setIsConnecting(true);
+      
+      if (!isWalletExtensionAvailable) {
+        throw new Error('TON Wallet extension not detected. Please install Tonkeeper or another TON wallet.');
+      }
+
+      // Additional check in case state wasn't updated
+      if (!window.ton || typeof window.ton.send !== 'function') {
+        throw new Error('Wallet connection not ready. Please try again.');
       }
 
       // Request account access
@@ -370,6 +431,15 @@ const AdsPage = () => {
     } catch (err) {
       console.error('Wallet connection error:', err);
       setError(err.message || 'Failed to connect wallet');
+      
+      // Reset connection state if user rejected or canceled
+      if (err.message.includes('rejected') || err.message.includes('canceled')) {
+        setWalletAddress(null);
+        setWalletName(null);
+        localStorage.removeItem('berry_connected_wallet');
+      }
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -478,9 +548,28 @@ const AdsPage = () => {
               </PremiumBenefit>
               
               {!walletAddress ? (
-                <WalletButton onClick={connectWallet}>
-                  <FaWallet /> Connect Wallet
-                </WalletButton>
+                <div>
+                  <WalletButton 
+                    onClick={connectWallet}
+                    disabled={!isWalletExtensionAvailable || isConnecting}
+                  >
+                    <FaWallet /> 
+                    {isConnecting ? 'Connecting...' : 
+                     isWalletExtensionAvailable ? 'Connect Wallet' : 'Install Wallet First'}
+                  </WalletButton>
+                  {!isWalletExtensionAvailable && (
+                    <WalletExtensionAlert>
+                      TON Wallet extension not detected.
+                      <WalletInstallLink 
+                        href="https://tonkeeper.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        Download Tonkeeper
+                      </WalletInstallLink>
+                    </WalletExtensionAlert>
+                  )}
+                </div>
               ) : (
                 <>
                   <WalletInfo>
