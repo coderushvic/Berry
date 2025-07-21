@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect} from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
@@ -298,7 +298,7 @@ const AdsPage = () => {
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const wallet = useTonWallet();
-  const [tonConnectUI, setOptions] = useTonConnectUI();
+  const [tonConnectUI] = useTonConnectUI();
   const [isTelegram, setIsTelegram] = useState(false);
 
   // Payment details
@@ -310,38 +310,30 @@ const AdsPage = () => {
     setIsTelegram(window.Telegram?.WebApp?.platform !== 'unknown');
   }, []);
 
-  // Initialize TonConnect with Berry Ads manifest
-  const initializeTonConnect = useCallback(async () => {
-    try {
-      await setOptions({
-        manifestUrl: 'https://chic-phoenix-c00482.netlify.app//tonconnect-manifest.json',
-        language: 'en',
-        uiPreferences: {
-          theme: 'DARK',
-          colorsSet: {
-            tonconnect: berryTheme.colors.primary,
-            text: '#FFFFFF',
-            background: '#1E1E1E'
-          }
-        },
-        actionsConfiguration: {
-          twaReturnUrl: 'https://t.me/Fuhdhdbot',
-          modals: ['back', 'close']
-        }
-      });
-
-      setConnectionStatus(wallet ? `Connected to ${wallet.device.appName}` : 
-        isTelegram ? 'Telegram Wallet Ready' : 'Ready to connect');
-    } catch (err) {
-      console.error('TON Connect initialization error:', err);
-      setConnectionStatus('Connection failed');
-      setError('Failed to initialize wallet connection');
-    }
-  }, [setOptions, wallet, isTelegram]);
-
+  // Initialize TonConnect with proper error handling
   useEffect(() => {
+    const initializeTonConnect = async () => {
+      try {
+        // First try to restore existing connection
+        await tonConnectUI.connector.restoreConnection();
+        
+        // Set connection status based on wallet state
+        if (wallet) {
+          setConnectionStatus(`Connected to ${wallet.device.appName}`);
+        } else if (isTelegram) {
+          setConnectionStatus('Telegram Wallet Ready');
+        } else {
+          setConnectionStatus('Ready to connect');
+        }
+      } catch (err) {
+        console.error('TON Connect initialization error:', err);
+        setConnectionStatus('Connection failed');
+        setError('Failed to initialize wallet connection');
+      }
+    };
+
     initializeTonConnect();
-  }, [initializeTonConnect]);
+  }, [tonConnectUI, wallet, isTelegram]);
 
   // Initialize Telegram WebApp if available
   useEffect(() => {
@@ -398,7 +390,7 @@ const AdsPage = () => {
       setIsProcessing(true);
       setError(null);
       
-      // Try Telegram Wallet first if in Telegram
+      // Try Telegram Wallet first if available
       if (isTelegram) {
         try {
           const result = await window.Telegram.WebApp.sendData(JSON.stringify({
@@ -509,7 +501,7 @@ const AdsPage = () => {
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
             
-            {!isTelegram && !wallet && (
+            {!isTelegram && !wallet ? (
               <TonConnectButton 
                 style={{
                   marginTop: '16px',
@@ -518,9 +510,7 @@ const AdsPage = () => {
                   padding: '12px 24px'
                 }}
               />
-            )}
-            
-            {(isTelegram || wallet) && (
+            ) : (
               <ConnectButton 
                 onClick={activatePremium} 
                 disabled={isProcessing}
