@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
-import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaTimes, FaWallet } from 'react-icons/fa';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
 import { useUser } from '../../context/userContext';
@@ -290,6 +290,44 @@ const ConnectionStatus = styled.div`
   };
 `;
 
+const WalletSelector = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+`;
+
+const WalletOption = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: ${berryTheme.colors.grey50};
+  border: 1px solid ${berryTheme.colors.grey200};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${berryTheme.colors.grey100};
+    border-color: ${berryTheme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+`;
+
+const WalletIcon = styled.img`
+  width: 24px;
+  height: 24px;
+`;
+
+const WalletOptionText = styled.span`
+  font-weight: 500;
+`;
+
 const AdsPage = () => {
   const { id, isPremium, setIsPremium, dollarBalance2, setDollarBalance2 } = useUser();
   const [showModal, setShowModal] = useState(false);
@@ -297,6 +335,7 @@ const AdsPage = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
   const [isTelegram, setIsTelegram] = useState(false);
@@ -307,23 +346,25 @@ const AdsPage = () => {
 
   // Check if running in Telegram WebApp
   useEffect(() => {
-    setIsTelegram(window.Telegram?.WebApp?.platform !== 'unknown');
+    const tgWebApp = window.Telegram?.WebApp;
+    setIsTelegram(tgWebApp?.platform !== 'unknown');
+    
+    if (tgWebApp) {
+      tgWebApp.expand();
+      tgWebApp.enableClosingConfirmation();
+    }
   }, []);
 
-  // Initialize TonConnect with proper error handling
+  // Initialize TonConnect
   useEffect(() => {
     const initializeTonConnect = async () => {
       try {
-        // First try to restore existing connection
         await tonConnectUI.connector.restoreConnection();
         
-        // Set connection status based on wallet state
         if (wallet) {
           setConnectionStatus(`Connected to ${wallet.device.appName}`);
-        } else if (isTelegram) {
-          setConnectionStatus('Telegram Wallet Ready');
         } else {
-          setConnectionStatus('Ready to connect');
+          setConnectionStatus(isTelegram ? 'Telegram Wallet Ready' : 'Ready to connect');
         }
       } catch (err) {
         console.error('TON Connect initialization error:', err);
@@ -334,18 +375,6 @@ const AdsPage = () => {
 
     initializeTonConnect();
   }, [tonConnectUI, wallet, isTelegram]);
-
-  // Initialize Telegram WebApp if available
-  useEffect(() => {
-    if (isTelegram) {
-      try {
-        window.Telegram.WebApp.expand();
-        window.Telegram.WebApp.enableClosingConfirmation();
-      } catch (err) {
-        console.error('Telegram WebApp initialization error:', err);
-      }
-    }
-  }, [isTelegram]);
 
   const transaction = {
     validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
@@ -361,59 +390,72 @@ const AdsPage = () => {
   const handleUpgradeClick = () => {
     setShowModal(true);
     setError(null);
+    setShowWalletSelector(false);
   };
 
   const handleCloseModal = () => {
     if (!isProcessing) {
       setShowModal(false);
+      setShowWalletSelector(false);
     }
   };
 
   const completePremiumActivation = async () => {
-    // Update user in Firestore
-    const userRef = doc(db, 'telegramUsers', id.toString());
-    await updateDoc(userRef, {
-      isPremium: true,
-      dollarBalance2: increment(premiumBonus),
-      lastPremiumActivation: new Date(),
-    });
+    try {
+      // Update user in Firestore
+      const userRef = doc(db, 'telegramUsers', id.toString());
+      await updateDoc(userRef, {
+        isPremium: true,
+        dollarBalance2: increment(premiumBonus),
+        lastPremiumActivation: new Date(),
+      });
 
-    // Update local state
-    setIsPremium(true);
-    setDollarBalance2(dollarBalance2 + premiumBonus);
-    setShowSuccess(true);
-    setShowModal(false);
+      // Update local state
+      setIsPremium(true);
+      setDollarBalance2(dollarBalance2 + premiumBonus);
+      setShowSuccess(true);
+      setShowModal(false);
+      setShowWalletSelector(false);
+    } catch (err) {
+      console.error('Error completing premium activation:', err);
+      setError('Failed to activate premium. Please try again.');
+    }
   };
 
-  const activatePremium = async () => {
+  const initiateTelegramPayment = async () => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+
+      const result = await window.Telegram.WebApp.sendData(JSON.stringify({
+        type: 'send_transaction',
+        to: process.env.REACT_APP_TON_WALLET_ADDRESS,
+        value: paymentAmount,
+        payload: 'Berry Ads Premium Subscription',
+        asset: 'TON'
+      }));
+
+      if (!result) {
+        throw new Error('Payment was cancelled');
+      }
+
+      await completePremiumActivation();
+    } catch (err) {
+      console.error('Telegram payment error:', err);
+      setError(err.message || 'Payment failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const initiateTonConnectPayment = async () => {
     try {
       setIsProcessing(true);
       setError(null);
       
-      // Try Telegram Wallet first if available
-      if (isTelegram) {
-        try {
-          const result = await window.Telegram.WebApp.sendData(JSON.stringify({
-            type: 'send_transaction',
-            to: process.env.REACT_APP_TON_WALLET_ADDRESS,
-            value: paymentAmount,
-            payload: 'Berry Ads Premium Subscription'
-          }));
-
-          if (result) {
-            await completePremiumActivation();
-            return;
-          }
-        } catch (telegramErr) {
-          console.log('Falling back to TonConnect due to Telegram error:', telegramErr);
-        }
-      }
-
-      // Fallback to TonConnect
       const response = await tonConnectUI.sendTransaction(transaction);
       console.log('TON transaction successful:', response);
       await completePremiumActivation();
-      
     } catch (err) {
       console.error('Transaction error:', err);
       setError(err.message || 'Transaction failed or was cancelled');
@@ -500,23 +542,55 @@ const AdsPage = () => {
             </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
-            
-            {!isTelegram && !wallet ? (
-              <TonConnectButton 
-                style={{
-                  marginTop: '16px',
-                  width: '100%',
-                  borderRadius: '24px',
-                  padding: '12px 24px'
-                }}
-              />
+
+            {showWalletSelector ? (
+              <WalletSelector>
+                <WalletOption 
+                  onClick={initiateTelegramPayment} 
+                  disabled={isProcessing}
+                >
+                  <WalletIcon src="/telegram-icon.png" alt="Telegram Wallet" />
+                  <WalletOptionText>
+                    {isProcessing ? 'Processing...' : 'Pay with Telegram Wallet'}
+                  </WalletOptionText>
+                </WalletOption>
+                <WalletOption 
+                  onClick={() => setShowWalletSelector(false)}
+                  style={{ backgroundColor: berryTheme.colors.grey200 }}
+                >
+                  <FaWallet />
+                  <WalletOptionText>Back to Wallet Options</WalletOptionText>
+                </WalletOption>
+              </WalletSelector>
             ) : (
-              <ConnectButton 
-                onClick={activatePremium} 
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'Processing...' : 'Confirm Payment'}
-              </ConnectButton>
+              <>
+                {isTelegram && (
+                  <ConnectButton 
+                    onClick={() => setShowWalletSelector(true)}
+                    disabled={isProcessing}
+                  >
+                    <FaWallet /> Select Wallet
+                  </ConnectButton>
+                )}
+                {!isTelegram && !wallet && (
+                  <TonConnectButton 
+                    style={{
+                      marginTop: '16px',
+                      width: '100%',
+                      borderRadius: '24px',
+                      padding: '12px 24px'
+                    }}
+                  />
+                )}
+                {!isTelegram && wallet && (
+                  <ConnectButton 
+                    onClick={initiateTonConnectPayment} 
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? 'Processing...' : 'Confirm Payment'}
+                  </ConnectButton>
+                )}
+              </>
             )}
           </ModalContent>
         </ModalOverlay>
