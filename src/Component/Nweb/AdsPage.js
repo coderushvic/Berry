@@ -147,6 +147,8 @@ const UpgradeButton = styled.button`
   gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 
   &:hover {
     background: ${berryTheme.colors.primaryDark};
@@ -157,6 +159,22 @@ const UpgradeButton = styled.button`
     background: ${berryTheme.colors.grey300};
     cursor: not-allowed;
     transform: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover::after {
+    transform: translateX(0);
   }
 `;
 
@@ -192,6 +210,11 @@ const CloseButton = styled.button`
   font-size: 1.2rem;
   cursor: pointer;
   color: ${berryTheme.colors.textSecondary};
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 
   &:disabled {
     cursor: not-allowed;
@@ -236,6 +259,8 @@ const ConnectButton = styled.button`
   gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 
   &:hover {
     background: ${berryTheme.colors.primaryDark};
@@ -245,6 +270,22 @@ const ConnectButton = styled.button`
     background: ${berryTheme.colors.grey300};
     cursor: not-allowed;
   }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover::after {
+    transform: translateX(0);
+  }
 `;
 
 const ErrorMessage = styled.div`
@@ -252,6 +293,9 @@ const ErrorMessage = styled.div`
   text-align: center;
   margin: 8px 0;
   font-size: 0.9rem;
+  padding: 8px;
+  background: ${berryTheme.colors.errorLight};
+  border-radius: 8px;
 `;
 
 const SuccessModalContent = styled.div`
@@ -270,10 +314,12 @@ const SuccessTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: bold;
   margin-bottom: 16px;
+  color: ${berryTheme.colors.primaryDark};
 `;
 
 const SuccessText = styled.p`
   margin-bottom: 24px;
+  color: ${berryTheme.colors.textDark};
 `;
 
 const ConnectionStatus = styled.div`
@@ -319,7 +365,7 @@ const AdsPage = () => {
   const paymentAmount = '100000000'; // 0.1 TON
   const premiumBonus = 2000; // Bonus points
 
-  const transaction = {
+  const transaction = useCallback(() => ({
     validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
     messages: [
       {
@@ -328,34 +374,49 @@ const AdsPage = () => {
         payload: "Berry Ads Premium Subscription"
       },
     ],
-  };
+  }), [paymentAmount]);
 
   // Fast wallet connection initialization
   useEffect(() => {
-    // Set UI options immediately for faster connection
-    tonConnectUI.uiOptions = {
-      manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
-      language: 'en',
-      uiPreferences: {
-        theme: 'DARK',
-        colorsSet: {
-          tonconnect: berryTheme.colors.primary,
-          text: '#FFFFFF',
-          background: '#1E1E1E'
+    let isMounted = true;
+    
+    const initializeWallet = async () => {
+      try {
+        tonConnectUI.uiOptions = {
+          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
+          language: 'en',
+          uiPreferences: {
+            theme: 'DARK',
+            colorsSet: {
+              tonconnect: berryTheme.colors.primary,
+              text: '#FFFFFF',
+              background: '#1E1E1E'
+            }
+          },
+          actionsConfiguration: {
+            twaReturnUrl: 'https://t.me/Fuhdhdbot',
+            modals: ['back', 'close']
+          }
+        };
+
+        await tonConnectUI.connectionRestored;
+        if (isMounted && tonConnectUI.connected) {
+          setConnectionStatus(`Connected to ${tonConnectUI.wallet?.device.appName || 'wallet'}`);
         }
-      },
-      actionsConfiguration: {
-        twaReturnUrl: 'https://t.me/Fuhdhdbot',
-        modals: ['back', 'close']
+      } catch (err) {
+        if (isMounted) {
+          console.error("Wallet initialization error:", err);
+          setConnectionStatus('Connection error');
+          setError('Failed to initialize wallet connection');
+        }
       }
     };
 
-    // Check existing connection
-    tonConnectUI.connectionRestored.then(() => {
-      if (tonConnectUI.connected) {
-        setConnectionStatus(`Connected to ${tonConnectUI.wallet?.device.appName || 'wallet'}`);
-      }
-    });
+    initializeWallet();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [tonConnectUI]);
 
   // Real-time connection status updates
@@ -364,6 +425,7 @@ const AdsPage = () => {
       if (wallet) {
         setConnectionStatus(`Connected to ${wallet.device.appName}`);
         setIsConnecting(false);
+        setError(null);
       } else {
         setConnectionStatus('Ready to connect');
       }
@@ -372,104 +434,133 @@ const AdsPage = () => {
     return () => unsubscribe();
   }, [tonConnectUI]);
 
-  // Optimized wallet connection check
+  // Improved wallet connection check
   const checkConnection = useCallback(async () => {
     try {
-      if (tonConnectUI.connected) {
-        return true;
-      }
+      if (tonConnectUI.connected) return true;
       
       setIsConnecting(true);
       setConnectionStatus('Connecting...');
+      setError(null);
       
-      // Fast connection check with 3 second timeout
-      const connectionPromise = new Promise((resolve) => {
-        const check = () => {
+      // More reliable connection check
+      const connected = await new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 30; // 3 seconds total (100ms * 30)
+        const checkInterval = 100;
+        
+        const checkConnection = () => {
           if (tonConnectUI.connected) {
             resolve(true);
+          } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(checkConnection, checkInterval);
           } else {
-            setTimeout(check, 100);
+            resolve(false);
           }
         };
-        check();
+        
+        checkConnection();
       });
 
-      const timeoutPromise = new Promise((resolve) => 
-        setTimeout(() => resolve(false), 3000)
-      );
-
-      const connected = await Promise.race([connectionPromise, timeoutPromise]);
-      
       if (!connected) {
-        setConnectionStatus('Ready to connect');
+        setError('Connection timed out. Please try again.');
         return false;
       }
       
       return true;
     } catch (err) {
       console.error("Connection check error:", err);
+      setError('Connection failed. Please try again.');
       return false;
     } finally {
       setIsConnecting(false);
     }
   }, [tonConnectUI]);
 
-  const handleUpgradeClick = async () => {
-    setError(null);
-    const isConnected = await checkConnection();
-    
-    if (isConnected) {
-      setShowModal(true);
-    } else {
-      setError('Please connect your wallet first');
+  // Improved button click handler
+  const handleUpgradeClick = useCallback(async () => {
+    try {
+      setError(null);
+      setIsConnecting(true);
+      
+      const isConnected = await checkConnection();
+      
+      if (isConnected) {
+        setShowModal(true);
+      }
+    } catch (err) {
+      console.error("Upgrade click error:", err);
+      setError('Failed to connect wallet. Please try again.');
+    } finally {
+      setIsConnecting(false);
     }
-  };
+  }, [checkConnection]);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     if (!isProcessing) {
       setShowModal(false);
+      setError(null);
     }
-  };
+  }, [isProcessing]);
 
-  const activatePremium = async () => {
+  // More reliable payment processing
+  const activatePremium = useCallback(async () => {
     try {
       setIsProcessing(true);
       setError(null);
       
-      // Final connection check
-      if (!tonConnectUI.connected) {
-        throw new Error('Wallet not connected');
+      if (!tonConnectUI.connected || !wallet) {
+        throw new Error('Wallet not properly connected');
       }
 
-      // Send 0.1 TON transaction
-      const response = await tonConnectUI.sendTransaction(transaction);
-      console.log('Transaction successful:', response);
+      // Create fresh transaction object
+      const currentTransaction = transaction();
+      
+      // Send transaction with error handling
+      const response = await tonConnectUI.sendTransaction(currentTransaction).catch(err => {
+        console.error("Transaction sending error:", err);
+        throw new Error('Transaction failed to send');
+      });
 
-      // Update user in Firestore
+      console.log('Transaction response:', response);
+      
+      // Verify transaction was successful
+      if (!response || !response.boc) {
+        throw new Error('Transaction not completed');
+      }
+
+      // Calculate new balance
+      const newBalance = dollarBalance2 + premiumBonus;
+
+      // Update Firestore
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
         dollarBalance2: increment(premiumBonus),
         lastPremiumActivation: new Date(),
+      }).catch(err => {
+        console.error("Firestore update error:", err);
+        throw new Error('Account update failed');
       });
 
       // Update local state
       setIsPremium(true);
-      setDollarBalance2(dollarBalance2 + premiumBonus);
+      setDollarBalance2(newBalance);
       setShowSuccess(true);
       setShowModal(false);
       
     } catch (err) {
-      console.error('Transaction error:', err);
+      console.error('Payment processing error:', err);
       setError(err.message || 'Payment failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [tonConnectUI, wallet, transaction, id, premiumBonus, setIsPremium, dollarBalance2, setDollarBalance2]);
 
-  const closeSuccessModal = () => {
+  const closeSuccessModal = useCallback(() => {
     setShowSuccess(false);
-  };
+  }, []);
 
   return (
     <AppContainer>
@@ -487,9 +578,9 @@ const AdsPage = () => {
           <StatItem>
             <StatValue>
               <FaCoins color="#FFD700" />
-              +{isPremium ? '2000' : '1000'}
+              {dollarBalance2.toLocaleString()}
             </StatValue>
-            <StatLabel>Per Ad</StatLabel>
+            <StatLabel>Current Balance</StatLabel>
           </StatItem>
         </StatsCard>
         
@@ -511,8 +602,19 @@ const AdsPage = () => {
               <PremiumBenefit>
                 <FaCoins color="#FFD700" /> No waiting time
               </PremiumBenefit>
-              <UpgradeButton onClick={handleUpgradeClick}>
-                <FaCrown /> Upgrade Now (0.1 TON)
+              <UpgradeButton 
+                onClick={handleUpgradeClick}
+                disabled={isConnecting || isProcessing}
+              >
+                {isConnecting ? (
+                  <>
+                    <ConnectionLoader /> Connecting...
+                  </>
+                ) : (
+                  <>
+                    <FaCrown /> Upgrade Now (0.1 TON)
+                  </>
+                )}
               </UpgradeButton>
             </PremiumContent>
           </PremiumCard>
@@ -540,13 +642,7 @@ const AdsPage = () => {
             </PaymentAmount>
             
             <ConnectionStatus connected={!!wallet}>
-              {isConnecting ? (
-                <>
-                  <ConnectionLoader /> Connecting...
-                </>
-              ) : (
-                wallet ? `Connected to ${wallet.device.appName}` : connectionStatus
-              )}
+              {wallet ? `Connected to ${wallet.device.appName}` : connectionStatus}
             </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -556,7 +652,13 @@ const AdsPage = () => {
                 onClick={activatePremium} 
                 disabled={isProcessing}
               >
-                {isProcessing ? 'Processing...' : 'Confirm Payment'}
+                {isProcessing ? (
+                  <>
+                    <ConnectionLoader /> Processing...
+                  </>
+                ) : (
+                  'Confirm Payment'
+                )}
               </ConnectButton>
             ) : (
               <TonConnectButton 
@@ -582,7 +684,7 @@ const AdsPage = () => {
               <SuccessIcon />
               <SuccessTitle>Premium Activated!</SuccessTitle>
               <SuccessText>
-                You now have unlimited ads and 2x earning rate!
+                You received {premiumBonus} bonus points! Your new balance is {(dollarBalance2 + premiumBonus).toLocaleString()}.
               </SuccessText>
               <ConnectButton onClick={closeSuccessModal}>
                 Continue
