@@ -147,8 +147,6 @@ const UpgradeButton = styled.button`
   gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
 
   &:hover {
     background: ${berryTheme.colors.primaryDark};
@@ -159,22 +157,6 @@ const UpgradeButton = styled.button`
     background: ${berryTheme.colors.grey300};
     cursor: not-allowed;
     transform: none;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-
-  &:hover::after {
-    transform: translateX(0);
   }
 `;
 
@@ -210,11 +192,6 @@ const CloseButton = styled.button`
   font-size: 1.2rem;
   cursor: pointer;
   color: ${berryTheme.colors.textSecondary};
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
 
   &:disabled {
     cursor: not-allowed;
@@ -259,8 +236,6 @@ const ConnectButton = styled.button`
   gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
 
   &:hover {
     background: ${berryTheme.colors.primaryDark};
@@ -270,22 +245,6 @@ const ConnectButton = styled.button`
     background: ${berryTheme.colors.grey300};
     cursor: not-allowed;
   }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-
-  &:hover::after {
-    transform: translateX(0);
-  }
 `;
 
 const ErrorMessage = styled.div`
@@ -293,9 +252,6 @@ const ErrorMessage = styled.div`
   text-align: center;
   margin: 8px 0;
   font-size: 0.9rem;
-  padding: 8px;
-  background: ${berryTheme.colors.errorLight};
-  border-radius: 8px;
 `;
 
 const SuccessModalContent = styled.div`
@@ -314,12 +270,10 @@ const SuccessTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: bold;
   margin-bottom: 16px;
-  color: ${berryTheme.colors.primaryDark};
 `;
 
 const SuccessText = styled.p`
   margin-bottom: 24px;
-  color: ${berryTheme.colors.textDark};
 `;
 
 const ConnectionStatus = styled.div`
@@ -376,7 +330,7 @@ const AdsPage = () => {
     ],
   }), [paymentAmount]);
 
-  // Fast wallet connection initialization
+  // Enhanced wallet connection initialization
   useEffect(() => {
     let isMounted = true;
     
@@ -488,6 +442,8 @@ const AdsPage = () => {
       
       if (isConnected) {
         setShowModal(true);
+      } else {
+        setError('Please connect your wallet first');
       }
     } catch (err) {
       console.error("Upgrade click error:", err);
@@ -556,7 +512,7 @@ const AdsPage = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [tonConnectUI, wallet, transaction, id, premiumBonus, setIsPremium, dollarBalance2, setDollarBalance2]);
+  }, [tonConnectUI, wallet, transaction, id, premiumBonus, dollarBalance2, setIsPremium, setDollarBalance2]);
 
   const closeSuccessModal = useCallback(() => {
     setShowSuccess(false);
@@ -642,7 +598,13 @@ const AdsPage = () => {
             </PaymentAmount>
             
             <ConnectionStatus connected={!!wallet}>
-              {wallet ? `Connected to ${wallet.device.appName}` : connectionStatus}
+              {isConnecting ? (
+                <>
+                  <ConnectionLoader /> Connecting...
+                </>
+              ) : (
+                wallet ? `Connected to ${wallet.device.appName}` : connectionStatus
+              )}
             </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
