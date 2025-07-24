@@ -319,7 +319,7 @@ const AdsPage = () => {
   const paymentAmount = '100000000'; // 0.1 TON
   const premiumBonus = 2000; // Bonus points
 
-  const transaction = useCallback(() => ({
+  const transaction = {
     validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
     messages: [
       {
@@ -328,49 +328,34 @@ const AdsPage = () => {
         payload: "Berry Ads Premium Subscription"
       },
     ],
-  }), [paymentAmount]);
+  };
 
-  // Enhanced wallet connection initialization
+  // Fast wallet connection initialization
   useEffect(() => {
-    let isMounted = true;
-    
-    const initializeWallet = async () => {
-      try {
-        tonConnectUI.uiOptions = {
-          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
-          language: 'en',
-          uiPreferences: {
-            theme: 'DARK',
-            colorsSet: {
-              tonconnect: berryTheme.colors.primary,
-              text: '#FFFFFF',
-              background: '#1E1E1E'
-            }
-          },
-          actionsConfiguration: {
-            twaReturnUrl: 'https://t.me/Fuhdhdbot',
-            modals: ['back', 'close']
-          }
-        };
-
-        await tonConnectUI.connectionRestored;
-        if (isMounted && tonConnectUI.connected) {
-          setConnectionStatus(`Connected to ${tonConnectUI.wallet?.device.appName || 'wallet'}`);
+    // Set UI options immediately for faster connection
+    tonConnectUI.uiOptions = {
+      manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
+      language: 'en',
+      uiPreferences: {
+        theme: 'DARK',
+        colorsSet: {
+          tonconnect: berryTheme.colors.primary,
+          text: '#FFFFFF',
+          background: '#1E1E1E'
         }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Wallet initialization error:", err);
-          setConnectionStatus('Connection error');
-          setError('Failed to initialize wallet connection');
-        }
+      },
+      actionsConfiguration: {
+        twaReturnUrl: 'https://t.me/Fuhdhdbot',
+        modals: ['back', 'close']
       }
     };
 
-    initializeWallet();
-    
-    return () => {
-      isMounted = false;
-    };
+    // Check existing connection
+    tonConnectUI.connectionRestored.then(() => {
+      if (tonConnectUI.connected) {
+        setConnectionStatus(`Connected to ${tonConnectUI.wallet?.device.appName || 'wallet'}`);
+      }
+    });
   }, [tonConnectUI]);
 
   // Real-time connection status updates
@@ -379,7 +364,6 @@ const AdsPage = () => {
       if (wallet) {
         setConnectionStatus(`Connected to ${wallet.device.appName}`);
         setIsConnecting(false);
-        setError(null);
       } else {
         setConnectionStatus('Ready to connect');
       }
@@ -388,135 +372,104 @@ const AdsPage = () => {
     return () => unsubscribe();
   }, [tonConnectUI]);
 
-  // Improved wallet connection check
+  // Optimized wallet connection check
   const checkConnection = useCallback(async () => {
     try {
-      if (tonConnectUI.connected) return true;
+      if (tonConnectUI.connected) {
+        return true;
+      }
       
       setIsConnecting(true);
       setConnectionStatus('Connecting...');
-      setError(null);
       
-      // More reliable connection check
-      const connected = await new Promise((resolve) => {
-        let attempts = 0;
-        const maxAttempts = 30; // 3 seconds total (100ms * 30)
-        const checkInterval = 100;
-        
-        const checkConnection = () => {
+      // Fast connection check with 3 second timeout
+      const connectionPromise = new Promise((resolve) => {
+        const check = () => {
           if (tonConnectUI.connected) {
             resolve(true);
-          } else if (attempts < maxAttempts) {
-            attempts++;
-            setTimeout(checkConnection, checkInterval);
           } else {
-            resolve(false);
+            setTimeout(check, 100);
           }
         };
-        
-        checkConnection();
+        check();
       });
 
+      const timeoutPromise = new Promise((resolve) => 
+        setTimeout(() => resolve(false), 3000)
+      );
+
+      const connected = await Promise.race([connectionPromise, timeoutPromise]);
+      
       if (!connected) {
-        setError('Connection timed out. Please try again.');
+        setConnectionStatus('Ready to connect');
         return false;
       }
       
       return true;
     } catch (err) {
       console.error("Connection check error:", err);
-      setError('Connection failed. Please try again.');
       return false;
     } finally {
       setIsConnecting(false);
     }
   }, [tonConnectUI]);
 
-  // Improved button click handler
-  const handleUpgradeClick = useCallback(async () => {
-    try {
-      setError(null);
-      setIsConnecting(true);
-      
-      const isConnected = await checkConnection();
-      
-      if (isConnected) {
-        setShowModal(true);
-      } else {
-        setError('Please connect your wallet first');
-      }
-    } catch (err) {
-      console.error("Upgrade click error:", err);
-      setError('Failed to connect wallet. Please try again.');
-    } finally {
-      setIsConnecting(false);
+  const handleUpgradeClick = async () => {
+    setError(null);
+    const isConnected = await checkConnection();
+    
+    if (isConnected) {
+      setShowModal(true);
+    } else {
+      setError('Please connect your wallet first');
     }
-  }, [checkConnection]);
+  };
 
-  const handleCloseModal = useCallback(() => {
+  const handleCloseModal = () => {
     if (!isProcessing) {
       setShowModal(false);
-      setError(null);
     }
-  }, [isProcessing]);
+  };
 
-  // More reliable payment processing
-  const activatePremium = useCallback(async () => {
+  const activatePremium = async () => {
     try {
       setIsProcessing(true);
       setError(null);
       
-      if (!tonConnectUI.connected || !wallet) {
-        throw new Error('Wallet not properly connected');
+      // Final connection check
+      if (!tonConnectUI.connected) {
+        throw new Error('Wallet not connected');
       }
 
-      // Create fresh transaction object
-      const currentTransaction = transaction();
-      
-      // Send transaction with error handling
-      const response = await tonConnectUI.sendTransaction(currentTransaction).catch(err => {
-        console.error("Transaction sending error:", err);
-        throw new Error('Transaction failed to send');
-      });
+      // Send 0.1 TON transaction
+      const response = await tonConnectUI.sendTransaction(transaction);
+      console.log('Transaction successful:', response);
 
-      console.log('Transaction response:', response);
-      
-      // Verify transaction was successful
-      if (!response || !response.boc) {
-        throw new Error('Transaction not completed');
-      }
-
-      // Calculate new balance
-      const newBalance = dollarBalance2 + premiumBonus;
-
-      // Update Firestore
+      // Update user in Firestore
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
         dollarBalance2: increment(premiumBonus),
         lastPremiumActivation: new Date(),
-      }).catch(err => {
-        console.error("Firestore update error:", err);
-        throw new Error('Account update failed');
       });
 
       // Update local state
       setIsPremium(true);
-      setDollarBalance2(newBalance);
+      setDollarBalance2(dollarBalance2 + premiumBonus);
       setShowSuccess(true);
       setShowModal(false);
       
     } catch (err) {
-      console.error('Payment processing error:', err);
+      console.error('Transaction error:', err);
       setError(err.message || 'Payment failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
-  }, [tonConnectUI, wallet, transaction, id, premiumBonus, dollarBalance2, setIsPremium, setDollarBalance2]);
+  };
 
-  const closeSuccessModal = useCallback(() => {
+  const closeSuccessModal = () => {
     setShowSuccess(false);
-  }, []);
+  };
 
   return (
     <AppContainer>
@@ -534,9 +487,9 @@ const AdsPage = () => {
           <StatItem>
             <StatValue>
               <FaCoins color="#FFD700" />
-              {dollarBalance2.toLocaleString()}
+              +{isPremium ? '2000' : '1000'}
             </StatValue>
-            <StatLabel>Current Balance</StatLabel>
+            <StatLabel>Per Ad</StatLabel>
           </StatItem>
         </StatsCard>
         
@@ -558,19 +511,8 @@ const AdsPage = () => {
               <PremiumBenefit>
                 <FaCoins color="#FFD700" /> No waiting time
               </PremiumBenefit>
-              <UpgradeButton 
-                onClick={handleUpgradeClick}
-                disabled={isConnecting || isProcessing}
-              >
-                {isConnecting ? (
-                  <>
-                    <ConnectionLoader /> Connecting...
-                  </>
-                ) : (
-                  <>
-                    <FaCrown /> Upgrade Now (0.1 TON)
-                  </>
-                )}
+              <UpgradeButton onClick={handleUpgradeClick}>
+                <FaCrown /> Upgrade Now (0.1 TON)
               </UpgradeButton>
             </PremiumContent>
           </PremiumCard>
@@ -614,13 +556,7 @@ const AdsPage = () => {
                 onClick={activatePremium} 
                 disabled={isProcessing}
               >
-                {isProcessing ? (
-                  <>
-                    <ConnectionLoader /> Processing...
-                  </>
-                ) : (
-                  'Confirm Payment'
-                )}
+                {isProcessing ? 'Processing...' : 'Confirm Payment'}
               </ConnectButton>
             ) : (
               <TonConnectButton 
@@ -646,7 +582,7 @@ const AdsPage = () => {
               <SuccessIcon />
               <SuccessTitle>Premium Activated!</SuccessTitle>
               <SuccessText>
-                You received {premiumBonus} bonus points! Your new balance is {(dollarBalance2 + premiumBonus).toLocaleString()}.
+                You now have unlimited ads and 2x earning rate!
               </SuccessText>
               <ConnectButton onClick={closeSuccessModal}>
                 Continue
