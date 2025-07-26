@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
-import { IoCheckmarkCircleSharp } from 'react-icons/io5';
-import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
-import { doc, updateDoc, increment, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firestore';
-import { useUser } from '../../context/userContext';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
+import { useUser } from '../../context/userContext';
+import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
+import { IoCheckmarkCircleSharp } from 'react-icons/io5';
 
 // Styled Components
 const AppContainer = styled.div`
@@ -290,123 +290,66 @@ const ConnectionStatus = styled.div`
   };
 `;
 
-const ConnectionLoader = styled.div`
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-radius: 50%;
-  border-top-color: #fff;
-  animation: spin 1s ease-in-out infinite;
-  
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-`;
-
 const AdsPage = () => {
   const { id, isPremium, setIsPremium, dollarBalance2, setDollarBalance2 } = useUser();
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('Ready to connect');
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
 
-  // Payment details - 0.1 TON in nanoTON
-  const paymentAmount = '100000000';
-  const premiumBonus = 2000;
+  // Payment details
+  const paymentAmount = '1000000000'; // 1 TON in nanoTON
+  const premiumBonus = 2000; // Bonus points for premium activation
 
-  // TON Utility Functions
-  const prepareTransaction = (amount, payload) => {
-    const encodedPayload = btoa(JSON.stringify(payload));
-    return {
-      validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
-      messages: [
-        {
-          address: process.env.REACT_APP_TON_WALLET_ADDRESS,
-          amount: amount.toString(),
-          payload: encodedPayload
-        }
-      ]
-    };
-  };
-
-  const initTonConnect = (tonConnectUI) => {
-    tonConnectUI.uiOptions = {
-      manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
-      language: 'en',
-      uiPreferences: {
-        theme: 'DARK',
-        colorsSet: {
-          tonconnect: berryTheme.colors.primary,
-          text: '#FFFFFF',
-          background: '#1E1E1E'
-        }
-      },
-      actionsConfiguration: {
-        twaReturnUrl: 'https://t.me/Fuhdhdbot',
-        modals: ['back', 'close']
-      }
-    };
-  };
-
-  // Initialize TON Connect
+  // Initialize TonConnect with Berry Ads manifest
   useEffect(() => {
-    initTonConnect(tonConnectUI);
-    
-    const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
-      if (wallet) {
-        setConnectionStatus(`Connected to ${wallet.device.appName}`);
-        setIsConnecting(false);
-      } else {
-        setConnectionStatus('Ready to connect');
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [tonConnectUI]);
-
-  const checkConnection = useCallback(async () => {
-    if (tonConnectUI.connected) {
-      return true;
-    }
-    
-    setIsConnecting(true);
-    setConnectionStatus('Connecting...');
-    
-    try {
-      const connected = await new Promise((resolve) => {
-        const check = () => {
-          if (tonConnectUI.connected) {
-            resolve(true);
-          } else {
-            setTimeout(check, 100);
+    const initializeTonConnect = async () => {
+      try {
+        tonConnectUI.uiOptions = {
+          manifestUrl: 'https://your-berry-ads-domain.com/tonconnect-manifest.json',
+          language: 'en',
+          uiPreferences: {
+            theme: 'DARK',
+            colorsSet: {
+              tonconnect: berryTheme.colors.primary,
+              text: '#FFFFFF',
+              background: '#1E1E1E'
+            }
+          },
+          actionsConfiguration: {
+            twaReturnUrl: 'https://t.me/YourBerryAdsBot',
+            modals: ['back', 'close']
           }
         };
-        check();
-      });
-      
-      return connected || false;
-    } catch (err) {
-      console.error("Connection check error:", err);
-      return false;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [tonConnectUI]);
 
-  const handleUpgradeClick = async () => {
+        setConnectionStatus(wallet ? `Connected to ${wallet.device.appName}` : 'Ready to connect');
+      } catch (err) {
+        console.error('TON Connect initialization error:', err);
+        setConnectionStatus('Connection failed');
+        setError('Failed to initialize wallet connection');
+      }
+    };
+
+    initializeTonConnect();
+  }, [tonConnectUI, wallet]);
+
+  const transaction = {
+    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
+    messages: [
+      {
+        address: process.env.REACT_APP_TON_WALLET_ADDRESS,
+        amount: paymentAmount,
+        payload: "Berry Ads Premium Subscription"
+      },
+    ],
+  };
+
+  const handleUpgradeClick = () => {
+    setShowModal(true);
     setError(null);
-    const isConnected = await checkConnection();
-    
-    if (isConnected) {
-      setShowModal(true);
-    } else {
-      setError('Please connect your wallet first');
-    }
   };
 
   const handleCloseModal = () => {
@@ -420,36 +363,16 @@ const AdsPage = () => {
       setIsProcessing(true);
       setError(null);
       
-      if (!tonConnectUI.connected) {
-        throw new Error('Wallet not connected');
-      }
-
-      // Prepare and send transaction
-      const transaction = prepareTransaction(paymentAmount, {
-        item: "premium_subscription",
-        user_id: id,
-        points: premiumBonus
-      });
-
+      // Send transaction through TonConnect
       const response = await tonConnectUI.sendTransaction(transaction);
-
-      // Save transaction to Firestore
-      const transactionRef = doc(db, 'transactions', response.boc);
-      await setDoc(transactionRef, {
-        inMessageHash: response.boc,
-        qty: premiumBonus,
-        uid: id,
-        status: 'completed',
-        transactionData: response,
-        createdAt: new Date()
-      });
+      console.log('TON transaction successful:', response);
 
       // Update user in Firestore
-      const userRef = doc(db, 'telegramUsers', id);
+      const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
         dollarBalance2: increment(premiumBonus),
-        lastPremiumActivation: new Date()
+        lastPremiumActivation: new Date(),
       });
 
       // Update local state
@@ -459,8 +382,8 @@ const AdsPage = () => {
       setShowModal(false);
       
     } catch (err) {
-      console.error('Transaction error:', err);
-      setError(err.message || 'Payment failed. Please try again.');
+      console.error('TON transaction error:', err);
+      setError(err.message || 'Transaction failed or was cancelled');
     } finally {
       setIsProcessing(false);
     }
@@ -511,7 +434,7 @@ const AdsPage = () => {
                 <FaCoins color="#FFD700" /> No waiting time
               </PremiumBenefit>
               <UpgradeButton onClick={handleUpgradeClick}>
-                <FaCrown /> Upgrade Now (0.1 TON)
+                <FaCrown /> Upgrade Now (1 TON)
               </UpgradeButton>
             </PremiumContent>
           </PremiumCard>
@@ -531,21 +454,15 @@ const AdsPage = () => {
             <ModalTitle>Upgrade to Premium</ModalTitle>
             
             <ModalText>
-              Pay 0.1 TON to activate premium features and get {premiumBonus} bonus points.
+              Pay 1 TON to activate premium features and get {premiumBonus} bonus points.
             </ModalText>
             
             <PaymentAmount>
-              Payment Amount: <strong>0.1 TON</strong>
+              Payment Amount: <strong>1 TON</strong>
             </PaymentAmount>
             
             <ConnectionStatus connected={!!wallet}>
-              {isConnecting ? (
-                <>
-                  <ConnectionLoader /> Connecting...
-                </>
-              ) : (
-                wallet ? `Connected to ${wallet.device.appName}` : connectionStatus
-              )}
+              {wallet ? `Connected to ${wallet.device.appName}` : connectionStatus}
             </ConnectionStatus>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -564,8 +481,7 @@ const AdsPage = () => {
                   marginTop: '16px',
                   width: '100%',
                   borderRadius: '24px',
-                  padding: '12px 24px',
-                  transition: 'all 0.3s ease'
+                  padding: '12px 24px'
                 }}
               />
             )}
