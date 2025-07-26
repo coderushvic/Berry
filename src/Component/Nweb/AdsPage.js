@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { berryTheme } from '../../Theme';
 import { FaCoins, FaCrown, FaTimes } from 'react-icons/fa';
+import { IoCheckmarkCircleSharp } from 'react-icons/io5';
+import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
+import { doc, updateDoc, increment, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase/firestore';
+import { useUser } from '../../context/userContext';
 import AdTask from '../Adsgram/AdTask';
 import NavBar from '../../Component/Nweb/NavBar';
-import { useUser } from '../../context/userContext';
-import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
-import { doc, updateDoc, increment } from 'firebase/firestore';
-import { db } from '../../firebase/firestore';
-import { IoCheckmarkCircleSharp } from 'react-icons/io5';
 
 // Styled Components
 const AppContainer = styled.div`
@@ -316,23 +316,25 @@ const AdsPage = () => {
   const [tonConnectUI] = useTonConnectUI();
 
   // Payment details - 0.1 TON in nanoTON
-  const paymentAmount = '100000000'; // 0.1 TON
-  const premiumBonus = 2000; // Bonus points
+  const paymentAmount = '100000000';
+  const premiumBonus = 2000;
 
-  const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
-    messages: [
-      {
-        address: process.env.REACT_APP_TON_WALLET_ADDRESS,
-        amount: paymentAmount,
-        payload: "Berry Ads Premium Subscription"
-      },
-    ],
+  // TON Utility Functions
+  const prepareTransaction = (amount, payload) => {
+    const encodedPayload = btoa(JSON.stringify(payload));
+    return {
+      validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
+      messages: [
+        {
+          address: process.env.REACT_APP_TON_WALLET_ADDRESS,
+          amount: amount.toString(),
+          payload: encodedPayload
+        }
+      ]
+    };
   };
 
-  // Fast wallet connection initialization
-  useEffect(() => {
-    // Set UI options immediately for faster connection
+  const initTonConnect = (tonConnectUI) => {
     tonConnectUI.uiOptions = {
       manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
       language: 'en',
@@ -349,17 +351,12 @@ const AdsPage = () => {
         modals: ['back', 'close']
       }
     };
+  };
 
-    // Check existing connection
-    tonConnectUI.connectionRestored.then(() => {
-      if (tonConnectUI.connected) {
-        setConnectionStatus(`Connected to ${tonConnectUI.wallet?.device.appName || 'wallet'}`);
-      }
-    });
-  }, [tonConnectUI]);
-
-  // Real-time connection status updates
+  // Initialize TON Connect
   useEffect(() => {
+    initTonConnect(tonConnectUI);
+    
     const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
       if (wallet) {
         setConnectionStatus(`Connected to ${wallet.device.appName}`);
@@ -372,18 +369,16 @@ const AdsPage = () => {
     return () => unsubscribe();
   }, [tonConnectUI]);
 
-  // Optimized wallet connection check
   const checkConnection = useCallback(async () => {
+    if (tonConnectUI.connected) {
+      return true;
+    }
+    
+    setIsConnecting(true);
+    setConnectionStatus('Connecting...');
+    
     try {
-      if (tonConnectUI.connected) {
-        return true;
-      }
-      
-      setIsConnecting(true);
-      setConnectionStatus('Connecting...');
-      
-      // Fast connection check with 3 second timeout
-      const connectionPromise = new Promise((resolve) => {
+      const connected = await new Promise((resolve) => {
         const check = () => {
           if (tonConnectUI.connected) {
             resolve(true);
@@ -393,19 +388,8 @@ const AdsPage = () => {
         };
         check();
       });
-
-      const timeoutPromise = new Promise((resolve) => 
-        setTimeout(() => resolve(false), 3000)
-      );
-
-      const connected = await Promise.race([connectionPromise, timeoutPromise]);
       
-      if (!connected) {
-        setConnectionStatus('Ready to connect');
-        return false;
-      }
-      
-      return true;
+      return connected || false;
     } catch (err) {
       console.error("Connection check error:", err);
       return false;
@@ -436,21 +420,36 @@ const AdsPage = () => {
       setIsProcessing(true);
       setError(null);
       
-      // Final connection check
       if (!tonConnectUI.connected) {
         throw new Error('Wallet not connected');
       }
 
-      // Send 0.1 TON transaction
+      // Prepare and send transaction
+      const transaction = prepareTransaction(paymentAmount, {
+        item: "premium_subscription",
+        user_id: id,
+        points: premiumBonus
+      });
+
       const response = await tonConnectUI.sendTransaction(transaction);
-      console.log('Transaction successful:', response);
+
+      // Save transaction to Firestore
+      const transactionRef = doc(db, 'transactions', response.boc);
+      await setDoc(transactionRef, {
+        inMessageHash: response.boc,
+        qty: premiumBonus,
+        uid: id,
+        status: 'completed',
+        transactionData: response,
+        createdAt: new Date()
+      });
 
       // Update user in Firestore
-      const userRef = doc(db, 'telegramUsers', id.toString());
+      const userRef = doc(db, 'telegramUsers', id);
       await updateDoc(userRef, {
         isPremium: true,
         dollarBalance2: increment(premiumBonus),
-        lastPremiumActivation: new Date(),
+        lastPremiumActivation: new Date()
       });
 
       // Update local state
