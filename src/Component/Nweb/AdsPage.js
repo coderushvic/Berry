@@ -322,6 +322,7 @@ const AdsPage = () => {
   useEffect(() => {
     const initializeTonConnect = async () => {
       try {
+        // First ensure the UI options are properly set
         tonConnectUI.uiOptions = {
           manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
           language: 'en',
@@ -340,9 +341,12 @@ const AdsPage = () => {
         };
 
         setIsConnecting(true);
+        
+        // Wait for connection to be fully restored
         await tonConnectUI.connectionRestored;
         
-        if (tonConnectUI.connected) {
+        // Additional check to ensure wallet object exists
+        if (tonConnectUI.connected && tonConnectUI.wallet) {
           setConnectionStatus(`Connected to ${tonConnectUI.wallet.device.appName}`);
         } else {
           setConnectionStatus('Ready to connect');
@@ -350,7 +354,7 @@ const AdsPage = () => {
       } catch (err) {
         console.error('TON Connect initialization error:', err);
         setConnectionStatus('Connection failed');
-        setError('Failed to initialize wallet connection');
+        setError('Failed to initialize wallet connection. Please refresh the page.');
       } finally {
         setIsConnecting(false);
       }
@@ -370,15 +374,22 @@ const AdsPage = () => {
   }, [tonConnectUI]);
 
   const createTransaction = () => {
+    if (!tonConnectUI.wallet) {
+      throw new Error('Wallet connection not ready');
+    }
+
     return {
       validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
       messages: [
         {
           address: process.env.REACT_APP_TON_WALLET_ADDRESS,
           amount: paymentAmount,
-          payload: "Berry Ads Premium Subscription"
-        },
+          payload: "Berry Ads Premium Subscription",
+          sendMode: 3, // Pay transfer fees separately
+          stateInit: null // No state init needed for simple transfers
+        }
       ],
+      network: tonConnectUI.wallet.account.chain === '-239' ? 'mainnet' : 'testnet'
     };
   };
 
@@ -398,17 +409,24 @@ const AdsPage = () => {
       setIsProcessing(true);
       setError(null);
       
-      if (!tonConnectUI.connected) {
-        throw new Error('Please connect your wallet first');
+      // Enhanced connection check
+      if (!tonConnectUI.connected || !tonConnectUI.wallet) {
+        throw new Error('Wallet connection not ready. Please reconnect your wallet.');
       }
+
+      // Wait for any pending connection operations
+      await tonConnectUI.connectionRestored;
 
       const transaction = createTransaction();
       
-      // Show transaction to user and wait for confirmation
-      const response = await tonConnectUI.sendTransaction(transaction);
-      
+      // Add error boundary for the transaction
+      const response = await tonConnectUI.sendTransaction(transaction).catch(err => {
+        console.error('Transaction error details:', err);
+        throw new Error('Transaction failed. Please check your wallet and try again.');
+      });
+
       if (!response?.boc) {
-        throw new Error('Transaction failed or was cancelled');
+        throw new Error('Transaction was not completed. Please try again.');
       }
 
       console.log('TON transaction successful:', response);
@@ -441,7 +459,12 @@ const AdsPage = () => {
       
     } catch (err) {
       console.error('TON transaction error:', err);
-      setError(err.message || 'Transaction failed. Please try again.');
+      // Handle NullPointerException specifically
+      if (err.message.includes('NullPointerException') || err.message.includes('null')) {
+        setError('Wallet connection issue. Please reconnect and try again.');
+      } else {
+        setError(err.message || 'Transaction failed. Please try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -529,7 +552,13 @@ const AdsPage = () => {
               )}
             </ConnectionStatus>
             
-            {error && <ErrorMessage>{error}</ErrorMessage>}
+            {error && (
+              <ErrorMessage>
+                {error.includes('NullPointerException') || error.includes('null') 
+                  ? 'Wallet connection issue. Please reconnect.'
+                  : error}
+              </ErrorMessage>
+            )}
             
             {wallet ? (
               <ConnectButton 
