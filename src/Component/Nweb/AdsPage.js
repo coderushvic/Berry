@@ -315,15 +315,15 @@ const AdsPage = () => {
   const wallet = useTonWallet();
   const [tonConnectUI] = useTonConnectUI();
 
-  // Payment details - 1 TON in nanoTON
-  const paymentAmount = '1000000000';
+  // Payment details - 0.1 TON in nanoTON (1 TON = 10^9 nanoTON)
+  const paymentAmount = '100000000'; // 0.1 TON
   const premiumBonus = 2000;
 
   useEffect(() => {
     const initializeTonConnect = async () => {
       try {
         tonConnectUI.uiOptions = {
-          manifestUrl: 'https://your-berry-ads-domain.com/tonconnect-manifest.json',
+          manifestUrl: 'https://chic-phoenix-c00482.netlify.app/tonconnect-manifest.json',
           language: 'en',
           uiPreferences: {
             theme: 'DARK',
@@ -334,7 +334,7 @@ const AdsPage = () => {
             }
           },
           actionsConfiguration: {
-            twaReturnUrl: 'https://t.me/YourBerryAdsBot',
+            twaReturnUrl: 'https://t.me/Fuhdhdbot',
             modals: ['back', 'close']
           }
         };
@@ -369,15 +369,17 @@ const AdsPage = () => {
     return () => unsubscribe();
   }, [tonConnectUI]);
 
-  const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
-    messages: [
-      {
-        address: process.env.REACT_APP_TON_WALLET_ADDRESS,
-        amount: paymentAmount,
-        payload: "Berry Ads Premium Subscription"
-      },
-    ],
+  const createTransaction = () => {
+    return {
+      validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes expiry
+      messages: [
+        {
+          address: process.env.REACT_APP_TON_WALLET_ADDRESS,
+          amount: paymentAmount,
+          payload: "Berry Ads Premium Subscription"
+        },
+      ],
+    };
   };
 
   const handleUpgradeClick = () => {
@@ -397,12 +399,21 @@ const AdsPage = () => {
       setError(null);
       
       if (!tonConnectUI.connected) {
-        throw new Error('Wallet not connected');
+        throw new Error('Please connect your wallet first');
       }
 
+      const transaction = createTransaction();
+      
+      // Show transaction to user and wait for confirmation
       const response = await tonConnectUI.sendTransaction(transaction);
+      
+      if (!response?.boc) {
+        throw new Error('Transaction failed or was cancelled');
+      }
+
       console.log('TON transaction successful:', response);
 
+      // Update user data in Firestore
       const userRef = doc(db, 'telegramUsers', id.toString());
       await updateDoc(userRef, {
         isPremium: true,
@@ -410,6 +421,7 @@ const AdsPage = () => {
         lastPremiumActivation: new Date(),
       });
 
+      // Save transaction record
       const txRef = doc(db, 'transactions', response.boc);
       await setDoc(txRef, {
         inMessageHash: response.boc,
@@ -417,9 +429,11 @@ const AdsPage = () => {
         uid: id,
         status: 'completed',
         createdAt: new Date(),
-        transactionData: response
+        transactionData: response,
+        amount: '0.1 TON'
       });
 
+      // Update local state
       setIsPremium(true);
       setDollarBalance2(dollarBalance2 + premiumBonus);
       setShowSuccess(true);
@@ -427,7 +441,7 @@ const AdsPage = () => {
       
     } catch (err) {
       console.error('TON transaction error:', err);
-      setError(err.message || 'Transaction failed or was cancelled');
+      setError(err.message || 'Transaction failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -478,7 +492,7 @@ const AdsPage = () => {
                 <FaCoins color="#FFD700" /> No waiting time
               </PremiumBenefit>
               <UpgradeButton onClick={handleUpgradeClick}>
-                <FaCrown /> Upgrade Now (1 TON)
+                <FaCrown /> Upgrade Now (0.1 TON)
               </UpgradeButton>
             </PremiumContent>
           </PremiumCard>
@@ -498,11 +512,11 @@ const AdsPage = () => {
             <ModalTitle>Upgrade to Premium</ModalTitle>
             
             <ModalText>
-              Pay 1 TON to activate premium features and get {premiumBonus} bonus points.
+              Pay 0.1 TON to activate premium features and get {premiumBonus} bonus points.
             </ModalText>
             
             <PaymentAmount>
-              Payment Amount: <strong>1 TON</strong>
+              Payment Amount: <strong>0.1 TON</strong>
             </PaymentAmount>
             
             <ConnectionStatus connected={!!wallet}>
