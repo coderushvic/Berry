@@ -39,6 +39,7 @@ import VideoWatchPage from './Component/Nweb/VideoWatchPage';
 import AdsPage from './Component/Nweb/AdsPage';
 import AdminAdsSettings from './Component/adminComp/AdminAdsSettings';
 import DailyReward from './Component/Nweb/DailyReward';
+import Gallery from './Pages/Home/Gallery';
 
 const router = createBrowserRouter([
   {
@@ -69,6 +70,10 @@ const router = createBrowserRouter([
       {
         path: "/ProfilePage",
         element: <ProfilePage />
+      },
+      {
+        path: "/user/:id",
+        element: <Gallery/>
       },
       {
         path: "/VideoWatchPage",
