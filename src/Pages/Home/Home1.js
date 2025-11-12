@@ -16,7 +16,7 @@ const UserList = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Fetch users from Firebase (READ ONLY)
+  // Fetch users from Firebase
   useEffect(() => {
     const demoUsers = [
       {
@@ -27,7 +27,8 @@ const UserList = () => {
         height: '165cm',
         price: '20-40w',
         online: true,
-        verified: true
+        verified: true,
+        imageUrl: 'https://via.placeholder.com/150' // demo placeholder
       },
       {
         id: '2',
@@ -37,15 +38,15 @@ const UserList = () => {
         height: '156cm',
         price: '15-25w',
         online: true,
-        verified: false
+        verified: false,
+        imageUrl: '' // no image → fallback to initials
       }
-      // ... rest of your demo users
     ];
 
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        
+
         let usersQuery;
         const usersRef = collection(db, 'users');
 
@@ -60,32 +61,26 @@ const UserList = () => {
             usersQuery = query(usersRef, orderBy('name'));
         }
 
-        // Real-time listener for data changes
-        const unsubscribe = onSnapshot(usersQuery, 
+        const unsubscribe = onSnapshot(
+          usersQuery,
           (querySnapshot) => {
             const usersData = [];
             querySnapshot.forEach((doc) => {
               usersData.push({ id: doc.id, ...doc.data() });
             });
-            
+
             // If no data in Firebase, use demo data
-            if (usersData.length === 0) {
-              setUsers(demoUsers);
-            } else {
-              setUsers(usersData);
-            }
+            setUsers(usersData.length === 0 ? demoUsers : usersData);
             setLoading(false);
           },
           (error) => {
             console.error('Error fetching users:', error);
-            // If Firebase fails, use demo data
             setUsers(demoUsers);
             setLoading(false);
           }
         );
 
         return () => unsubscribe();
-
       } catch (err) {
         console.error('Error:', err);
         setUsers(demoUsers);
@@ -96,12 +91,12 @@ const UserList = () => {
     fetchUsers();
   }, [activeFilter]);
 
-  // Handle user click to navigate to profile
+  // Handle user click
   const handleUserClick = (userId) => {
     navigate(`/user/${userId}`);
   };
 
-  // Apply filters to users
+  // Apply filters
   const filteredUsers = users.filter(user => {
     switch (activeFilter) {
       case 'online':
@@ -159,17 +154,26 @@ const UserList = () => {
           </div>
         ) : (
           filteredUsers.map((user, index) => (
-            <div 
-              key={user.id} 
-              className="user-card" 
+            <div
+              key={user.id}
+              className="user-card"
               style={{ animationDelay: `${index * 0.1}s` }}
               onClick={() => handleUserClick(user.id)}
             >
               <div className="user-main">
                 <div className="avatar-section">
-                  <div className="avatar">
-                    {user.name.charAt(0)}
-                  </div>
+                  {user.imageUrl ? (
+                    <img
+                      src={user.imageUrl}
+                      alt={user.name}
+                      className="user-avatar"
+                    />
+                  ) : (
+                    <div className="avatar">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
+
                   <div className={`status-dot ${user.online ? 'online' : 'offline'}`}></div>
                   {user.verified && <div className="verified-badge">✓</div>}
                 </div>
@@ -178,7 +182,9 @@ const UserList = () => {
                   <div className="name-section">
                     <div className="name-wrapper">
                       <h3 className="user-name">{user.name}</h3>
-                      {user.verified && <span className="verified-icon" title="Verified Profile">✓</span>}
+                      {user.verified && (
+                        <span className="verified-icon" title="Verified Profile">✓</span>
+                      )}
                     </div>
                     <div className="price-section">
                       <span className="price-label">Income</span>
