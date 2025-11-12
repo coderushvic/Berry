@@ -44,7 +44,7 @@ const LoginComp = () => {
         setErrorCode("");
         setSuccessMessage("Login successful! Redirecting to dashboard...");
         setTimeout(() => {
-          navigate("/dashboardAdx/stats");
+          navigate("/dashboardAdx");
         }, 2000); // Redirect after 2 seconds
       } else {
         setLoading(false);
