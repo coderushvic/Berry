@@ -17,8 +17,8 @@ const maskEmail = (email) => {
 
 const linksTo = [
     {
-        link: '/dashboardAdx/stats',
-        title: 'Dashboard',
+        link: '/dashboardAdx',
+        title: 'NewDashboard',
     },
     {
         link: '/dashboardAdx/managetasks',
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         const titles = {
-            '/dashboardAdx/stats': 'Admin Dashboard',
+            '/dashboardAdx': 'New Dashboard',
             '/dashboardAdx/managetasks': 'Manage Telegram Tasks',
             '/dashboardAdx/externaltasks': 'Manage External Tasks',
             '/dashboardAdx/broadcast': 'Broadcast',
