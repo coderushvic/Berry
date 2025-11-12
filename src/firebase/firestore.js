@@ -1,28 +1,47 @@
-// Import only the necessary functions from the Firebase SDK
+// Import necessary Firebase SDK functions
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, collection, getDocs, query, where, updateDoc, doc } from "firebase/firestore"; // Add missing Firestore imports
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  updateDoc, 
+  doc 
+} from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
-// Add the Web App's Firebase configuration.
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_API_KEY, // Ensure this is set correctly
+  apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_PROJECT_ID, // Make sure this is not undefined
+  projectId: process.env.REACT_APP_PROJECT_ID,
   storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_APP_ID,
 };
 
-// Initialize Firebase only if it hasn't been initialized already
-let firebaseApp;
-if (!getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
-} else {
-  firebaseApp = getApps()[0]; // Use the existing app
-}
+// Initialize Firebase (prevent duplicate initialization)
+const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Export Firebase services and Firestore functions
-export const auth = getAuth(firebaseApp);
-export const db = getFirestore(firebaseApp);
-export { collection, getDocs, query, where, updateDoc, doc }; // Export necessary Firestore functions
+// Initialize Firebase services
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
+
+// ✅ Export everything (including firebaseApp)
+export {
+  firebaseApp,
+  auth,
+  db,
+  storage,
+  collection,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  doc
+};
+
 export default firebaseApp;

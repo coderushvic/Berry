@@ -1,8 +1,22 @@
-//* Import the functions you need from the SDKs you need
+// ✅ Import the functions you need from the SDKs
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  updateDoc, 
+  doc 
+} from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
-//* Add the Web App's Firebase configuration
+// ✅ Firebase configuration (ensure these are set in your .env file)
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_API_KEY,
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -12,18 +26,31 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID,
 };
 
-//* Initialize Firebase
-let firebase_app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// ✅ Initialize Firebase (prevent duplicate initialization)
+const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-//* Initialize Firebase Auth and set persistence
-const auth = getAuth(firebase_app);
+// ✅ Initialize Firebase services
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
+
+// ✅ Set persistent login for users
 setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log("Session persistence set to LOCAL");
-  })
-  .catch((error) => {
-    console.error("Failed to set session persistence:", error);
-  });
+  .then(() => console.log("✅ Firebase Auth persistence set to LOCAL"))
+  .catch((error) => console.error("❌ Failed to set session persistence:", error));
 
-export { auth };
-export default firebase_app;
+// ✅ Export all Firebase services and helpers
+export { 
+  firebaseApp, 
+  auth, 
+  db, 
+  storage, 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  updateDoc, 
+  doc 
+};
+
+export default firebaseApp;

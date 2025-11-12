@@ -15,7 +15,7 @@ import Search from "./Pages/admin/Search";
 import Statistics from "./Pages/admin/Statistics";
 import AdminYoutube from "./Pages/admin/AdminYoutube";
 import NotAdmin236 from "./Pages/admin/AdminLogin";
-import AdminDashboard from "./Pages/admin/AdminDashboard";
+import NewDashboard from "./Pages/admin/NewDashboard";
 import AdminTelegramTasks from "./Pages/admin/AdminTelegramTasks";
 import AdminDailyTasks from "./Pages/admin/AdminDailyTasks";
 import { AuthContextProvider } from "./context/AuthContext";
@@ -144,7 +144,7 @@ const router = createBrowserRouter([
   },
     {
       path: "/dashboardAdx",
-      element: <AdminDashboard />,
+      element: <NewDashboard />,
       errorElement: <ErrorCom />,
       children:[
         {
