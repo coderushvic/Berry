@@ -19,14 +19,14 @@ import NewDashboard from "./Pages/admin/NewDashboard";
 import AdminTelegramTasks from "./Pages/admin/AdminTelegramTasks";
 import AdminDailyTasks from "./Pages/admin/AdminDailyTasks";
 import { AuthContextProvider } from "./context/AuthContext";
-import Taskss from '../src/Component/Adsgram/Taskss'
+import Taskss from '../src/Component/Adsgram/Taskss';
 import BroadcastMessage from './Component/adminComp/BroadcastMessage';
 import DailyCheckIn from './Pages/DailyCheckIn';
 import DailyRewardCard from './Pages/DailyRewardCard';
 import Animate from './Component/Animate';
 import GameComponent from './Pages/ColorSwitchGame';
 import GameButton from './Pages/GameButton';
-import AdTask from './Component/Adsgram/AdTask'
+import AdTask from './Component/Adsgram/AdTask';
 import AdminWithdrawals from './Pages/admin/AdminWithdrawals';
 import UserDashboard from './Pages/user/userDashboard';
 import Userdashcard from './Pages/Userdashcard';
@@ -41,23 +41,27 @@ import AdminAdsSettings from './Component/adminComp/AdminAdsSettings';
 import DailyReward from './Component/Nweb/DailyReward';
 import Gallery from './Pages/Home/Gallery';
 
+/* 🌍 LANGUAGE */
+import "../src/i18n/i18n";
+import LanguageSwitcher from "../src/Component/LanguageSwitcher";
+
 const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
-    errorElement: <ErrorCom />, // Error component for fallback routes
+    errorElement: <ErrorCom />,
     children: [
       {
         path: "/",
-        element: <Home1 />, // Home page
+        element: <Home1 />,
       },
       {
         path: "/invitefriends",
-        element: <InviteFrens />, // Invite friends page
+        element: <InviteFrens />,
       },
       {
         path: "/airdrop",
-        element: <Airdrop />, // Airdrop page
+        element: <Airdrop />,
       },
       {
         path: "/Taskss",
@@ -83,125 +87,131 @@ const router = createBrowserRouter([
         path: "/AdsPage",
         element: <AdsPage />
       },
-       {
+      {
         path: "/DailyReward",
         element: <DailyReward />
       },
       {
         path: "/leaderboard",
-        element: <Leaderboard />, // Leaderboard page
+        element: <Leaderboard />,
       },
       {
         path: "/TaskPage",
-        element: <TaskPage />, // Task page
+        element: <TaskPage />,
       },
       {
         path: "/withdrawx",
-        element: <WithdrawForm />, // for User
+        element: <WithdrawForm />,
       },
       {
         path: "/status",
-        element: <StatusTracker />, // For User
+        element: <StatusTracker />,
       },
       {
         path: "/AdTask",
-        element: <AdTask />, // Task page
+        element: <AdTask />,
       },
       {
         path: "/DailyCheckIn",
-        element: <DailyCheckIn />, // Task page
+        element: <DailyCheckIn />,
       },
       {
         path: "/DailyRewardCard",
-        element: <DailyRewardCard />, // Task page
+        element: <DailyRewardCard />,
       },
       {
         path: "/Userdashcard",
-        element: <Userdashcard />, // Task page
+        element: <Userdashcard />,
       },
       {
         path: "/GameComponent",
-        element: <GameComponent/>, // Task page
+        element: <GameComponent/>,
       },
       {
         path: "/GameButton",
-        element: <GameButton/>, // Task page
+        element: <GameButton/>,
       },
       {
         path: "/userdash",
-        element: <UserDashboard/>, // Task page
+        element: <UserDashboard/>,
       },
       {
         path: "/Animate",
-        element: <Animate />, // Task page
+        element: <Animate />,
       },
       {
         path:"/dashboardlogin",
         element: <NotAdmin236/>,
       },
     ]
-
   },
-    {
-      path: "/dashboardAdx",
-      element: <NewDashboard />,
-      errorElement: <ErrorCom />,
-      children:[
-        {
-          path:"/dashboardAdx/settings",
-          element: <Settings />,
-        },
-        {
-          path:"/dashboardAdx/managetasks",
-          element: <AdminTelegramTasks />,
-        },
-        {
-          path:"/dashboardAdx/externaltasks",
-          element: <AdminDailyTasks />,
-        },
-        {
-          path:"/dashboardAdx/broadcast",
-          element: <BroadcastMessage />,
-        },
-        {
-          path:"/dashboardAdx/promo",
-          element: <AdminAdvertTasks />,
-        },
-        {
-          path:"/dashboardAdx/withdrawals",
-          element: <AdminWithdrawals />,
-        },
-        {
-          path:"/dashboardAdx/youtube",
-          element: <AdminYoutube />,
-        },
-        {
-          path:"/dashboardAdx/airdroplist",
-          element: <AirdropWallets />,
-        },
-        {
-          path:"/dashboardAdx/adminadssetting",
-          element: <AdminAdsSettings/>,
-        },
-        {
-          path:"/dashboardAdx/search",
-          element: <Search />,
-        },
-        {
-          path:"/dashboardAdx/stats",
-          element: <Statistics />,
-        },
-  
-      ]
-    }
-  ]);
-  
-  
-  const root = ReactDOM.createRoot(document.getElementById("root"));
+
+  /* ADMIN ROUTES */
+  {
+    path: "/dashboardAdx",
+    element: <NewDashboard />,
+    errorElement: <ErrorCom />,
+    children:[
+      {
+        path:"/dashboardAdx/settings",
+        element: <Settings />,
+      },
+      {
+        path:"/dashboardAdx/managetasks",
+        element: <AdminTelegramTasks />,
+      },
+      {
+        path:"/dashboardAdx/externaltasks",
+        element: <AdminDailyTasks />,
+      },
+      {
+        path:"/dashboardAdx/broadcast",
+        element: <BroadcastMessage />,
+      },
+      {
+        path:"/dashboardAdx/promo",
+        element: <AdminAdvertTasks />,
+      },
+      {
+        path:"/dashboardAdx/withdrawals",
+        element: <AdminWithdrawals />,
+      },
+      {
+        path:"/dashboardAdx/youtube",
+        element: <AdminYoutube />,
+      },
+      {
+        path:"/dashboardAdx/airdroplist",
+        element: <AirdropWallets />,
+      },
+      {
+        path:"/dashboardAdx/adminadssetting",
+        element: <AdminAdsSettings/>,
+      },
+      {
+        path:"/dashboardAdx/search",
+        element: <Search />,
+      },
+      {
+        path:"/dashboardAdx/stats",
+        element: <Statistics />,
+      },
+    ]
+  }
+]);
+
+/* ROOT RENDER — language switcher included */
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <AuthContextProvider>
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
+    <React.StrictMode>
+
+      {/* 🌍 GLOBAL LANGUAGE SWITCHER */}
+      <LanguageSwitcher />
+
+      {/* ROUTES */}
+      <RouterProvider router={router} />
+
+    </React.StrictMode>
   </AuthContextProvider>
 );
