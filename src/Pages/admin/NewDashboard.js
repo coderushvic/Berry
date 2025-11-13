@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/Pages/Admin/AdminPage.js
+import React, { useEffect, useState, useCallback } from "react";
 import {
   collection,
   addDoc,
@@ -9,9 +10,12 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../firebase/firestore";
+import { useTranslation } from "react-i18next";
 import "./AdminPage.css";
 
 const AdminPage = () => {
+  const { t } = useTranslation();
+
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({
     name: "",
@@ -32,13 +36,12 @@ const AdminPage = () => {
     online: false,
     photos: [],
   });
-
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
 
-  // Fetch all users
-  const fetchUsers = async () => {
+  // Fetch users (reusable)
+  const fetchUsers = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "users"));
       const userList = [];
@@ -49,11 +52,11 @@ const AdminPage = () => {
     } catch (error) {
       console.error("Error fetching users:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   // Handle field change
   const handleChange = (e) => {
@@ -111,12 +114,13 @@ const AdminPage = () => {
       if (editId) {
         const userDoc = doc(db, "users", editId);
         await updateDoc(userDoc, userData);
-        alert("Profile updated successfully!");
+        alert(t("updateProfile") || "Profile updated successfully!");
       } else {
         await addDoc(collection(db, "users"), userData);
-        alert("New profile created successfully!");
+        alert(t("addProfile") || "New profile created successfully!");
       }
 
+      // Reset form
       setNewUser({
         name: "",
         age: "",
@@ -141,7 +145,7 @@ const AdminPage = () => {
       fetchUsers();
     } catch (error) {
       console.error("Error saving user:", error);
-      alert("Failed to save user");
+      alert(t("failedSave") || "Failed to save user");
     } finally {
       setLoading(false);
     }
@@ -163,10 +167,10 @@ const AdminPage = () => {
 
   // Delete a user
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this profile?")) return;
+    if (!window.confirm(t("confirmDelete") || "Are you sure you want to delete this profile?")) return;
     try {
       await deleteDoc(doc(db, "users", id));
-      alert("User deleted successfully!");
+      alert(t("deletedUser") || "User deleted successfully!");
       fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
@@ -175,57 +179,60 @@ const AdminPage = () => {
 
   return (
     <div className="admin-container">
-      <h1>👑 Admin Dashboard</h1>
+      <h1>👑 {t("adminDashboard") || "Admin Dashboard"}</h1>
+
+      {/* Form */}
       <form className="admin-form" onSubmit={handleSubmit}>
         <div className="form-grid">
-          <input name="name" placeholder="Name" value={newUser.name} onChange={handleChange} required />
-          <input name="age" placeholder="Age" value={newUser.age} onChange={handleChange} />
-          <input name="height" placeholder="Height" value={newUser.height} onChange={handleChange} />
-          <input name="weight" placeholder="Weight" value={newUser.weight} onChange={handleChange} />
-          <input name="chestCircumference" placeholder="Chest Circumference" value={newUser.chestCircumference} onChange={handleChange} />
-          <input name="price" placeholder="Price (e.g. 8-14w)" value={newUser.price} onChange={handleChange} />
-          <input name="address" placeholder="Address" value={newUser.address} onChange={handleChange} />
+          <input name="name" placeholder={t("name") || "Name"} value={newUser.name} onChange={handleChange} required />
+          <input name="age" placeholder={t("age") || "Age"} value={newUser.age} onChange={handleChange} />
+          <input name="height" placeholder={t("height") || "Height"} value={newUser.height} onChange={handleChange} />
+          <input name="weight" placeholder={t("weight") || "Weight"} value={newUser.weight} onChange={handleChange} />
+          <input name="chestCircumference" placeholder={t("chestCircumference") || "Chest Circumference"} value={newUser.chestCircumference} onChange={handleChange} />
+          <input name="price" placeholder={t("price") || "Price"} value={newUser.price} onChange={handleChange} />
+          <input name="address" placeholder={t("address") || "Address"} value={newUser.address} onChange={handleChange} />
         </div>
 
-        <textarea name="about" placeholder="About Me" value={newUser.about} onChange={handleChange}></textarea>
+        <textarea name="about" placeholder={t("about") || "About Me"} value={newUser.about} onChange={handleChange}></textarea>
 
-        <h3>📞 Contact Information</h3>
+        <h3>📞 {t("contactSection") || "Contact Information"}</h3>
         <div className="form-grid">
-          <input name="telegram" placeholder="Telegram" value={newUser.telegram} onChange={handleChange} />
-          <input name="wechat" placeholder="WeChat" value={newUser.wechat} onChange={handleChange} />
-          <input name="phone" placeholder="Phone" value={newUser.phone} onChange={handleChange} />
-          <input name="email" placeholder="Email" value={newUser.email} onChange={handleChange} />
+          <input name="telegram" placeholder={t("telegram") || "Telegram"} value={newUser.telegram} onChange={handleChange} />
+          <input name="wechat" placeholder={t("wechat") || "WeChat"} value={newUser.wechat} onChange={handleChange} />
+          <input name="phone" placeholder={t("phone") || "Phone"} value={newUser.phone} onChange={handleChange} />
+          <input name="email" placeholder={t("email") || "Email"} value={newUser.email} onChange={handleChange} />
         </div>
 
-        <h3>🎯 Talents</h3>
-        <textarea name="talents" placeholder="Comma separated list" value={newUser.talents} onChange={handleChange}></textarea>
+        <h3>🎯 {t("talentList") || "Talents"}</h3>
+        <textarea name="talents" placeholder={t("talentList") || "Comma separated list"} value={newUser.talents} onChange={handleChange}></textarea>
 
         <div className="checkbox-group">
-          <label><input type="checkbox" name="verified" checked={newUser.verified} onChange={handleChange}/> Verified</label>
-          <label><input type="checkbox" name="online" checked={newUser.online} onChange={handleChange}/> Online</label>
+          <label><input type="checkbox" name="verified" checked={newUser.verified} onChange={handleChange}/> {t("verifiedLabel") || "Verified"}</label>
+          <label><input type="checkbox" name="online" checked={newUser.online} onChange={handleChange}/> {t("onlineLabel") || "Online"}</label>
         </div>
 
         <div className="upload-section">
-          <label>📷 Upload Profile Image</label>
+          <label>📷 {t("uploadProfileImage") || "Upload Profile Image"}</label>
           <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} />
         </div>
 
-        <button type="submit" disabled={loading}>{loading ? "Saving..." : editId ? "Update Profile" : "Add Profile"}</button>
+        <button type="submit" disabled={loading}>{loading ? t("saving") || "Saving..." : editId ? t("updateProfile") || "Update Profile" : t("addProfile") || "Add Profile"}</button>
       </form>
 
-      <h2>📋 All Profiles</h2>
+      {/* All Users */}
+      <h2>📋 {t("allProfiles") || "All Profiles"}</h2>
       <div className="user-list">
         {users.map((user) => (
           <div key={user.id} className="user-card">
             <img src={user.photos?.[0] || "https://via.placeholder.com/100"} alt={user.name} />
             <div className="user-info">
               <h4>{user.name}</h4>
-              <p>{user.age} yrs — {user.status}</p>
+              <p>{user.age} {t("age") || "yrs"} — {user.status}</p>
               <p>{user.price}</p>
             </div>
             <div className="user-actions">
-              <button onClick={() => handleEdit(user)}>✏️ Edit</button>
-              <button className="delete-btn" onClick={() => handleDelete(user.id)}>🗑 Delete</button>
+              <button onClick={() => handleEdit(user)}>✏️ {t("edit") || "Edit"}</button>
+              <button className="delete-btn" onClick={() => handleDelete(user.id)}>🗑 {t("delete") || "Delete"}</button>
             </div>
           </div>
         ))}
