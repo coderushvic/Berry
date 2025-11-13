@@ -3,9 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../firebase/firestore";
+import { useTranslation } from "react-i18next";
 import "./ProfilePage.css";
 
 const ProfilePage = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("info");
@@ -40,8 +42,7 @@ const ProfilePage = () => {
     ],
     online: true,
     verified: true,
-    about:
-      "Professional and friendly companion with 3 years of experience. Fluent in English, Mandarin, and Japanese. Passionate about arts, music, and creating memorable experiences.",
+    about: "Professional and friendly companion with 3 years of experience. Fluent in English, Mandarin, and Japanese. Passionate about arts, music, and creating memorable experiences.",
     photos: [
       "https://via.placeholder.com/400x500/667eea/ffffff?text=Main+Photo",
       "https://via.placeholder.com/400x500/764ba2/ffffff?text=Gallery+1",
@@ -112,7 +113,7 @@ const ProfilePage = () => {
       setUser(prev => ({ ...prev, photos: [downloadURL, ...prev.photos.slice(1)] }));
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Failed to upload main image");
+      alert(t("uploadFailed"));
     } finally {
       setUploadingMain(false);
     }
@@ -132,25 +133,35 @@ const ProfilePage = () => {
       setUser(prev => ({ ...prev, photos: updatedPhotos }));
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Failed to upload gallery image");
+      alert(t("uploadFailed"));
     } finally {
       setUploadingGallery(false);
     }
   };
 
   if (loading) return (
-    <div className="profile-container"><div className="loading-container"><div className="loading-spinner"></div><p>Loading profile...</p></div></div>
+    <div className="profile-container">
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>{t("loadingProfile")}</p>
+      </div>
+    </div>
   );
 
   if (!user) return (
-    <div className="profile-container"><div className="error-container"><h2>User not found</h2><button onClick={handleBackClick} className="back-button">Back</button></div></div>
+    <div className="profile-container">
+      <div className="error-container">
+        <h2>{t("userNotFound")}</h2>
+        <button onClick={handleBackClick} className="back-button">{t("back")}</button>
+      </div>
+    </div>
   );
 
   return (
     <div className="profile-container">
       {/* Header */}
       <div className="profile-header">
-        <button className="back-button" onClick={handleBackClick}>← Back</button>
+        <button className="back-button" onClick={handleBackClick}>← {t("back")}</button>
         <div className="header-actions">
           <button className="action-btn favorite">❤</button>
           <button className="action-btn share">↗</button>
@@ -162,12 +173,12 @@ const ProfilePage = () => {
         <div className="profile-image-container">
           <img src={user.photos[0]} alt={user.name} className="profile-main-image"/>
           <label className="upload-label">
-            {uploadingMain ? "Uploading..." : "📤 Upload New Profile Image"}
+            {uploadingMain ? t("uploading") : t("uploadMain")}
             <input type="file" accept="image/*" onChange={handleMainImageUpload} disabled={uploadingMain} style={{ display: "none" }}/>
           </label>
           <div className="profile-badges">
-            {user.online && <div className="status-badge online"><div className="pulse-dot"></div> Online Now</div>}
-            {user.verified && <div className="status-badge verified">✓ Verified</div>}
+            {user.online && <div className="status-badge online"><div className="pulse-dot"></div> {t("onlineNow")}</div>}
+            {user.verified && <div className="status-badge verified">✓ {t("verified")}</div>}
           </div>
         </div>
 
@@ -175,43 +186,43 @@ const ProfilePage = () => {
           <h1>{user.name}</h1>
           <div className="id-tag">ID: {user.id}</div>
           <div className="stats-grid">
-            <div className="stat-card"><div className="stat-value">{user.age}</div><div className="stat-label">Age</div></div>
-            <div className="stat-card"><div className="stat-value">{user.height}</div><div className="stat-label">Height</div></div>
-            <div className="stat-card"><div className="stat-value">{user.weight}</div><div className="stat-label">Weight</div></div>
-            <div className="stat-card"><div className="stat-value">{user.chestCircumference}</div><div className="stat-label">Chest</div></div>
+            <div className="stat-card"><div className="stat-value">{user.age}</div><div className="stat-label">{t("age")}</div></div>
+            <div className="stat-card"><div className="stat-value">{user.height}</div><div className="stat-label">{t("height")}</div></div>
+            <div className="stat-card"><div className="stat-value">{user.weight}</div><div className="stat-label">{t("weight")}</div></div>
+            <div className="stat-card"><div className="stat-value">{user.chestCircumference}</div><div className="stat-label">{t("chest")}</div></div>
           </div>
           <div className="status-price-section">
-            <div className="status-display"><span className="status-label">Status:</span> <span className={`status-value ${user.status.toLowerCase()}`}>{user.status}</span></div>
-            <div className="income-section"><div className="income-label">Annual Income</div><div className="income-amount">${user.price}</div></div>
+            <div className="status-display"><span className="status-label">{t("status")}:</span> <span className={`status-value ${user.status.toLowerCase()}`}>{user.status}</span></div>
+            <div className="income-section"><div className="income-label">{t("income")}</div><div className="income-amount">${user.price}</div></div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="profile-tabs">
-        <button className={`tab-button ${activeTab==="info"?"active":""}`} onClick={()=>setActiveTab("info")}>📋 Information</button>
-        <button className={`tab-button ${activeTab==="gallery"?"active":""}`} onClick={()=>setActiveTab("gallery")}>📸 Gallery ({user.photos.length})</button>
+        <button className={`tab-button ${activeTab==="info"?"active":""}`} onClick={()=>setActiveTab("info")}>📋 {t("aboutMe")}</button>
+        <button className={`tab-button ${activeTab==="gallery"?"active":""}`} onClick={()=>setActiveTab("gallery")}>📸 {t("uploadGallery")} ({user.photos.length})</button>
       </div>
 
       {/* Tab Content */}
       {activeTab==="info" ? (
         <div className="info-content">
-          <div className="content-card"><h3>About Me</h3><p>{user.about}</p></div>
-          <div className="content-card"><h3>📞 Contact Information</h3>
+          <div className="content-card"><h3>{t("aboutMe")}</h3><p>{user.about}</p></div>
+          <div className="content-card"><h3>{t("contactInfo")}</h3>
             <div className="contact-grid">
-              <div className="contact-item"><span>Telegram:</span> {user.contactInfo.telegram}</div>
-              <div className="contact-item"><span>WeChat:</span> {user.contactInfo.wechat}</div>
-              <div className="contact-item"><span>Phone:</span> {user.contactInfo.phone}</div>
-              <div className="contact-item"><span>Email:</span> {user.contactInfo.email}</div>
+              <div className="contact-item"><span>{t("telegram")}:</span> {user.contactInfo.telegram}</div>
+              <div className="contact-item"><span>{t("wechat")}:</span> {user.contactInfo.wechat}</div>
+              <div className="contact-item"><span>{t("phone")}:</span> {user.contactInfo.phone}</div>
+              <div className="contact-item"><span>{t("email")}:</span> {user.contactInfo.email}</div>
             </div>
           </div>
-          <div className="content-card"><h3>🌟 Talents & Skills</h3>
+          <div className="content-card"><h3>{t("talents")}</h3>
             <div className="talents-grid">{user.talents.map((t,i)=><div key={i} className="talent-item">✨ {t}</div>)}</div>
           </div>
         </div>
       ) : (
         <div className="gallery-content">
-          <label className="upload-label">{uploadingGallery?"Uploading...":"📸 Add New Gallery Photo"}
+          <label className="upload-label">{uploadingGallery ? t("uploading") : t("uploadGallery")}
             <input type="file" accept="image/*" onChange={handleGalleryUpload} disabled={uploadingGallery} style={{display:"none"}}/>
           </label>
           <div className="gallery-grid">{user.photos.map((p,i)=><div key={i} className="gallery-item"><img src={p} alt={`${user.name}-${i}`} /></div>)}</div>
@@ -220,8 +231,8 @@ const ProfilePage = () => {
 
       {/* Action Bar */}
       <div className="action-bar">
-        <button className="message-button">💬 Send Message</button>
-        <button className="book-button">⭐ Book Session</button>
+        <button className="message-button">💬 {t("sendMessage")}</button>
+        <button className="book-button">⭐ {t("bookSession")}</button>
       </div>
     </div>
   );

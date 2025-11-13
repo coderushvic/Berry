@@ -8,9 +8,11 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '../../firebase/firestore';
+import { useTranslation } from "react-i18next";
 import './UserList.css';
 
 const UserList = () => {
+  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState('all');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ const UserList = () => {
         price: '20-40w',
         online: true,
         verified: true,
-        imageUrl: 'https://via.placeholder.com/150' // demo placeholder
+        imageUrl: 'https://via.placeholder.com/150'
       },
       {
         id: '2',
@@ -39,7 +41,7 @@ const UserList = () => {
         price: '15-25w',
         online: true,
         verified: false,
-        imageUrl: '' // no image → fallback to initials
+        imageUrl: ''
       }
     ];
 
@@ -69,7 +71,6 @@ const UserList = () => {
               usersData.push({ id: doc.id, ...doc.data() });
             });
 
-            // If no data in Firebase, use demo data
             setUsers(usersData.length === 0 ? demoUsers : usersData);
             setLoading(false);
           },
@@ -91,12 +92,10 @@ const UserList = () => {
     fetchUsers();
   }, [activeFilter]);
 
-  // Handle user click
   const handleUserClick = (userId) => {
     navigate(`/user/${userId}`);
   };
 
-  // Apply filters
   const filteredUsers = users.filter(user => {
     switch (activeFilter) {
       case 'online':
@@ -113,7 +112,7 @@ const UserList = () => {
       <div className="user-list-container">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading users...</p>
+          <p>{t("loadingUsers")}</p>
         </div>
       </div>
     );
@@ -123,34 +122,46 @@ const UserList = () => {
     <div className="user-list-container">
       <div className="app-header">
         <div className="header-content">
-          <h1 className="app-title">Elite Match</h1>
-          <p className="app-subtitle">Annual Income Range</p>
+          <h1 className="app-title">{t("eliteMatch")}</h1>
+          <p className="app-subtitle">{t("annualIncomeRange")}</p>
         </div>
       </div>
 
       <div className="filter-section">
         <div className="filter-tabs">
-          {['all', 'online', 'verified'].map(filter => (
-            <button
-              key={filter}
-              className={`filter-tab ${activeFilter === filter ? 'active' : ''}`}
-              onClick={() => setActiveFilter(filter)}
-            >
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
-            </button>
-          ))}
+          <button
+            className={`filter-tab ${activeFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('all')}
+          >
+            {t("all")}
+          </button>
+
+          <button
+            className={`filter-tab ${activeFilter === 'online' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('online')}
+          >
+            {t("online")}
+          </button>
+
+          <button
+            className={`filter-tab ${activeFilter === 'verified' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('verified')}
+          >
+            {t("verified")}
+          </button>
         </div>
+
         <div className="user-stats">
-          <span className="stat">Total: {filteredUsers.length}</span>
-          <span className="stat">Online: {filteredUsers.filter(u => u.online).length}</span>
+          <span className="stat">{t("total")}: {filteredUsers.length}</span>
+          <span className="stat">{t("online")}: {filteredUsers.filter(u => u.online).length}</span>
         </div>
       </div>
 
       <div className="user-list">
         {filteredUsers.length === 0 ? (
           <div className="empty-state">
-            <p>No users found</p>
-            <p className="empty-subtitle">Check back later for new profiles</p>
+            <p>{t("noUsersFound")}</p>
+            <p className="empty-subtitle">{t("checkBackLater")}</p>
           </div>
         ) : (
           filteredUsers.map((user, index) => (
@@ -183,11 +194,11 @@ const UserList = () => {
                     <div className="name-wrapper">
                       <h3 className="user-name">{user.name}</h3>
                       {user.verified && (
-                        <span className="verified-icon" title="Verified Profile">✓</span>
+                        <span className="verified-icon" title={t("verifiedProfile")}>✓</span>
                       )}
                     </div>
                     <div className="price-section">
-                      <span className="price-label">Income</span>
+                      <span className="price-label">{t("income")}</span>
                       <span className="user-price">${user.price}</span>
                     </div>
                   </div>
@@ -199,17 +210,17 @@ const UserList = () => {
 
                   <div className="user-details">
                     <div className="detail-item">
-                      <span className="detail-label">Age</span>
+                      <span className="detail-label">{t("age")}</span>
                       <span className="detail-value">{user.age}</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-label">Height</span>
+                      <span className="detail-label">{t("height")}</span>
                       <span className="detail-value">{user.height}</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-label">Status</span>
+                      <span className="detail-label">{t("status")}</span>
                       <span className={`status ${user.online ? 'online' : 'offline'}`}>
-                        {user.online ? 'Online' : 'Offline'}
+                        {user.online ? t("online") : t("offline")}
                       </span>
                     </div>
                   </div>
@@ -221,8 +232,8 @@ const UserList = () => {
       </div>
 
       <div className="info-footer">
-        <p>💰 Price indicates annual income range in 10,000s (w)</p>
-        <p className="user-count">{filteredUsers.length} users found</p>
+        <p>{t("priceInfo")}</p>
+        <p className="user-count">{filteredUsers.length} {t("usersFound")}</p>
       </div>
     </div>
   );
