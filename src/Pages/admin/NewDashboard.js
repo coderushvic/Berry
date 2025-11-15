@@ -52,9 +52,9 @@ const AdminPage = () => {
   /** FETCH USERS **/
   const fetchUsers = useCallback(async () => {
     try {
-      const snapshot = await getDocs(collection(db, "users"));
-      const list = [];
-      snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      const usersQuery = query(collection(db, "users"), orderBy("name"));
+      const snapshot = await getDocs(usersQuery);
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setUsers(list);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -66,8 +66,7 @@ const AdminPage = () => {
     try {
       const adsQuery = query(collection(db, "ads"), orderBy("order", "asc"));
       const snapshot = await getDocs(adsQuery);
-      const list = [];
-      snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setAds(list);
     } catch (err) {
       console.error("Error fetching ads:", err);
