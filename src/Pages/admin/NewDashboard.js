@@ -7,6 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../../firebase/firestore";
@@ -16,6 +18,7 @@ import "./AdminPage.css";
 const AdminPage = () => {
   const { t } = useTranslation();
 
+  /** USERS STATE **/
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({
     name: "",
@@ -36,66 +39,75 @@ const AdminPage = () => {
     online: false,
     photos: [],
   });
-  const [loading, setLoading] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
+  const [editUserId, setEditUserId] = useState(null);
+  const [userImageFile, setUserImageFile] = useState(null);
 
-  // Fetch users (reusable)
+  /** ADS STATE **/
+  const [ads, setAds] = useState([]);
+  const [newAd, setNewAd] = useState({ imageFile: null, link: "", order: 0 });
+  const [editAdId, setEditAdId] = useState(null);
+
+  const [loading, setLoading] = useState(false);
+
+  /** FETCH USERS **/
   const fetchUsers = useCallback(async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      const userList = [];
-      querySnapshot.forEach((doc) => {
-        userList.push({ id: doc.id, ...doc.data() });
-      });
-      setUsers(userList);
-    } catch (error) {
-      console.error("Error fetching users:", error);
+      const snapshot = await getDocs(collection(db, "users"));
+      const list = [];
+      snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setUsers(list);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  }, []);
+
+  /** FETCH ADS **/
+  const fetchAds = useCallback(async () => {
+    try {
+      const adsQuery = query(collection(db, "ads"), orderBy("order", "asc"));
+      const snapshot = await getDocs(adsQuery);
+      const list = [];
+      snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+      setAds(list);
+    } catch (err) {
+      console.error("Error fetching ads:", err);
     }
   }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+    fetchAds();
+  }, [fetchUsers, fetchAds]);
 
-  // Handle field change
-  const handleChange = (e) => {
+  /** HANDLE INPUT CHANGE **/
+  const handleChange = (e, isAd = false) => {
     const { name, value, type, checked } = e.target;
-    setNewUser((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    if (isAd) {
+      setNewAd((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    } else {
+      setNewUser((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    }
   };
 
-  // Upload image to Firebase Storage
-  const handleImageUpload = async (file) => {
+  /** UPLOAD FILE TO FIREBASE **/
+  const uploadFile = async (file, folder) => {
     if (!file) return "";
-    const imageRef = ref(storage, `profileImages/${file.name}_${Date.now()}`);
-    await uploadBytes(imageRef, file);
-    const downloadURL = await getDownloadURL(imageRef);
-    return downloadURL;
+    const fileRef = ref(storage, `${folder}/${file.name}_${Date.now()}`);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    return url;
   };
 
-  // Create or update user
-  const handleSubmit = async (e) => {
+  /** CREATE OR UPDATE USER **/
+  const handleUserSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       let photoURL = "";
-      if (imageFile) {
-        photoURL = await handleImageUpload(imageFile);
-      }
+      if (userImageFile) photoURL = await uploadFile(userImageFile, "profileImages");
 
       const userData = {
-        name: newUser.name,
-        age: newUser.age,
-        height: newUser.height,
-        weight: newUser.weight,
-        chestCircumference: newUser.chestCircumference,
-        status: newUser.status,
-        price: newUser.price,
-        address: newUser.address,
-        about: newUser.about,
+        ...newUser,
         contactInfo: {
           telegram: newUser.telegram,
           wechat: newUser.wechat,
@@ -106,21 +118,17 @@ const AdminPage = () => {
           .split(",")
           .map((t) => t.trim())
           .filter((t) => t.length > 0),
-        verified: newUser.verified,
-        online: newUser.online,
         photos: photoURL ? [photoURL] : [],
       };
 
-      if (editId) {
-        const userDoc = doc(db, "users", editId);
-        await updateDoc(userDoc, userData);
-        alert(t("updateProfile") || "Profile updated successfully!");
+      if (editUserId) {
+        await updateDoc(doc(db, "users", editUserId), userData);
+        alert(t("updateProfile") || "Profile updated!");
       } else {
         await addDoc(collection(db, "users"), userData);
-        alert(t("addProfile") || "New profile created successfully!");
+        alert(t("addProfile") || "New profile added!");
       }
 
-      // Reset form
       setNewUser({
         name: "",
         age: "",
@@ -140,40 +148,85 @@ const AdminPage = () => {
         online: false,
         photos: [],
       });
-      setImageFile(null);
-      setEditId(null);
+      setUserImageFile(null);
+      setEditUserId(null);
       fetchUsers();
-    } catch (error) {
-      console.error("Error saving user:", error);
+    } catch (err) {
+      console.error("Error saving user:", err);
       alert(t("failedSave") || "Failed to save user");
     } finally {
       setLoading(false);
     }
   };
 
-  // Edit a user
-  const handleEdit = (user) => {
-    setEditId(user.id);
+  /** EDIT USER **/
+  const handleUserEdit = (user) => {
+    setEditUserId(user.id);
     setNewUser({
       ...user,
       telegram: user.contactInfo?.telegram || "",
       wechat: user.contactInfo?.wechat || "",
       phone: user.contactInfo?.phone || "",
       email: user.contactInfo?.email || "",
-      talents: user.talents ? user.talents.join(", ") : "",
+      talents: user.talents?.join(", ") || "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Delete a user
-  const handleDelete = async (id) => {
-    if (!window.confirm(t("confirmDelete") || "Are you sure you want to delete this profile?")) return;
+  /** DELETE USER **/
+  const handleUserDelete = async (id) => {
+    if (!window.confirm(t("confirmDelete") || "Are you sure?")) return;
     try {
       await deleteDoc(doc(db, "users", id));
-      alert(t("deletedUser") || "User deleted successfully!");
       fetchUsers();
-    } catch (error) {
-      console.error("Error deleting user:", error);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  /** CREATE OR UPDATE ADS **/
+  const handleAdSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      let imageUrl = "";
+      if (newAd.imageFile) imageUrl = await uploadFile(newAd.imageFile, "ads");
+
+      const adData = { imageUrl, link: newAd.link, order: Number(newAd.order) || 0 };
+
+      if (editAdId) {
+        await updateDoc(doc(db, "ads", editAdId), adData);
+        alert("Ad updated!");
+      } else {
+        await addDoc(collection(db, "ads"), adData);
+        alert("Ad added!");
+      }
+
+      setNewAd({ imageFile: null, link: "", order: 0 });
+      setEditAdId(null);
+      fetchAds();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** EDIT AD **/
+  const handleAdEdit = (ad) => {
+    setEditAdId(ad.id);
+    setNewAd({ imageFile: null, link: ad.link, order: ad.order });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** DELETE AD **/
+  const handleAdDelete = async (id) => {
+    if (!window.confirm("Are you sure to delete this ad?")) return;
+    try {
+      await deleteDoc(doc(db, "ads", id));
+      fetchAds();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -181,58 +234,85 @@ const AdminPage = () => {
     <div className="admin-container">
       <h1>👑 {t("adminDashboard") || "Admin Dashboard"}</h1>
 
-      {/* Form */}
-      <form className="admin-form" onSubmit={handleSubmit}>
+      {/* ===================== USER FORM ===================== */}
+      <form className="admin-form" onSubmit={handleUserSubmit}>
+        <h2>{editUserId ? t("updateProfile") : t("addProfile")}</h2>
         <div className="form-grid">
-          <input name="name" placeholder={t("name") || "Name"} value={newUser.name} onChange={handleChange} required />
-          <input name="age" placeholder={t("age") || "Age"} value={newUser.age} onChange={handleChange} />
-          <input name="height" placeholder={t("height") || "Height"} value={newUser.height} onChange={handleChange} />
-          <input name="weight" placeholder={t("weight") || "Weight"} value={newUser.weight} onChange={handleChange} />
-          <input name="chestCircumference" placeholder={t("chestCircumference") || "Chest Circumference"} value={newUser.chestCircumference} onChange={handleChange} />
-          <input name="price" placeholder={t("price") || "Price"} value={newUser.price} onChange={handleChange} />
-          <input name="address" placeholder={t("address") || "Address"} value={newUser.address} onChange={handleChange} />
+          <input name="name" placeholder="Name" value={newUser.name} onChange={handleChange} required />
+          <input name="age" placeholder="Age" value={newUser.age} onChange={handleChange} />
+          <input name="height" placeholder="Height" value={newUser.height} onChange={handleChange} />
+          <input name="weight" placeholder="Weight" value={newUser.weight} onChange={handleChange} />
+          <input name="chestCircumference" placeholder="Chest Circumference" value={newUser.chestCircumference} onChange={handleChange} />
+          <input name="price" placeholder="Price" value={newUser.price} onChange={handleChange} />
+          <input name="address" placeholder="Address" value={newUser.address} onChange={handleChange} />
         </div>
 
-        <textarea name="about" placeholder={t("about") || "About Me"} value={newUser.about} onChange={handleChange}></textarea>
+        <textarea name="about" placeholder="About" value={newUser.about} onChange={handleChange}></textarea>
 
-        <h3>📞 {t("contactSection") || "Contact Information"}</h3>
+        <h3>📞 Contact Info</h3>
         <div className="form-grid">
-          <input name="telegram" placeholder={t("telegram") || "Telegram"} value={newUser.telegram} onChange={handleChange} />
-          <input name="wechat" placeholder={t("wechat") || "WeChat"} value={newUser.wechat} onChange={handleChange} />
-          <input name="phone" placeholder={t("phone") || "Phone"} value={newUser.phone} onChange={handleChange} />
-          <input name="email" placeholder={t("email") || "Email"} value={newUser.email} onChange={handleChange} />
+          <input name="telegram" placeholder="Telegram" value={newUser.telegram} onChange={handleChange} />
+          <input name="wechat" placeholder="WeChat" value={newUser.wechat} onChange={handleChange} />
+          <input name="phone" placeholder="Phone" value={newUser.phone} onChange={handleChange} />
+          <input name="email" placeholder="Email" value={newUser.email} onChange={handleChange} />
         </div>
 
-        <h3>🎯 {t("talentList") || "Talents"}</h3>
-        <textarea name="talents" placeholder={t("talentList") || "Comma separated list"} value={newUser.talents} onChange={handleChange}></textarea>
+        <textarea name="talents" placeholder="Talents, comma separated" value={newUser.talents} onChange={handleChange}></textarea>
 
         <div className="checkbox-group">
-          <label><input type="checkbox" name="verified" checked={newUser.verified} onChange={handleChange}/> {t("verifiedLabel") || "Verified"}</label>
-          <label><input type="checkbox" name="online" checked={newUser.online} onChange={handleChange}/> {t("onlineLabel") || "Online"}</label>
+          <label><input type="checkbox" name="verified" checked={newUser.verified} onChange={handleChange}/> Verified</label>
+          <label><input type="checkbox" name="online" checked={newUser.online} onChange={handleChange}/> Online</label>
         </div>
 
         <div className="upload-section">
-          <label>📷 {t("uploadProfileImage") || "Upload Profile Image"}</label>
-          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} />
+          <label>📷 Profile Image</label>
+          <input type="file" accept="image/*" onChange={(e) => setUserImageFile(e.target.files[0])} />
         </div>
 
-        <button type="submit" disabled={loading}>{loading ? t("saving") || "Saving..." : editId ? t("updateProfile") || "Update Profile" : t("addProfile") || "Add Profile"}</button>
+        <button type="submit" disabled={loading}>{loading ? "Saving..." : editUserId ? "Update User" : "Add User"}</button>
       </form>
 
-      {/* All Users */}
-      <h2>📋 {t("allProfiles") || "All Profiles"}</h2>
+      {/* ===================== USER LIST ===================== */}
+      <h2>📋 All Users</h2>
       <div className="user-list">
         {users.map((user) => (
           <div key={user.id} className="user-card">
             <img src={user.photos?.[0] || "https://via.placeholder.com/100"} alt={user.name} />
             <div className="user-info">
               <h4>{user.name}</h4>
-              <p>{user.age} {t("age") || "yrs"} — {user.status}</p>
+              <p>{user.age} yrs — {user.status}</p>
               <p>{user.price}</p>
             </div>
             <div className="user-actions">
-              <button onClick={() => handleEdit(user)}>✏️ {t("edit") || "Edit"}</button>
-              <button className="delete-btn" onClick={() => handleDelete(user.id)}>🗑 {t("delete") || "Delete"}</button>
+              <button onClick={() => handleUserEdit(user)}>✏️ Edit</button>
+              <button className="delete-btn" onClick={() => handleUserDelete(user.id)}>🗑 Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ===================== ADS FORM ===================== */}
+      <form className="admin-form" onSubmit={handleAdSubmit}>
+        <h2>{editAdId ? "Update Ad" : "Add New Ad"}</h2>
+        <input type="file" accept="image/*" onChange={(e) => setNewAd((prev) => ({ ...prev, imageFile: e.target.files[0] }))} required={!editAdId} />
+        <input type="text" placeholder="Link" name="link" value={newAd.link} onChange={(e) => handleChange(e, true)} required />
+        <input type="number" placeholder="Order" name="order" value={newAd.order} onChange={(e) => handleChange(e, true)} />
+        <button type="submit" disabled={loading}>{loading ? "Saving..." : editAdId ? "Update Ad" : "Add Ad"}</button>
+      </form>
+
+      {/* ===================== ADS LIST ===================== */}
+      <h2>📢 Manage Ads</h2>
+      <div className="user-list">
+        {ads.map((ad) => (
+          <div key={ad.id} className="user-card">
+            <img src={ad.imageUrl} alt="Ad" style={{ width: "200px", objectFit: "cover" }} />
+            <div className="user-info">
+              <p>Link: <a href={ad.link} target="_blank" rel="noopener noreferrer">{ad.link}</a></p>
+              <p>Order: {ad.order}</p>
+            </div>
+            <div className="user-actions">
+              <button onClick={() => handleAdEdit(ad)}>✏️ Edit</button>
+              <button className="delete-btn" onClick={() => handleAdDelete(ad.id)}>🗑 Delete</button>
             </div>
           </div>
         ))}
