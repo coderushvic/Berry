@@ -41,7 +41,7 @@
     "slick-carousel": "^1.8.1",
     "styled-components": "^6.1.18",
     "telegraf": "^4.16.3",
-    "uuid": "^13.0.0",
+    "uuid": "^8.3.2",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
   },
