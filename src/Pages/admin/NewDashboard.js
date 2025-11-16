@@ -10,8 +10,7 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase/firestore";
+import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
 import "./AdminPage.css";
 
@@ -88,13 +87,24 @@ const AdminPage = () => {
     }
   };
 
-  /** UPLOAD FILE TO FIREBASE **/
-  const uploadFile = async (file, folder) => {
+  /** UPLOAD FILE TO NETLIFY FUNCTION **/
+  const uploadFile = async (file) => {
     if (!file) return "";
-    const fileRef = ref(storage, `${folder}/${file.name}_${Date.now()}`);
-    await uploadBytes(fileRef, file);
-    const url = await getDownloadURL(fileRef);
-    return url;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/.netlify/functions/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      return data.url;
+    } catch (err) {
+      console.error("Upload error:", err);
+      return "";
+    }
   };
 
   /** CREATE OR UPDATE USER **/
@@ -103,7 +113,7 @@ const AdminPage = () => {
     setLoading(true);
     try {
       let photoURL = "";
-      if (userImageFile) photoURL = await uploadFile(userImageFile, "profileImages");
+      if (userImageFile) photoURL = await uploadFile(userImageFile);
 
       const userData = {
         ...newUser,
@@ -189,7 +199,7 @@ const AdminPage = () => {
     setLoading(true);
     try {
       let imageUrl = "";
-      if (newAd.imageFile) imageUrl = await uploadFile(newAd.imageFile, "ads");
+      if (newAd.imageFile) imageUrl = await uploadFile(newAd.imageFile);
 
       const adData = { imageUrl, link: newAd.link, order: Number(newAd.order) || 0 };
 

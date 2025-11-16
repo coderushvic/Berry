@@ -1,0 +1,8 @@
+[build]
+  functions = "netlify/functions"
+  publish = "dist"
+
+[[redirects]]
+  from = "/uploads/*"
+  to = "/.netlify/functions/serveFile?file=:splat"
+  status = 200
