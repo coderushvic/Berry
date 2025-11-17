@@ -1,40 +1,28 @@
-// firebase.js
+// Import only the necessary functions from the Firebase SDK
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore, collection, getDocs, query, where, updateDoc, doc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getFirestore, collection, getDocs, query, where, updateDoc, doc } from "firebase/firestore"; // Add missing Firestore imports
 
-// Firebase config
+// Add the Web App's Firebase configuration.
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_API_KEY,
+  apiKey: process.env.REACT_APP_API_KEY, // Ensure this is set correctly
   authDomain: process.env.REACT_APP_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_PROJECT_ID,
+  projectId: process.env.REACT_APP_PROJECT_ID, // Make sure this is not undefined
+  storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_APP_ID,
 };
 
-// Initialize Firebase
-const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+// Initialize Firebase only if it hasn't been initialized already
+let firebaseApp;
+if (!getApps().length) {
+  firebaseApp = initializeApp(firebaseConfig);
+} else {
+  firebaseApp = getApps()[0]; // Use the existing app
+}
 
-// Initialize Firebase services
-const auth = getAuth(firebaseApp);
-const db = getFirestore(firebaseApp);
-
-// Set persistent login
-setPersistence(auth, browserLocalPersistence)
-  .then(() => console.log("✅ Firebase Auth persistence set to LOCAL"))
-  .catch((error) => console.error("❌ Failed to set session persistence:", error));
-
-// Export
-export {
-  firebaseApp,
-  auth,
-  db,
-  collection,
-  getDocs,
-  query,
-  where,
-  updateDoc,
-  doc
-};
-
+// Export Firebase services and Firestore functions
+export const auth = getAuth(firebaseApp);
+export const db = getFirestore(firebaseApp);
+export { collection, getDocs, query, where, updateDoc, doc }; // Export necessary Firestore functions
 export default firebaseApp;
