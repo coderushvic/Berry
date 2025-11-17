@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase/firestore"; // Only Firestore, no storage
+import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
 import "./ProfilePage.css";
 
@@ -15,7 +15,6 @@ const ProfilePage = () => {
   const [uploadingMain, setUploadingMain] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  // Demo fallback user
   const demoUser = useMemo(() => ({
     id: id || "CDC043",
     name: "Nanyu",
@@ -100,7 +99,7 @@ const ProfilePage = () => {
 
   const handleBackClick = () => navigate(-1);
 
-  // ✅ Helper for uploading to Netlify function
+  // Upload helper using Netlify
   const uploadFileToNetlify = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -113,7 +112,7 @@ const ProfilePage = () => {
     return data.url;
   };
 
-  // Handle main profile image upload
+  // Main image upload
   const handleMainImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !user) return;
@@ -131,7 +130,7 @@ const ProfilePage = () => {
     }
   };
 
-  // Handle gallery image upload
+  // Gallery image upload
   const handleGalleryUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !user) return;

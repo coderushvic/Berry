@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
       fs.copyFileSync(file.path, filePath);
 
-      // Public URL for frontend access via Netlify Functions redirect
+      // Public URL for frontend
       const publicUrl = `/.netlify/functions/serveFile?file=${newFileName}`;
       resolve({ statusCode: 200, body: JSON.stringify({ url: publicUrl }) });
     });

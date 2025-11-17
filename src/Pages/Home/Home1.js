@@ -41,8 +41,8 @@ const UserList = () => {
   // Fetch users from Firebase
   useEffect(() => {
     const demoUsers = [
-      { id: '1', name: 'Windlike Girl', address: '2.2km away', age: 24, height: '165cm', price: '20-40w', online: true, verified: true, imageUrl: 'https://via.placeholder.com/150' },
-      { id: '2', name: 'Fora', address: '1km away', age: 22, height: '156cm', price: '15-25w', online: true, verified: false, imageUrl: '' }
+      { id: '1', name: 'Windlike Girl', address: '2.2km away', age: 24, height: '165cm', price: '20-40w', online: true, verified: true, photos: ['https://via.placeholder.com/150'] },
+      { id: '2', name: 'Fora', address: '1km away', age: 22, height: '156cm', price: '15-25w', online: true, verified: false, photos: [] }
     ];
 
     const fetchUsers = async () => {
@@ -176,8 +176,8 @@ const UserList = () => {
             >
               <div className="user-main">
                 <div className="avatar-section">
-                  {user.imageUrl ? (
-                    <img src={user.imageUrl} alt={user.name} className="user-avatar"/>
+                  {user.photos?.[0] ? (
+                    <img src={user.photos[0]} alt={user.name} className="user-avatar"/>
                   ) : (
                     <div className="avatar">{user.name.charAt(0)}</div>
                   )}
