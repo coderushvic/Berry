@@ -100,7 +100,7 @@ const AdminPage = () => {
       });
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
-      return data.url;
+      return data.url; // URL returned from Netlify function
     } catch (err) {
       console.error("Upload error:", err);
       return "";
