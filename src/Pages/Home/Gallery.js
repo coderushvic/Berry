@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase/firestore";
+import { db } from "../../firebase/firestore"; // Only Firestore, no storage
 import { useTranslation } from "react-i18next";
 import "./ProfilePage.css";
 
@@ -16,6 +15,7 @@ const ProfilePage = () => {
   const [uploadingMain, setUploadingMain] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
+  // Demo fallback user
   const demoUser = useMemo(() => ({
     id: id || "CDC043",
     name: "Nanyu",
@@ -50,7 +50,7 @@ const ProfilePage = () => {
     ],
   }), [id]);
 
-  // Fetch user data
+  // Fetch user data from Firestore
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -100,14 +100,26 @@ const ProfilePage = () => {
 
   const handleBackClick = () => navigate(-1);
 
+  // ✅ Helper for uploading to Netlify function
+  const uploadFileToNetlify = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch("/.netlify/functions/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) throw new Error("Upload failed");
+    const data = await response.json();
+    return data.url;
+  };
+
+  // Handle main profile image upload
   const handleMainImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !user) return;
     try {
       setUploadingMain(true);
-      const imageRef = ref(storage, `profileImages/${user.id}_main_${file.name}`);
-      await uploadBytes(imageRef, file);
-      const downloadURL = await getDownloadURL(imageRef);
+      const downloadURL = await uploadFileToNetlify(file);
       const userDocRef = doc(db, "users", user.id);
       await updateDoc(userDocRef, { "photos.0": downloadURL });
       setUser(prev => ({ ...prev, photos: [downloadURL, ...prev.photos.slice(1)] }));
@@ -119,14 +131,13 @@ const ProfilePage = () => {
     }
   };
 
+  // Handle gallery image upload
   const handleGalleryUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !user) return;
     try {
       setUploadingGallery(true);
-      const imageRef = ref(storage, `gallery/${user.id}_${file.name}`);
-      await uploadBytes(imageRef, file);
-      const downloadURL = await getDownloadURL(imageRef);
+      const downloadURL = await uploadFileToNetlify(file);
       const updatedPhotos = [...user.photos, downloadURL];
       const userDocRef = doc(db, "users", user.id);
       await updateDoc(userDocRef, { photos: updatedPhotos });
