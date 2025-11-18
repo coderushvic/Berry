@@ -1,40 +1,42 @@
-const fs = require("fs");
-const path = require("path");
-const formidable = require("formidable");
+// netlify/functions/upload.js
+import { blobs } from "@netlify/blobs";
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
+export async function handler(event) {
+  try {
+    const formData = await event.body;
+    const boundary = event.headers["content-type"].split("boundary=")[1];
 
-  // Dynamically import uuid
-  const { v4: uuidv4 } = await import("uuid");
+    const buffer = Buffer.from(formData, "base64");
+    const parts = buffer
+      .toString()
+      .split(boundary)
+      .filter((p) => p.includes("filename"));
 
-  const form = new formidable.IncomingForm({ multiples: false });
+    if (!parts.length) {
+      return { statusCode: 400, body: "No file received" };
+    }
 
-  return new Promise((resolve) => {
-    form.parse(event, (err, fields, files) => {
-      if (err) {
-        return resolve({ statusCode: 500, body: JSON.stringify({ error: "Upload failed", details: err.message }) });
-      }
+    const part = parts[0];
+    const match = part.match(/filename="(.+?)"/);
+    const filename = Date.now() + "-" + match[1];
 
-      const file = files.file;
-      if (!file) {
-        return resolve({ statusCode: 400, body: JSON.stringify({ error: "No file uploaded" }) });
-      }
+    const fileContent = Buffer.from(
+      part.split("\r\n\r\n")[1].replace(/\r\n--$/, ""),
+      "binary"
+    );
 
-      const uploadDir = path.join(__dirname, "../../uploads");
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-      const fileExt = path.extname(file.name);
-      const newFileName = uuidv4() + fileExt;
-      const filePath = path.join(uploadDir, newFileName);
-
-      fs.copyFileSync(file.path, filePath);
-
-      // Public URL for frontend
-      const publicUrl = `/.netlify/functions/serveFile?file=${newFileName}`;
-      resolve({ statusCode: 200, body: JSON.stringify({ url: publicUrl }) });
+    const blobStore = blobs();
+    await blobStore.set(`uploads/${filename}`, fileContent, {
+      contentType: "image/jpeg",
     });
-  });
-};
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        url: `/uploads/${filename}`,
+      }),
+    };
+  } catch (error) {
+    return { statusCode: 500, body: JSON.stringify({ error }) };
+  }
+}
