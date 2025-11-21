@@ -1,3 +1,4 @@
+// src/Pages/UserList/UserList.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -22,59 +23,35 @@ const UserList = () => {
   const [ads, setAds] = useState([]);
   const navigate = useNavigate();
 
-  // --- Fetch Ads ---
+  // Ads
   useEffect(() => {
     const adsRef = collection(db, "ads");
     const adsQuery = query(adsRef, orderBy("order", "asc"));
 
-    const unsubscribe = onSnapshot(
-      adsQuery,
-      (snapshot) => {
-        const adsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAds(adsData.slice(0, 6));
-      },
-      (error) => {
-        console.error("Error fetching ads:", error);
-        setAds([]);
-      }
-    );
+    const unsubscribe = onSnapshot(adsQuery, (snapshot) => {
+      const adsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAds(adsData.slice(0, 6));
+    }, (error) => {
+      console.error("Error fetching ads:", error);
+      setAds([]);
+    });
 
     return () => unsubscribe();
   }, []);
 
-  // --- Fetch Users ---
+  // Users
   useEffect(() => {
     const demoUsers = [
-      {
-        id: '1',
-        name: 'Windlike Girl',
-        address: '2.2km away',
-        age: 24,
-        height: '165cm',
-        price: '20-40w',
-        online: true,
-        verified: true,
-        photos: ['https://via.placeholder.com/150']
-      },
-      {
-        id: '2',
-        name: 'Fora',
-        address: '1km away',
-        age: 22,
-        height: '156cm',
-        price: '15-25w',
-        online: true,
-        verified: false,
-        photos: []
-      }
+      { id: '1', name: 'Windlike Girl', address: '2.2km away', age: 24, height: '165cm', price: '20-40w', online: true, verified: true, photos: ['https://via.placeholder.com/150'] },
+      { id: '2', name: 'Fora', address: '1km away', age: 22, height: '156cm', price: '15-25w', online: true, verified: false, photos: [] }
     ];
 
-    const fetchUsers = async () => {
+    const fetch = async () => {
       try {
         setLoading(true);
         const usersRef = collection(db, 'users');
-
         let usersQuery;
+
         switch (activeFilter) {
           case 'online':
             usersQuery = query(usersRef, where('online', '==', true), orderBy('name'));
@@ -89,14 +66,13 @@ const UserList = () => {
         const unsubscribe = onSnapshot(
           usersQuery,
           (querySnapshot) => {
-            const list = [];
-            querySnapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-
-            setUsers(list.length === 0 ? demoUsers : list);
+            const usersData = [];
+            querySnapshot.forEach((doc) => usersData.push({ id: doc.id, ...doc.data() }));
+            setUsers(usersData.length === 0 ? demoUsers : usersData);
             setLoading(false);
           },
           (error) => {
-            console.error("Error fetching users:", error);
+            console.error('Error fetching users:', error);
             setUsers(demoUsers);
             setLoading(false);
           }
@@ -104,20 +80,20 @@ const UserList = () => {
 
         return () => unsubscribe();
       } catch (err) {
-        console.error("Error:", err);
+        console.error('Error:', err);
         setUsers(demoUsers);
         setLoading(false);
       }
     };
 
-    fetchUsers();
+    fetch();
   }, [activeFilter]);
 
   const handleUserClick = (userId) => navigate(`/user/${userId}`);
 
   const filteredUsers = users.filter(user => {
-    if (activeFilter === "online") return user.online;
-    if (activeFilter === "verified") return user.verified;
+    if (activeFilter === 'online') return user.online;
+    if (activeFilter === 'verified') return user.verified;
     return true;
   });
 
@@ -145,19 +121,13 @@ const UserList = () => {
 
   return (
     <div className="user-list-container">
-
-      {/* --- Ads Slider --- */}
       {ads.length > 0 && (
         <div className="ads-slider mb-4">
           <Slider {...sliderSettings}>
             {ads.map(ad => (
               <div key={ad.id}>
                 <a href={ad.link} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={ad.imageUrl}
-                    alt={`Ad ${ad.id}`}
-                    style={{ width: '100%', borderRadius: '10px', cursor: 'pointer' }}
-                  />
+                  <img src={ad.imageUrl} alt={`Ad ${ad.id}`} style={{ width: '100%', borderRadius: '10px', cursor: 'pointer' }} />
                 </a>
               </div>
             ))}
@@ -165,27 +135,20 @@ const UserList = () => {
         </div>
       )}
 
-      {/* --- Filter Section --- */}
       <div className="filter-section">
         <div className="filter-tabs">
-          {["all", "online", "verified"].map(filter => (
-            <button
-              key={filter}
-              className={`filter-tab ${activeFilter === filter ? "active" : ""}`}
-              onClick={() => setActiveFilter(filter)}
-            >
+          {['all','online','verified'].map(filter => (
+            <button key={filter} className={`filter-tab ${activeFilter === filter ? 'active' : ''}`} onClick={() => setActiveFilter(filter)}>
               {t(filter)}
             </button>
           ))}
         </div>
-
         <div className="user-stats">
           <span className="stat">{t("total")}: {filteredUsers.length}</span>
           <span className="stat">{t("online")}: {filteredUsers.filter(u => u.online).length}</span>
         </div>
       </div>
 
-      {/* --- User List --- */}
       <div className="user-list">
         {filteredUsers.length === 0 ? (
           <div className="empty-state">
@@ -193,70 +156,45 @@ const UserList = () => {
             <p className="empty-subtitle">{t("checkBackLater")}</p>
           </div>
         ) : (
-          filteredUsers.map((user, index) => {
-            const imageSrc =
-              user?.photos?.[0] ||
-              user?.imageUrl ||
-              "";
+          filteredUsers.map((user, index) => (
+            <div key={user.id} className="user-card" style={{ animationDelay: `${index * 0.1}s` }} onClick={() => handleUserClick(user.id)}>
+              <div className="user-main">
+                <div className="avatar-section">
+                  {user.photos?.[0] ? (
+                    <img src={user.photos[0]} alt={user.name} className="user-avatar" />
+                  ) : (
+                    <div className="avatar">{user.name?.charAt(0) || "U"}</div>
+                  )}
+                  <div className={`status-dot ${user.online ? 'online' : 'offline'}`}></div>
+                  {user.verified && <div className="verified-badge">✓</div>}
+                </div>
 
-            return (
-              <div
-                key={user.id}
-                className="user-card"
-                style={{ animationDelay: `${index * 0.1}s` }}
-                onClick={() => handleUserClick(user.id)}
-              >
-                <div className="user-main">
-                  <div className="avatar-section">
-
-                    {imageSrc ? (
-                      <img src={imageSrc} alt={user.name} className="user-avatar" />
-                    ) : (
-                      <div className="avatar">{user.name?.charAt(0)}</div>
-                    )}
-
-                    <div className={`status-dot ${user.online ? 'online' : 'offline'}`}></div>
-
-                    {user.verified && <div className="verified-badge">✓</div>}
-                  </div>
-
-                  <div className="user-info">
-                    <div className="name-section">
-                      <h3 className="user-name">{user.name}</h3>
-
-                      {user.verified && (
-                        <span className="verified-icon" title={t("verifiedProfile")}>✓</span>
-                      )}
-
-                      <div className="price-section">
-                        <span className="price-label">{t("income")}</span>
-                        <span className="user-price">{user.price}</span>
-                      </div>
-                    </div>
-
-                    <div className="user-address">📍 {user.address}</div>
-
-                    <div className="user-details">
-                      <div className="detail-item"><span>{t("age")}</span>: {user.age}</div>
-                      <div className="detail-item"><span>{t("height")}</span>: {user.height}</div>
-                      <div className="detail-item"><span>{t("status")}</span>: {user.online ? t("online") : t("offline")}</div>
+                <div className="user-info">
+                  <div className="name-section">
+                    <h3 className="user-name">{user.name}</h3>
+                    {user.verified && <span className="verified-icon" title={t("verifiedProfile")}>✓</span>}
+                    <div className="price-section">
+                      <span className="price-label">{t("income")}</span>
+                      <span className="user-price">{user.price}</span>
                     </div>
                   </div>
-
+                  <div className="user-address">📍 {user.address}</div>
+                  <div className="user-details">
+                    <div className="detail-item"><span>{t("age")}</span>: {user.age}</div>
+                    <div className="detail-item"><span>{t("height")}</span>: {user.height}</div>
+                    <div className="detail-item"><span>{t("status")}</span>: {user.online ? t("online") : t("offline")}</div>
+                  </div>
                 </div>
               </div>
-            );
-          })
+            </div>
+          ))
         )}
       </div>
 
       <div className="info-footer">
         <p>{t("priceInfo")}</p>
-        <p className="user-count">
-          {filteredUsers.length} {t("usersFound")}
-        </p>
+        <p className="user-count">{filteredUsers.length} {t("usersFound")}</p>
       </div>
-
     </div>
   );
 };
