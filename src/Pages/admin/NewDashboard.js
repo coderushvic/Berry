@@ -1,4 +1,4 @@
-// src/Pages/Admin/AdminPage.js
+// src/Pages/admin/AdminPage.js
 import React, { useEffect, useState, useCallback } from "react";
 import {
   collection,
@@ -12,62 +12,43 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
-import ImageUploader from "../../Component/ImageUploader/ImageUploader";
+import ImageUploader from "../../components/ImageUploader";
 import "./AdminPage.css";
 
 const AdminPage = () => {
   const { t } = useTranslation();
 
-  /** USERS STATE **/
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({
-    name: "",
-    age: "",
-    height: "",
-    weight: "",
-    chestCircumference: "",
-    status: "Available",
-    price: "",
-    address: "",
-    about: "",
-    telegram: "",
-    wechat: "",
-    phone: "",
-    email: "",
-    talents: "",
-    verified: false,
-    online: false,
-    photos: [],
+    name: "", age: "", height: "", weight: "", chestCircumference: "",
+    status: "Available", price: "", address: "", about: "",
+    telegram: "", wechat: "", phone: "", email: "", talents: "",
+    verified: false, online: false, photos: [],
   });
   const [editUserId, setEditUserId] = useState(null);
   const [userImagePreview, setUserImagePreview] = useState("");
 
-  /** ADS STATE **/
   const [ads, setAds] = useState([]);
   const [newAd, setNewAd] = useState({ imageFile: null, link: "", order: 0, imageUrl: "" });
   const [editAdId, setEditAdId] = useState(null);
 
   const [loading, setLoading] = useState(false);
 
-  /** FETCH USERS **/
   const fetchUsers = useCallback(async () => {
     try {
       const usersQuery = query(collection(db, "users"), orderBy("name"));
-      const snapshot = await getDocs(usersQuery);
-      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setUsers(list);
+      const snap = await getDocs(usersQuery);
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error("Error fetching users:", err);
     }
   }, []);
 
-  /** FETCH ADS **/
   const fetchAds = useCallback(async () => {
     try {
       const adsQuery = query(collection(db, "ads"), orderBy("order", "asc"));
-      const snapshot = await getDocs(adsQuery);
-      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setAds(list);
+      const snap = await getDocs(adsQuery);
+      setAds(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error("Error fetching ads:", err);
     }
@@ -78,17 +59,21 @@ const AdminPage = () => {
     fetchAds();
   }, [fetchUsers, fetchAds]);
 
-  /** HANDLE INPUT CHANGE **/
   const handleChange = (e, isAd = false) => {
     const { name, value, type, checked } = e.target;
-    if (isAd) {
-      setNewAd((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
-    } else {
-      setNewUser((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
-    }
+    if (isAd) setNewAd((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    else setNewUser((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
-  /** CREATE OR UPDATE USER **/
+  const onUserImageUploaded = (url) => {
+    setNewUser((prev) => ({ ...prev, photos: [url, ...(Array.isArray(prev.photos) ? prev.photos : [])] }));
+    setUserImagePreview(url);
+  };
+
+  const onAdImageUploaded = (url) => {
+    setNewAd((prev) => ({ ...prev, imageUrl: url }));
+  };
+
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -96,15 +81,11 @@ const AdminPage = () => {
       const userData = {
         ...newUser,
         contactInfo: {
-          telegram: newUser.telegram,
-          wechat: newUser.wechat,
-          phone: newUser.phone,
-          email: newUser.email,
+          telegram: newUser.telegram, wechat: newUser.wechat,
+          phone: newUser.phone, email: newUser.email,
         },
-        talents: newUser.talents
-          ? newUser.talents.split(",").map((t) => t.trim()).filter(Boolean)
-          : [],
-        photos: newUser.photos || [],
+        talents: newUser.talents ? newUser.talents.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        photos: Array.isArray(newUser.photos) ? newUser.photos.filter(Boolean) : [],
       };
 
       if (editUserId) {
@@ -115,25 +96,11 @@ const AdminPage = () => {
         alert(t("addProfile") || "New profile added!");
       }
 
-      // reset
       setNewUser({
-        name: "",
-        age: "",
-        height: "",
-        weight: "",
-        chestCircumference: "",
-        status: "Available",
-        price: "",
-        address: "",
-        about: "",
-        telegram: "",
-        wechat: "",
-        phone: "",
-        email: "",
-        talents: "",
-        verified: false,
-        online: false,
-        photos: [],
+        name: "", age: "", height: "", weight: "", chestCircumference: "",
+        status: "Available", price: "", address: "", about: "",
+        telegram: "", wechat: "", phone: "", email: "", talents: "",
+        verified: false, online: false, photos: [],
       });
       setUserImagePreview("");
       setEditUserId(null);
@@ -146,7 +113,6 @@ const AdminPage = () => {
     }
   };
 
-  /** EDIT USER **/
   const handleUserEdit = (user) => {
     setEditUserId(user.id);
     setNewUser({
@@ -156,13 +122,12 @@ const AdminPage = () => {
       phone: user.contactInfo?.phone || "",
       email: user.contactInfo?.email || "",
       talents: user.talents?.join(", ") || "",
-      photos: user.photos || [],
+      photos: Array.isArray(user.photos) ? user.photos : [],
     });
-    setUserImagePreview(user.photos?.[0] || "");
+    setUserImagePreview((Array.isArray(user.photos) && user.photos[0]) || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /** DELETE USER **/
   const handleUserDelete = async (id) => {
     if (!window.confirm(t("confirmDelete") || "Are you sure?")) return;
     try {
@@ -173,31 +138,21 @@ const AdminPage = () => {
     }
   };
 
-  /** AD FORM HANDLERS **/
   const handleAdSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       let imageUrl = newAd.imageUrl || "";
-
-      // If admin used ImageUploader to set imageUrl, it is already set.
-      // If admin used plain file input (legacy), we still support it by uploading.
       if (newAd.imageFile && !imageUrl) {
-        // fallback: upload directly
-        const uploadUrl = process.env.REACT_APP_RENDER_UPLOAD_URL;
-        if (uploadUrl) {
-          const fd = new FormData();
-          fd.append('file', newAd.imageFile);
-          const res = await fetch(uploadUrl, { method: 'POST', body: fd });
-          if (res.ok) {
-            const data = await res.json();
-            imageUrl = data.url || imageUrl;
-          }
+        const form = new FormData();
+        form.append("file", newAd.imageFile);
+        const res = await fetch(process.env.REACT_APP_RENDER_UPLOAD_URL, { method: "POST", body: form });
+        if (res.ok) {
+          const json = await res.json();
+          imageUrl = json.url || imageUrl;
         }
       }
-
       const adData = { imageUrl, link: newAd.link, order: Number(newAd.order) || 0 };
-
       if (editAdId) {
         await updateDoc(doc(db, "ads", editAdId), adData);
         alert("Ad updated!");
@@ -205,7 +160,6 @@ const AdminPage = () => {
         await addDoc(collection(db, "ads"), adData);
         alert("Ad added!");
       }
-
       setNewAd({ imageFile: null, link: "", order: 0, imageUrl: "" });
       setEditAdId(null);
       fetchAds();
@@ -217,14 +171,12 @@ const AdminPage = () => {
     }
   };
 
-  /** EDIT AD **/
   const handleAdEdit = (ad) => {
     setEditAdId(ad.id);
     setNewAd({ imageFile: null, link: ad.link, order: ad.order, imageUrl: ad.imageUrl });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /** DELETE AD **/
   const handleAdDelete = async (id) => {
     if (!window.confirm("Are you sure to delete this ad?")) return;
     try {
@@ -235,22 +187,10 @@ const AdminPage = () => {
     }
   };
 
-  // image uploaded callback for user
-  const onUserImageUploaded = (url) => {
-    setNewUser(prev => ({ ...prev, photos: [url, ...(prev.photos || [])] }));
-    setUserImagePreview(url);
-  };
-
-  // image uploaded callback for ads
-  const onAdImageUploaded = (url) => {
-    setNewAd(prev => ({ ...prev, imageUrl: url }));
-  };
-
   return (
     <div className="admin-container">
       <h1>👑 {t("adminDashboard") || "Admin Dashboard"}</h1>
 
-      {/* USER FORM */}
       <form className="admin-form" onSubmit={handleUserSubmit}>
         <h2>{editUserId ? t("updateProfile") : t("addProfile")}</h2>
         <div className="form-grid">
@@ -281,19 +221,28 @@ const AdminPage = () => {
         </div>
 
         <div className="upload-section">
-          <label>📷 Profile Image</label>
-          <ImageUploader initialImage={userImagePreview || newUser.photos?.[0]} onUploaded={onUserImageUploaded} buttonText={t('uploadProfileImage') || 'Upload Profile Image'} />
+          <label style={{ display: "block", marginBottom: 8 }}>📷 Profile Image</label>
+          <ImageUploader
+            initialImage={userImagePreview || (Array.isArray(newUser.photos) ? newUser.photos[0] : null)}
+            onUploaded={onUserImageUploaded}
+            buttonText={t("uploadProfileImage") || "Upload Profile Image"}
+            prominent={true}
+          />
         </div>
 
         <button type="submit" disabled={loading}>{loading ? "Saving..." : editUserId ? "Update User" : "Add User"}</button>
       </form>
 
-      {/* USERS LIST */}
       <h2>📋 All Users</h2>
       <div className="user-list">
         {users.map((u) => (
           <div key={u.id} className="user-card">
-            <img src={u.photos?.[0] || "https://via.placeholder.com/100"} alt={u.name} />
+            <img
+              src={Array.isArray(u.photos) && u.photos[0] && typeof u.photos[0] === "string" && u.photos[0].startsWith("http") ? u.photos[0] : ""}
+              alt={u.name}
+              style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8 }}
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+            />
             <div className="user-info">
               <h4>{u.name}</h4>
               <p>{u.age} yrs — {u.status}</p>
@@ -307,11 +256,10 @@ const AdminPage = () => {
         ))}
       </div>
 
-      {/* ADS FORM */}
       <form className="admin-form" onSubmit={handleAdSubmit}>
         <h2>{editAdId ? "Update Ad" : "Add New Ad"}</h2>
         <div style={{ marginBottom: 8 }}>
-          <ImageUploader initialImage={newAd.imageUrl} onUploaded={onAdImageUploaded} buttonText={t('uploadAdImage') || 'Upload Ad Image'} />
+          <ImageUploader initialImage={newAd.imageUrl} onUploaded={onAdImageUploaded} buttonText={t("uploadAdImage") || "Upload Ad Image"} prominent={true} />
         </div>
         <div style={{ marginTop: 8 }}>
           <input type="text" placeholder="Link" name="link" value={newAd.link} onChange={(e) => handleChange(e, true)} required />
@@ -320,12 +268,11 @@ const AdminPage = () => {
         <button type="submit" disabled={loading}>{loading ? "Saving..." : editAdId ? "Update Ad" : "Add Ad"}</button>
       </form>
 
-      {/* ADS LIST */}
       <h2>📢 Manage Ads</h2>
       <div className="user-list">
         {ads.map((ad) => (
           <div key={ad.id} className="user-card">
-            <img src={ad.imageUrl || "https://via.placeholder.com/200"} alt="Ad" style={{ width: "200px", objectFit: "cover" }} />
+            <img src={ad.imageUrl || ""} alt="Ad" style={{ width: "200px", objectFit: "cover" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
             <div className="user-info">
               <p>Link: <a href={ad.link} target="_blank" rel="noopener noreferrer">{ad.link}</a></p>
               <p>Order: {ad.order}</p>

@@ -1,10 +1,31 @@
 // src/Pages/Profile/ProfilePage.js
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
 import "./ProfilePage.css";
+
+const isValidImageUrl = (u) => typeof u === "string" && u.startsWith("http");
+
+const LetterAvatar = ({ name, size = 120 }) => {
+  const letter = (name && name.charAt(0).toUpperCase()) || "U";
+  const bgColors = ["#F97316", "#06B6D4", "#7C3AED", "#EF4444", "#10B981"];
+  const color = bgColors[(letter.charCodeAt(0) % bgColors.length)];
+  const style = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: color,
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: Math.round(size * 0.45),
+  };
+  return <div style={style}>{letter}</div>;
+};
 
 const ProfilePage = () => {
   const { t } = useTranslation();
@@ -16,106 +37,68 @@ const ProfilePage = () => {
   const [uploadingMain, setUploadingMain] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  const demoUser = useMemo(() => ({
-    id: id || "CDC043",
-    name: "Nanyu",
-    age: 24,
-    height: "170cm",
-    weight: "50kg",
-    chestCircumference: "88cm",
-    status: "Available",
-    price: "8-14w",
-    address: "High-Tech Zone, Nanmen, Shiyangchang, Shanghai",
-    contactInfo: {
-      telegram: "@NanyuOfficial",
-      wechat: "Nanyu_2024",
-      phone: "+86 138 0013 8000",
-      email: "nanyu@example.com",
-    },
-    talents: [
-      "Multi-lingual (English, Mandarin, Japanese)",
-      "Professional Dancer",
-      "Certified Masseuse",
-      "Cooking Expert",
-      "Photography Skills",
-      "Musical Instrument (Piano)",
-    ],
-    online: true,
-    verified: true,
-    about: "Professional and friendly companion with 3 years of experience.",
-    photos: [
-      "https://via.placeholder.com/400x500/667eea/ffffff?text=Main+Photo",
-      "https://via.placeholder.com/400x500/764ba2/ffffff?text=Gallery+1",
-      "https://via.placeholder.com/400x500/10b981/ffffff?text=Gallery+2",
-    ],
-  }), [id]);
-
   useEffect(() => {
     const fetchUser = async () => {
+      setLoading(true);
+      if (!id) {
+        // No id => show not found / empty state (per your choice C)
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       try {
-        setLoading(true);
-        if (!id) {
-          setUser(demoUser);
-          return;
-        }
         const userDocRef = doc(db, "users", id);
         const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
+        if (!userDoc.exists()) {
+          setUser(null);
+        } else {
           const data = userDoc.data();
+          // sanitize photos: keep only truthy strings
+          const photos = Array.isArray(data.photos) && data.photos.length ? data.photos.filter(Boolean) : [];
           setUser({
             id: userDoc.id,
-            name: data.name || demoUser.name,
-            age: data.age || demoUser.age,
-            height: data.height || demoUser.height,
-            weight: data.weight || demoUser.weight,
-            chestCircumference: data.chestCircumference || demoUser.chestCircumference,
-            status: data.status || demoUser.status,
-            price: data.price || demoUser.price,
-            address: data.address || demoUser.address,
-            contactInfo: {
-              telegram: data.contactInfo?.telegram || demoUser.contactInfo.telegram,
-              wechat: data.contactInfo?.wechat || demoUser.contactInfo.wechat,
-              phone: data.contactInfo?.phone || demoUser.contactInfo.phone,
-              email: data.contactInfo?.email || demoUser.contactInfo.email,
-            },
-            talents: data.talents || demoUser.talents,
-            online: data.online ?? demoUser.online,
-            verified: data.verified ?? demoUser.verified,
-            about: data.about || demoUser.about,
-            photos: data.photos && data.photos.length ? data.photos : demoUser.photos,
+            name: data.name || "",
+            age: data.age || "",
+            height: data.height || "",
+            weight: data.weight || "",
+            chestCircumference: data.chestCircumference || "",
+            status: data.status || "",
+            price: data.price || "",
+            address: data.address || "",
+            contactInfo: data.contactInfo || {},
+            talents: data.talents || [],
+            online: data.online ?? false,
+            verified: data.verified ?? false,
+            about: data.about || "",
+            photos,
           });
-        } else {
-          setUser(demoUser);
         }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        setUser(demoUser);
+      } catch (err) {
+        console.error("Error fetching user:", err);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
+
     fetchUser();
-  }, [id, demoUser]);
+  }, [id]);
 
   const handleBackClick = () => navigate(-1);
 
   const uploadFileToRender = async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const renderBase = process.env.REACT_APP_RENDER_UPLOAD_URL;
-    if (!renderBase) throw new Error('REACT_APP_RENDER_UPLOAD_URL not set');
-
-    const response = await fetch(renderBase, {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || "Upload failed");
+    if (!file) throw new Error("No file");
+    const form = new FormData();
+    form.append("file", file);
+    const uploadUrl = process.env.REACT_APP_RENDER_UPLOAD_URL;
+    if (!uploadUrl) throw new Error("REACT_APP_RENDER_UPLOAD_URL not set");
+    const res = await fetch(uploadUrl, { method: "POST", body: form });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => null);
+      throw new Error(txt || `Upload failed (${res.status})`);
     }
-    const data = await response.json();
-    return data.url;
+    const json = await res.json();
+    return json.url;
   };
 
   const handleMainImageUpload = async (event) => {
@@ -123,13 +106,15 @@ const ProfilePage = () => {
     if (!file || !user) return;
     try {
       setUploadingMain(true);
-      const downloadURL = await uploadFileToRender(file);
+      const url = await uploadFileToRender(file);
       const userDocRef = doc(db, "users", user.id);
-      await updateDoc(userDocRef, { "photos.0": downloadURL });
-      setUser(prev => ({ ...prev, photos: [downloadURL, ...prev.photos.slice(1)] }));
+      // update photos[0] to new url (preserve other photos)
+      const newPhotos = [url, ...(user.photos || []).slice(1)];
+      await updateDoc(userDocRef, { photos: newPhotos });
+      setUser((prev) => ({ ...prev, photos: newPhotos }));
     } catch (err) {
       console.error("Upload error:", err);
-      alert(t("uploadFailed"));
+      alert(t("uploadFailed") || "Upload failed");
     } finally {
       setUploadingMain(false);
     }
@@ -140,36 +125,40 @@ const ProfilePage = () => {
     if (!file || !user) return;
     try {
       setUploadingGallery(true);
-      const downloadURL = await uploadFileToRender(file);
-      const updatedPhotos = [...user.photos, downloadURL];
+      const url = await uploadFileToRender(file);
+      const updatedPhotos = [...(user.photos || []), url];
       const userDocRef = doc(db, "users", user.id);
       await updateDoc(userDocRef, { photos: updatedPhotos });
-      setUser(prev => ({ ...prev, photos: updatedPhotos }));
+      setUser((prev) => ({ ...prev, photos: updatedPhotos }));
     } catch (err) {
-      console.error("Upload error:", err);
-      alert(t("uploadFailed"));
+      console.error("Gallery upload error:", err);
+      alert(t("uploadFailed") || "Upload failed");
     } finally {
       setUploadingGallery(false);
     }
   };
 
-  if (loading) return (
-    <div className="profile-container">
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t("loadingProfile")}</p>
+  if (loading) {
+    return (
+      <div className="profile-container">
+        <div className="loading-container">
+          <div className="loading-spinner" />
+          <p>{t("loadingProfile")}</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
-  if (!user) return (
-    <div className="profile-container">
-      <div className="error-container">
-        <h2>{t("userNotFound")}</h2>
-        <button onClick={handleBackClick} className="back-button">{t("back")}</button>
+  if (!user) {
+    return (
+      <div className="profile-container">
+        <div className="error-container">
+          <h2>{t("userNotFound") || "User not found"}</h2>
+          <button onClick={handleBackClick} className="back-button">{t("back")}</button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="profile-container">
@@ -182,14 +171,22 @@ const ProfilePage = () => {
       </div>
 
       <div className="profile-hero">
-        <div className="profile-image-container">
-          <img src={user.photos[0]} alt={user.name} className="profile-main-image"/>
-          <label className="upload-label">
-            {uploadingMain ? t("uploading") : t("uploadMain")}
-            <input type="file" accept="image/*" onChange={handleMainImageUpload} disabled={uploadingMain} style={{ display: "none" }}/>
+        <div className="profile-image-container" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {isValidImageUrl(user.photos?.[0]) ? (
+            <img src={user.photos[0]} alt={user.name} className="profile-main-image" style={{ borderRadius: 12, maxWidth: 360 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          ) : (
+            <div style={{ marginBottom: 12 }}><LetterAvatar name={user.name} size={140} /></div>
+          )}
+
+          <label className="upload-label" style={{ marginTop: 8 }}>
+            <strong style={{ background: "#ff7a18", color: "#fff", padding: "10px 16px", borderRadius: 8, cursor: "pointer" }}>
+              {uploadingMain ? t("uploading") : t("uploadMain")}
+            </strong>
+            <input type="file" accept="image/*" onChange={handleMainImageUpload} disabled={uploadingMain} style={{ display: "none" }} />
           </label>
-          <div className="profile-badges">
-            {user.online && <div className="status-badge online"><div className="pulse-dot"></div> {t("onlineNow")}</div>}
+
+          <div className="profile-badges" style={{ marginTop: 10 }}>
+            {user.online && <div className="status-badge online"><div className="pulse-dot" /> {t("onlineNow")}</div>}
             {user.verified && <div className="status-badge verified">✓ {t("verified")}</div>}
           </div>
         </div>
@@ -204,38 +201,48 @@ const ProfilePage = () => {
             <div className="stat-card"><div className="stat-value">{user.chestCircumference}</div><div className="stat-label">{t("chest")}</div></div>
           </div>
           <div className="status-price-section">
-            <div className="status-display"><span className="status-label">{t("status")}:</span> <span className={`status-value ${user.status.toLowerCase()}`}>{user.status}</span></div>
+            <div className="status-display"><span className="status-label">{t("status")}:</span> <span className={`status-value ${String(user.status || "").toLowerCase()}`}>{user.status}</span></div>
             <div className="income-section"><div className="income-label">{t("income")}</div><div className="income-amount">${user.price}</div></div>
           </div>
         </div>
       </div>
 
       <div className="profile-tabs">
-        <button className={`tab-button ${activeTab==="info"?"active":""}`} onClick={()=>setActiveTab("info")}>📋 {t("aboutMe")}</button>
-        <button className={`tab-button ${activeTab==="gallery"?"active":""}`} onClick={()=>setActiveTab("gallery")}>📸 {t("uploadGallery")} ({user.photos.length})</button>
+        <button className={`tab-button ${activeTab === "info" ? "active" : ""}`} onClick={() => setActiveTab("info")}>📋 {t("aboutMe")}</button>
+        <button className={`tab-button ${activeTab === "gallery" ? "active" : ""}`} onClick={() => setActiveTab("gallery")}>📸 {t("uploadGallery")} ({user.photos.length})</button>
       </div>
 
-      {activeTab==="info" ? (
+      {activeTab === "info" ? (
         <div className="info-content">
           <div className="content-card"><h3>{t("aboutMe")}</h3><p>{user.about}</p></div>
           <div className="content-card"><h3>{t("contactInfo")}</h3>
             <div className="contact-grid">
-              <div className="contact-item"><span>{t("telegram")}:</span> {user.contactInfo.telegram}</div>
-              <div className="contact-item"><span>{t("wechat")}:</span> {user.contactInfo.wechat}</div>
-              <div className="contact-item"><span>{t("phone")}:</span> {user.contactInfo.phone}</div>
-              <div className="contact-item"><span>{t("email")}:</span> {user.contactInfo.email}</div>
+              <div className="contact-item"><span>{t("telegram")}:</span> {user.contactInfo?.telegram}</div>
+              <div className="contact-item"><span>{t("wechat")}:</span> {user.contactInfo?.wechat}</div>
+              <div className="contact-item"><span>{t("phone")}:</span> {user.contactInfo?.phone}</div>
+              <div className="contact-item"><span>{t("email")}:</span> {user.contactInfo?.email}</div>
             </div>
           </div>
           <div className="content-card"><h3>{t("talents")}</h3>
-            <div className="talents-grid">{user.talents.map((t,i)=><div key={i} className="talent-item">✨ {t}</div>)}</div>
+            <div className="talents-grid">{(user.talents || []).map((tt, i) => <div key={i} className="talent-item">✨ {tt}</div>)}</div>
           </div>
         </div>
       ) : (
         <div className="gallery-content">
-          <label className="upload-label">{uploadingGallery ? t("uploading") : t("uploadGallery")}
-            <input type="file" accept="image/*" onChange={handleGalleryUpload} disabled={uploadingGallery} style={{display:"none"}}/>
+          <label className="upload-label" style={{ display: "block", marginBottom: 8 }}>
+            <strong style={{ background: "#ff7a18", color: "#fff", padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}>
+              {uploadingGallery ? t("uploading") : t("uploadGallery")}
+            </strong>
+            <input type="file" accept="image/*" onChange={handleGalleryUpload} disabled={uploadingGallery} style={{ display: "none" }} />
           </label>
-          <div className="gallery-grid">{user.photos.map((p,i)=><div key={i} className="gallery-item"><img src={p} alt={`${user.name}-${i}`} /></div>)}</div>
+          <div className="gallery-grid">
+            {(user.photos || []).map((p, i) => (
+              <div key={i} className="gallery-item" style={{ marginBottom: 8 }}>
+                {isValidImageUrl(p) ? <img src={p} alt={`${user.name}-${i}`} onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <LetterAvatar name={user.name} size={96} />}
+              </div>
+            ))}
+            {(!user.photos || user.photos.length === 0) && <div className="empty-state"><p>{t("noPhotosYet") || "No photos uploaded yet"}</p></div>}
+          </div>
         </div>
       )}
 

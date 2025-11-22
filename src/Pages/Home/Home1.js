@@ -1,99 +1,101 @@
 // src/Pages/UserList/UserList.js
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
-import { db } from '../../firebase/firestore';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-import './UserList.css';
+import "./UserList.css";
+
+const isValidImageUrl = (u) => typeof u === "string" && u.startsWith("http");
+
+const LetterAvatar = ({ name, size = 56 }) => {
+  const letter = (name && name.charAt(0).toUpperCase()) || "U";
+  const bgColors = ["#F97316", "#06B6D4", "#7C3AED", "#EF4444", "#10B981"];
+  const color = bgColors[(letter.charCodeAt(0) % bgColors.length)];
+  const style = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: color,
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: Math.round(size * 0.45),
+  };
+  return <div style={style}>{letter}</div>;
+};
 
 const UserList = () => {
   const { t } = useTranslation();
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState("all");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState([]);
   const navigate = useNavigate();
 
-  // Ads
+  // Ads subscription
   useEffect(() => {
     const adsRef = collection(db, "ads");
     const adsQuery = query(adsRef, orderBy("order", "asc"));
-
-    const unsubscribe = onSnapshot(adsQuery, (snapshot) => {
-      const adsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAds(adsData.slice(0, 6));
-    }, (error) => {
-      console.error("Error fetching ads:", error);
-      setAds([]);
-    });
-
+    const unsubscribe = onSnapshot(
+      adsQuery,
+      (snapshot) => {
+        const adsData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAds(adsData.slice(0, 6));
+      },
+      (error) => {
+        console.error("Error fetching ads:", error);
+        setAds([]);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
-  // Users
+  // Users subscription
   useEffect(() => {
-    const demoUsers = [
-      { id: '1', name: 'Windlike Girl', address: '2.2km away', age: 24, height: '165cm', price: '20-40w', online: true, verified: true, photos: ['https://via.placeholder.com/150'] },
-      { id: '2', name: 'Fora', address: '1km away', age: 22, height: '156cm', price: '15-25w', online: true, verified: false, photos: [] }
-    ];
+    setLoading(true);
+    try {
+      const usersRef = collection(db, "users");
+      let usersQuery = query(usersRef, orderBy("name"));
 
-    const fetch = async () => {
-      try {
-        setLoading(true);
-        const usersRef = collection(db, 'users');
-        let usersQuery;
-
-        switch (activeFilter) {
-          case 'online':
-            usersQuery = query(usersRef, where('online', '==', true), orderBy('name'));
-            break;
-          case 'verified':
-            usersQuery = query(usersRef, where('verified', '==', true), orderBy('name'));
-            break;
-          default:
-            usersQuery = query(usersRef, orderBy('name'));
-        }
-
-        const unsubscribe = onSnapshot(
-          usersQuery,
-          (querySnapshot) => {
-            const usersData = [];
-            querySnapshot.forEach((doc) => usersData.push({ id: doc.id, ...doc.data() }));
-            setUsers(usersData.length === 0 ? demoUsers : usersData);
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error fetching users:', error);
-            setUsers(demoUsers);
-            setLoading(false);
-          }
-        );
-
-        return () => unsubscribe();
-      } catch (err) {
-        console.error('Error:', err);
-        setUsers(demoUsers);
-        setLoading(false);
+      if (activeFilter === "online") {
+        usersQuery = query(usersRef, where("online", "==", true), orderBy("name"));
+      } else if (activeFilter === "verified") {
+        usersQuery = query(usersRef, where("verified", "==", true), orderBy("name"));
       }
-    };
 
-    fetch();
+      const unsubscribe = onSnapshot(
+        usersQuery,
+        (snapshot) => {
+          const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+          setUsers(list);
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Error fetching users:", error);
+          setUsers([]);
+          setLoading(false);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Error in users fetch", err);
+      setUsers([]);
+      setLoading(false);
+    }
   }, [activeFilter]);
 
   const handleUserClick = (userId) => navigate(`/user/${userId}`);
 
-  const filteredUsers = users.filter(user => {
-    if (activeFilter === 'online') return user.online;
-    if (activeFilter === 'verified') return user.verified;
+  const filteredUsers = users.filter((user) => {
+    if (activeFilter === "online") return user.online;
+    if (activeFilter === "verified") return user.verified;
     return true;
   });
 
@@ -124,10 +126,15 @@ const UserList = () => {
       {ads.length > 0 && (
         <div className="ads-slider mb-4">
           <Slider {...sliderSettings}>
-            {ads.map(ad => (
+            {ads.map((ad) => (
               <div key={ad.id}>
                 <a href={ad.link} target="_blank" rel="noopener noreferrer">
-                  <img src={ad.imageUrl} alt={`Ad ${ad.id}`} style={{ width: '100%', borderRadius: '10px', cursor: 'pointer' }} />
+                  <img
+                    src={isValidImageUrl(ad.imageUrl) ? ad.imageUrl : ""}
+                    alt={`Ad ${ad.id}`}
+                    style={{ width: "100%", borderRadius: "10px", cursor: "pointer" }}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
                 </a>
               </div>
             ))}
@@ -137,15 +144,15 @@ const UserList = () => {
 
       <div className="filter-section">
         <div className="filter-tabs">
-          {['all','online','verified'].map(filter => (
-            <button key={filter} className={`filter-tab ${activeFilter === filter ? 'active' : ''}`} onClick={() => setActiveFilter(filter)}>
+          {["all", "online", "verified"].map((filter) => (
+            <button key={filter} className={`filter-tab ${activeFilter === filter ? "active" : ""}`} onClick={() => setActiveFilter(filter)}>
               {t(filter)}
             </button>
           ))}
         </div>
         <div className="user-stats">
           <span className="stat">{t("total")}: {filteredUsers.length}</span>
-          <span className="stat">{t("online")}: {filteredUsers.filter(u => u.online).length}</span>
+          <span className="stat">{t("online")}: {filteredUsers.filter((u) => u.online).length}</span>
         </div>
       </div>
 
@@ -160,12 +167,12 @@ const UserList = () => {
             <div key={user.id} className="user-card" style={{ animationDelay: `${index * 0.1}s` }} onClick={() => handleUserClick(user.id)}>
               <div className="user-main">
                 <div className="avatar-section">
-                  {user.photos?.[0] ? (
-                    <img src={user.photos[0]} alt={user.name} className="user-avatar" />
+                  {isValidImageUrl(user?.photos?.[0]) ? (
+                    <img src={user.photos[0]} alt={user.name} className="user-avatar" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   ) : (
-                    <div className="avatar">{user.name?.charAt(0) || "U"}</div>
+                    <LetterAvatar name={user.name} size={72} />
                   )}
-                  <div className={`status-dot ${user.online ? 'online' : 'offline'}`}></div>
+                  <div className={`status-dot ${user.online ? "online" : "offline"}`}></div>
                   {user.verified && <div className="verified-badge">✓</div>}
                 </div>
 
