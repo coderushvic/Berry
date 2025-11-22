@@ -15,7 +15,6 @@ import Search from "./Pages/admin/Search";
 import Statistics from "./Pages/admin/Statistics";
 import AdminYoutube from "./Pages/admin/AdminYoutube";
 import NotAdmin236 from "./Pages/admin/AdminLogin";
-import NewDashboard from "./Pages/admin/NewDashboard";
 import AdminTelegramTasks from "./Pages/admin/AdminTelegramTasks";
 import AdminDailyTasks from "./Pages/admin/AdminDailyTasks";
 import { AuthContextProvider } from "./context/AuthContext";
@@ -44,6 +43,7 @@ import Gallery from './Pages/Home/Gallery';
 /* 🌍 LANGUAGE */
 import "../src/i18n/i18n";
 import LanguageSwitcher from "../src/Component/LanguageSwitcher";
+import AdminPageWrapper from './Pages/admin/AdminPageWrapper';
 
 const router = createBrowserRouter([
   {
@@ -149,7 +149,7 @@ const router = createBrowserRouter([
   /* ADMIN ROUTES */
   {
     path: "/dashboardAdx",
-    element: <NewDashboard />,
+    element: <AdminPageWrapper />,
     errorElement: <ErrorCom />,
     children:[
       {
