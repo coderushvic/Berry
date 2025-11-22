@@ -194,6 +194,24 @@ const AdminPage = () => {
     setLoading(false);
   };
 
+  /** EDIT AD **/
+  const handleAdEdit = (ad) => {
+    setEditAdId(ad.id);
+    setNewAd({
+      imageUrl: ad.imageUrl || "",
+      link: ad.link || "",
+      order: ad.order || 0,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** DELETE AD **/
+  const handleAdDelete = async (id) => {
+    if (!window.confirm(t("confirmDelete"))) return;
+    await deleteDoc(doc(db, "ads", id));
+    fetchAds();
+  };
+
   return (
     <div className="admin-wrapper">
       {/* HEADER */}
@@ -345,11 +363,7 @@ const AdminPage = () => {
         <div className="list-grid">
           {users.map((u) => (
             <div key={u.id} className="list-card">
-              <img
-                src={u.photos?.[0] || ""}
-                alt={u.name}
-                className="list-photo"
-              />
+              <img src={u.photos?.[0] || ""} alt={u.name} className="list-photo" />
               <h4>{u.name}</h4>
               <p>
                 {u.age} {t("years")} • {u.status}
@@ -427,13 +441,10 @@ const AdminPage = () => {
               </a>
 
               <div className="actions-row">
-                <button className="edit-btn" onClick={() => setEditAdId(ad.id)}>
+                <button className="edit-btn" onClick={() => handleAdEdit(ad)}>
                   {t("edit")}
                 </button>
-                <button
-                  className="delete-btn"
-                  onClick={() => handleUserDelete(ad.id)}
-                >
+                <button className="delete-btn" onClick={() => handleAdDelete(ad.id)}>
                   {t("delete")}
                 </button>
               </div>
