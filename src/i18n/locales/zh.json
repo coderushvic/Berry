@@ -19,7 +19,7 @@
   "gallery": "📸 图库",
   "aboutMe": "关于我",
   "contactInfo": "📞 联系方式",
-  "telegram": "Telegram",
+  "telegram": "电报",
   "wechat": "微信",
   "phone": "电话",
   "email": "邮箱",
@@ -76,5 +76,12 @@
   "updateAd": "更新广告",
   "manageAds": "管理广告",
   "imageUploaded": "图片上传成功",
-  "unavailable": "不可用"
+  "unavailable": "不可用",
+  "all": "全部",
+  "checkBackLater": "请稍后再来查看",
+  "loadingUsers": "正在加载用户...",
+  "verifiedProfile": "已认证资料",
+  "priceInfo": "价格仅供参考，实际以用户报价为准",
+  "uploadFailed": "上传失败"
+
 }

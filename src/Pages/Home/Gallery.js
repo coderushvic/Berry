@@ -245,11 +245,6 @@ const ProfilePage = () => {
           </div>
         </div>
       )}
-
-      <div className="action-bar">
-        <button className="message-button">💬 {t("sendMessage")}</button>
-        <button className="book-button">⭐ {t("bookSession")}</button>
-      </div>
     </div>
   );
 };
