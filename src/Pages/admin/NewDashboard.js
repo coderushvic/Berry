@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
-import ImageUploader from "../../components/ImageUploader";
+import ImageUploader from "../../Component/ImageUploader/index";
 import "./AdminPage.css";
 
 const AdminPage = () => {
