@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
+import ImageUploader from "../../Component/ImageUploader/ImageUploader";
 import "./AdminPage.css";
 
 const AdminPage = () => {
@@ -39,7 +40,6 @@ const AdminPage = () => {
     photos: [],
   });
   const [editUserId, setEditUserId] = useState(null);
-  const [userImageFile, setUserImageFile] = useState(null);
   const [userImagePreview, setUserImagePreview] = useState("");
 
   /** ADS STATE **/
@@ -54,7 +54,7 @@ const AdminPage = () => {
     try {
       const usersQuery = query(collection(db, "users"), orderBy("name"));
       const snapshot = await getDocs(usersQuery);
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setUsers(list);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -66,7 +66,7 @@ const AdminPage = () => {
     try {
       const adsQuery = query(collection(db, "ads"), orderBy("order", "asc"));
       const snapshot = await getDocs(adsQuery);
-      const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setAds(list);
     } catch (err) {
       console.error("Error fetching ads:", err);
@@ -88,45 +88,11 @@ const AdminPage = () => {
     }
   };
 
-  /** UPLOAD FILE TO RENDER FUNCTION **/
-  const uploadFileToRender = async (file) => {
-    if (!file) return "";
-    try {
-      const renderBase = process.env.REACT_APP_RENDER_URL;
-      if (!renderBase) throw new Error("REACT_APP_RENDER_URL not set");
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`${renderBase.replace(/\/$/, "")}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => null);
-        throw new Error(`Upload failed (${res.status}) ${txt || ""}`);
-      }
-      const data = await res.json();
-      return data.url || "";
-    } catch (err) {
-      console.error("Upload error:", err);
-      return "";
-    }
-  };
-
   /** CREATE OR UPDATE USER **/
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      let photoURL = "";
-
-      // if a new file selected -> upload to Render
-      if (userImageFile) {
-        photoURL = await uploadFileToRender(userImageFile);
-      }
-
       const userData = {
         ...newUser,
         contactInfo: {
@@ -136,12 +102,9 @@ const AdminPage = () => {
           email: newUser.email,
         },
         talents: newUser.talents
-          ? newUser.talents
-              .split(",")
-              .map((t) => t.trim())
-              .filter((t) => t.length > 0)
+          ? newUser.talents.split(",").map((t) => t.trim()).filter(Boolean)
           : [],
-        photos: photoURL ? [photoURL] : newUser.photos || [],
+        photos: newUser.photos || [],
       };
 
       if (editUserId) {
@@ -172,7 +135,6 @@ const AdminPage = () => {
         online: false,
         photos: [],
       });
-      setUserImageFile(null);
       setUserImagePreview("");
       setEditUserId(null);
       fetchUsers();
@@ -211,16 +173,27 @@ const AdminPage = () => {
     }
   };
 
-  /** CREATE OR UPDATE ADS **/
+  /** AD FORM HANDLERS **/
   const handleAdSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       let imageUrl = newAd.imageUrl || "";
 
-      if (newAd.imageFile) {
-        const uploaded = await uploadFileToRender(newAd.imageFile);
-        if (uploaded) imageUrl = uploaded;
+      // If admin used ImageUploader to set imageUrl, it is already set.
+      // If admin used plain file input (legacy), we still support it by uploading.
+      if (newAd.imageFile && !imageUrl) {
+        // fallback: upload directly
+        const uploadUrl = process.env.REACT_APP_RENDER_UPLOAD_URL;
+        if (uploadUrl) {
+          const fd = new FormData();
+          fd.append('file', newAd.imageFile);
+          const res = await fetch(uploadUrl, { method: 'POST', body: fd });
+          if (res.ok) {
+            const data = await res.json();
+            imageUrl = data.url || imageUrl;
+          }
+        }
       }
 
       const adData = { imageUrl, link: newAd.link, order: Number(newAd.order) || 0 };
@@ -262,6 +235,17 @@ const AdminPage = () => {
     }
   };
 
+  // image uploaded callback for user
+  const onUserImageUploaded = (url) => {
+    setNewUser(prev => ({ ...prev, photos: [url, ...(prev.photos || [])] }));
+    setUserImagePreview(url);
+  };
+
+  // image uploaded callback for ads
+  const onAdImageUploaded = (url) => {
+    setNewAd(prev => ({ ...prev, imageUrl: url }));
+  };
+
   return (
     <div className="admin-container">
       <h1>👑 {t("adminDashboard") || "Admin Dashboard"}</h1>
@@ -298,19 +282,7 @@ const AdminPage = () => {
 
         <div className="upload-section">
           <label>📷 Profile Image</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              setUserImageFile(e.target.files[0]);
-              setUserImagePreview(URL.createObjectURL(e.target.files[0]));
-            }}
-          />
-          {userImagePreview && (
-            <div style={{ marginTop: 8 }}>
-              <img src={userImagePreview} alt="preview" style={{ width: 120, borderRadius: 8 }} />
-            </div>
-          )}
+          <ImageUploader initialImage={userImagePreview || newUser.photos?.[0]} onUploaded={onUserImageUploaded} buttonText={t('uploadProfileImage') || 'Upload Profile Image'} />
         </div>
 
         <button type="submit" disabled={loading}>{loading ? "Saving..." : editUserId ? "Update User" : "Add User"}</button>
@@ -319,17 +291,17 @@ const AdminPage = () => {
       {/* USERS LIST */}
       <h2>📋 All Users</h2>
       <div className="user-list">
-        {users.map((user) => (
-          <div key={user.id} className="user-card">
-            <img src={user.photos?.[0] || "https://via.placeholder.com/100"} alt={user.name} />
+        {users.map((u) => (
+          <div key={u.id} className="user-card">
+            <img src={u.photos?.[0] || "https://via.placeholder.com/100"} alt={u.name} />
             <div className="user-info">
-              <h4>{user.name}</h4>
-              <p>{user.age} yrs — {user.status}</p>
-              <p>{user.price}</p>
+              <h4>{u.name}</h4>
+              <p>{u.age} yrs — {u.status}</p>
+              <p>{u.price}</p>
             </div>
             <div className="user-actions">
-              <button onClick={() => handleUserEdit(user)}>✏️ Edit</button>
-              <button className="delete-btn" onClick={() => handleUserDelete(user.id)}>🗑 Delete</button>
+              <button onClick={() => handleUserEdit(u)}>✏️ Edit</button>
+              <button className="delete-btn" onClick={() => handleUserDelete(u.id)}>🗑 Delete</button>
             </div>
           </div>
         ))}
@@ -338,12 +310,13 @@ const AdminPage = () => {
       {/* ADS FORM */}
       <form className="admin-form" onSubmit={handleAdSubmit}>
         <h2>{editAdId ? "Update Ad" : "Add New Ad"}</h2>
-        <input type="file" accept="image/*" onChange={(e) => setNewAd((prev) => ({ ...prev, imageFile: e.target.files[0] }))} />
-        {newAd.imageUrl && (
-          <img src={newAd.imageUrl} alt="preview" style={{ width: 150, borderRadius: 10, marginTop: 8 }} />
-        )}
-        <input type="text" placeholder="Link" name="link" value={newAd.link} onChange={(e) => handleChange(e, true)} required />
-        <input type="number" placeholder="Order" name="order" value={newAd.order} onChange={(e) => handleChange(e, true)} />
+        <div style={{ marginBottom: 8 }}>
+          <ImageUploader initialImage={newAd.imageUrl} onUploaded={onAdImageUploaded} buttonText={t('uploadAdImage') || 'Upload Ad Image'} />
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <input type="text" placeholder="Link" name="link" value={newAd.link} onChange={(e) => handleChange(e, true)} required />
+          <input type="number" placeholder="Order" name="order" value={newAd.order} onChange={(e) => handleChange(e, true)} />
+        </div>
         <button type="submit" disabled={loading}>{loading ? "Saving..." : editAdId ? "Update Ad" : "Add Ad"}</button>
       </form>
 

@@ -103,10 +103,10 @@ const ProfilePage = () => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const renderBase = process.env.REACT_APP_RENDER_URL;
-    if (!renderBase) throw new Error('REACT_APP_RENDER_URL not set');
+    const renderBase = process.env.REACT_APP_RENDER_UPLOAD_URL;
+    if (!renderBase) throw new Error('REACT_APP_RENDER_UPLOAD_URL not set');
 
-    const response = await fetch(`${renderBase.replace(/\/$/, '')}/upload`, {
+    const response = await fetch(renderBase, {
       method: "POST",
       body: formData,
     });
