@@ -12,6 +12,7 @@
 .app-header {
   text-align: center;
   margin-bottom: 32px;
+  
 }
 
 .app-title {
@@ -40,6 +41,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  display: none;
+}
 }
 
 .filter-tabs {
@@ -220,6 +223,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: none;
 }
 
 .user-price {
@@ -318,6 +322,7 @@
   border-radius: 16px;
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  display: none;
 }
 
 .info-footer p {

@@ -17,7 +17,7 @@ const LanguageSwitcher = () => {
   };
 
   return (
-    <header className="w-full bg-white shadow-md px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+    <header className="w-full bg-white shadow-md px-6 py-3 items-center justify-between sticky top-0 z-50 hidden">
       {/* Left side: Logo or site title */}
       <div className="flex items-center gap-3">
         <div className="text-xl font-bold text-gray-800">MyPlatform</div>

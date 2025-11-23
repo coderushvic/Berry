@@ -187,9 +187,9 @@ const UserList = () => {
                   </div>
                   <div className="user-address">📍 {user.address}</div>
                   <div className="user-details">
-                    <div className="detail-item"><span>{t("age")}</span>: {user.age}</div>
-                    <div className="detail-item"><span>{t("height")}</span>: {user.height}</div>
-                    <div className="detail-item"><span>{t("status")}</span>: {user.online ? t("online") : t("offline")}</div>
+                    <div className="detail-item"><span>{t("age")}</span> {user.age}</div>
+                    <div className="detail-item"><span>{t("height")}</span> {user.height}</div>
+                    <div className="detail-item"><span>{t("status")}</span> {user.online ? t("online") : t("offline")}</div>
                   </div>
                 </div>
               </div>
