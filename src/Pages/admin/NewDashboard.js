@@ -94,10 +94,21 @@ const AdminPage = () => {
     toast.success(t("profileImageUploaded"));
   };
 
-  /** AD IMAGE UPLOAD **/
-  const onAdImageUploaded = (url) => {
-    setNewAd((prev) => ({ ...prev, imageUrl: url }));
-    toast.success(t("adImageUploaded"));
+  /** GALLERY IMAGE UPLOAD FOR USERS **/
+  const onGalleryImageUploaded = (url, userId) => {
+    const userDocRef = doc(db, "users", userId);
+    const userToUpdate = users.find(u => u.id === userId);
+    const updatedPhotos = [...(userToUpdate.photos || []), url];
+
+    updateDoc(userDocRef, { photos: updatedPhotos })
+      .then(() => {
+        toast.success(t("galleryImageUploaded"));
+        fetchUsers(); // refresh users to show updated gallery
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error(t("failedToUploadGallery"));
+      });
   };
 
   /** SUBMIT USER **/
@@ -384,6 +395,16 @@ const AdminPage = () => {
                 {u.age} {t("years")} • {u.status}
               </p>
 
+              {/* Gallery uploader */}
+              <div className="gallery-uploader">
+                <ImageUploader
+                  initialImage=""
+                  onUploaded={(url) => onGalleryImageUploaded(url, u.id)}
+                  prominent={false}
+                  buttonText={t("uploadGallery")}
+                />
+              </div>
+
               <div className="actions-row">
                 <button className="edit-btn" onClick={() => handleUserEdit(u)}>
                   {t("edit")}
@@ -406,7 +427,7 @@ const AdminPage = () => {
             <label>{t("adImage")}</label>
             <ImageUploader
               initialImage={newAd.imageUrl}
-              onUploaded={onAdImageUploaded}
+              onUploaded={(url) => setNewAd(prev => ({ ...prev, imageUrl: url }))}
               prominent={true}
               buttonText={t("uploadAd")}
             />
