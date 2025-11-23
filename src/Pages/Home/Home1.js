@@ -1,7 +1,6 @@
 // src/Pages/UserList/UserList.js
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { useTranslation } from "react-i18next";
 import Slider from "react-slick";
@@ -9,13 +8,14 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import "./UserList.css";
 
+// Utility to check if string is a valid image URL
 const isValidImageUrl = (u) => typeof u === "string" && u.startsWith("http");
 
+// Fallback letter avatar
 const LetterAvatar = ({ name, size = 56 }) => {
   const letter = (name && name.charAt(0).toUpperCase()) || "U";
   const bgColors = ["#F97316", "#06B6D4", "#7C3AED", "#EF4444", "#10B981"];
-  const color = bgColors[(letter.charCodeAt(0) % bgColors.length)];
-
+  const color = bgColors[letter.charCodeAt(0) % bgColors.length];
   const style = {
     width: size,
     height: size,
@@ -28,7 +28,6 @@ const LetterAvatar = ({ name, size = 56 }) => {
     fontWeight: 700,
     fontSize: Math.round(size * 0.45),
   };
-
   return <div style={style}>{letter}</div>;
 };
 
@@ -37,63 +36,72 @@ const UserList = () => {
   const [users, setUsers] = useState([]);
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
-  // Force Chinese as default language
+  // Force Chinese
   useEffect(() => {
     i18n.changeLanguage("zh");
   }, [i18n]);
 
-  // Ads subscription
+  // Fetch Ads in real-time
   useEffect(() => {
     const adsRef = collection(db, "ads");
-    const adsQuery = query(adsRef, where("active", "==", true), orderBy("order", "asc"));
-
+    const adsQuery = query(adsRef, orderBy("order", "asc"));
     const unsubscribe = onSnapshot(
       adsQuery,
       (snapshot) => {
-        const adsData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const adsData = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((ad) => ad.active);
         setAds(adsData.slice(0, 6));
       },
-      (error) => {
-        console.error("Error fetching ads:", error);
+      (err) => {
+        console.error("Ads fetch error:", err);
         setAds([]);
       }
     );
     return () => unsubscribe();
   }, []);
 
-  // Users subscription
+  // Fetch Users in real-time
   useEffect(() => {
     setLoading(true);
-
     try {
       const usersRef = collection(db, "users");
-      let usersQuery = query(usersRef, orderBy("createdAt", "desc"));
-
+      // If createdAt missing, fallback to default order
+      const usersQuery = query(usersRef);
       const unsubscribe = onSnapshot(
         usersQuery,
         (snapshot) => {
-          const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const list = snapshot.docs.map((doc) => {
+            const data = doc.data() || {};
+            return {
+              id: doc.id,
+              name: data.name || "未知",
+              age: data.age || "-",
+              height: data.height || "-",
+              online: data.online ?? false,
+              verified: data.verified ?? false,
+              address: data.address || "-",
+              photos: Array.isArray(data.photos) ? data.photos.filter(Boolean) : [],
+              price: data.price || "-",
+            };
+          });
           setUsers(list);
           setLoading(false);
         },
-        (error) => {
-          console.error("Error fetching users:", error);
+        (err) => {
+          console.error("Users fetch error:", err);
           setUsers([]);
           setLoading(false);
         }
       );
-
       return () => unsubscribe();
     } catch (err) {
-      console.error("Error in users fetch", err);
+      console.error("Users fetch setup error:", err);
       setUsers([]);
       setLoading(false);
     }
   }, []);
-
-  const handleUserClick = (userId) => navigate(`/user/${userId}`);
 
   const sliderSettings = {
     dots: true,
@@ -119,14 +127,13 @@ const UserList = () => {
 
   return (
     <div className="user-list-container">
-
-      {/* ADS SLIDER */}
+      {/* Ads Slider */}
       {ads.length > 0 && (
         <div className="ads-slider mb-4">
           <Slider {...sliderSettings}>
             {ads.map((ad) => (
               <div key={ad.id}>
-                <a href={ad.link} target="_blank" rel="noopener noreferrer">
+                <a href={ad.link || "#"} target="_blank" rel="noopener noreferrer">
                   <img
                     src={isValidImageUrl(ad.imageUrl) ? ad.imageUrl : ""}
                     alt={`Ad ${ad.id}`}
@@ -140,7 +147,7 @@ const UserList = () => {
         </div>
       )}
 
-      {/* USER LIST */}
+      {/* User List */}
       <div className="user-list">
         {users.length === 0 ? (
           <div className="empty-state">
@@ -148,18 +155,12 @@ const UserList = () => {
             <p className="empty-subtitle">{t("checkBackLater")}</p>
           </div>
         ) : (
-          users.map((user, index) => (
-            <div
-              key={user.id}
-              className="user-card"
-              style={{ animationDelay: `${index * 0.1}s` }}
-              onClick={() => handleUserClick(user.id)}
-            >
+          users.map((user, idx) => (
+            <div key={user.id} className="user-card" style={{ animationDelay: `${idx * 0.1}s` }}>
               <div className="user-main">
-
                 {/* Avatar */}
                 <div className="avatar-section">
-                  {isValidImageUrl(user?.photos?.[0]) ? (
+                  {isValidImageUrl(user.photos?.[0]) ? (
                     <img
                       src={user.photos[0]}
                       alt={user.name}
@@ -178,40 +179,25 @@ const UserList = () => {
                   <div className="name-section">
                     <h3 className="user-name">{user.name}</h3>
                   </div>
-
                   <div className="user-address">📍 {user.address}</div>
 
-                  {/* Clean details */}
                   <div className="user-details">
                     <div className="detail-item">
                       <span>{t("age")}</span> {user.age}
                     </div>
-
                     <div className="detail-item">
                       <span>{t("height")}</span> {user.height}
                     </div>
-
                     <div className="detail-item">
                       <span>{t("status")}</span> {user.online ? t("online") : t("offline")}
                     </div>
-
-                    {/* Price value only */}
-                    {user.price && (
-                      <div className="detail-item price-only">
-                        {user.price}
-                      </div>
-                    )}
+                    {user.price && <div className="detail-item price-only">{user.price}</div>}
                   </div>
                 </div>
               </div>
             </div>
           ))
         )}
-      </div>
-
-      <div className="info-footer">
-        <p>{t("priceInfo")}</p>
-        <p className="user-count">{users.length} {t("usersFound")}</p>
       </div>
     </div>
   );
