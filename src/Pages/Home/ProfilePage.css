@@ -433,37 +433,66 @@
   color: #10b981;
 }
 
-/* Gallery Section */
+/* -------------------- ENHANCED GALLERY -------------------- */
+
 .gallery-content {
   padding: 0;
 }
 
+/* Masonry Layout */
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  column-count: 2;
+  column-gap: 12px;
   padding: 0;
 }
 
+@media (min-width: 480px) {
+  .gallery-grid {
+    column-count: 3;
+  }
+}
+
 .gallery-item {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  display: block;
   position: relative;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  aspect-ratio: 3/4;
-  transition: transform 0.3s ease;
   background: #f8fafc;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateZ(0);
+  transition: transform 0.25s ease, filter 0.25s ease;
+  opacity: 0;
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.gallery-item:nth-child(1) { animation-delay: .1s; }
+.gallery-item:nth-child(2) { animation-delay: .2s; }
+.gallery-item:nth-child(3) { animation-delay: .3s; }
+.gallery-item:nth-child(4) { animation-delay: .4s; }
+.gallery-item:nth-child(5) { animation-delay: .5s; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .gallery-item:hover {
-  transform: scale(1.05);
+  transform: scale(1.04);
+  filter: brightness(0.9);
 }
 
 .gallery-item img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
   display: block;
+  border-radius: inherit;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.06);
 }
 
 .photo-overlay {
@@ -476,6 +505,7 @@
   border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
+  backdrop-filter: blur(6px);
 }
 
 /* Action Bar */
@@ -533,195 +563,32 @@
   .profile-header {
     padding: 16px 16px 0;
   }
-  
+
   .profile-hero {
     margin: 12px 16px;
   }
-  
+
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
-  
+
   .status-price-section {
     flex-direction: column;
     gap: 12px;
     text-align: center;
   }
-  
+
   .tab-content {
     padding: 12px 16px;
   }
-  
+
   .gallery-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    column-count: 2;
+    column-gap: 8px;
   }
-  
+
   .action-bar {
     padding: 12px 16px;
   }
-
-  /* -------------------- ProfilePage.css -------------------- */
-.profile-container {
-  padding: 16px;
-  max-width: 900px;
-  margin: auto;
-  font-family: Arial, sans-serif;
-}
-
-.profile-header {
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: 16px;
-}
-
-.back-button {
-  background: #ff7a18;
-  color: #fff;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.profile-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.profile-image-container img.profile-main-image {
-  max-width: 360px;
-  border-radius: 12px;
-  margin-bottom: 12px;
-}
-
-.upload-label strong {
-  display: inline-block;
-}
-
-.status-badge.verified {
-  margin-top: 8px;
-  padding: 4px 8px;
-  background-color: #10b981;
-  color: #fff;
-  border-radius: 6px;
-  font-weight: bold;
-}
-
-.profile-overview h1 {
-  margin-top: 12px;
-  margin-bottom: 12px;
-}
-
-.stats-grid {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.stat-card {
-  background: #f3f4f6;
-  padding: 12px;
-  border-radius: 8px;
-  text-align: center;
-  flex: 1 1 100px;
-}
-
-.stat-value {
-  font-weight: bold;
-  font-size: 18px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.price-only-section {
-  margin-bottom: 16px;
-}
-
-.price-amount {
-  font-weight: bold;
-  font-size: 20px;
-  color: #111827;
-}
-
-.content-card {
-  margin-bottom: 16px;
-}
-
-.talents-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.talent-item {
-  background: #fef3c7;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-/* ---------- Gallery Section ---------- */
-.photo-gallery-section {
-  margin-top: 16px;
-}
-
-.photo-gallery-section h3 {
-  margin-bottom: 8px;
-}
-
-.gallery-grid {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.gallery-thumb {
-  transition: transform 0.2s;
-}
-
-.gallery-thumb:hover {
-  transform: scale(1.05);
-}
-
-/* ---------- Modal Styles ---------- */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-in-out;
-  cursor: pointer;
-}
-
-.modal-image {
-  max-width: 90%;
-  max-height: 90%;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  animation: scaleIn 0.2s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scaleIn {
-  from { transform: scale(0.8); }
-  to { transform: scale(1); }
-}
-
 }
