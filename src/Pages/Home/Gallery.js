@@ -11,7 +11,7 @@ const isValidImageUrl = (u) => typeof u === "string" && u.startsWith("http");
 const LetterAvatar = ({ name, size = 120 }) => {
   const letter = (name && name.charAt(0).toUpperCase()) || "U";
   const bgColors = ["#F97316", "#06B6D4", "#7C3AED", "#EF4444", "#10B981"];
-  const color = bgColors[(letter.charCodeAt(0) % bgColors.length)];
+  const color = bgColors[letter.charCodeAt(0) % bgColors.length];
   const style = {
     width: size,
     height: size,
@@ -50,7 +50,10 @@ const ProfilePage = () => {
           setUser(null);
         } else {
           const data = userDoc.data();
-          const photos = Array.isArray(data.photos) ? data.photos.filter(Boolean) : [];
+          const photos = Array.isArray(data.photos)
+            ? data.photos.filter(Boolean)
+            : [];
+
           setUser({
             name: data.name || "",
             age: data.age || "",
@@ -71,6 +74,7 @@ const ProfilePage = () => {
         setLoading(false);
       }
     };
+
     fetchUser();
   }, [id]);
 
@@ -92,7 +96,9 @@ const ProfilePage = () => {
       <div className="profile-container">
         <div className="error-container">
           <h2>{t("userNotFound") || "User not found"}</h2>
-          <button onClick={handleBackClick} className="back-button">{t("back")}</button>
+          <button onClick={handleBackClick} className="back-button">
+            {t("back")}
+          </button>
         </div>
       </div>
     );
@@ -101,55 +107,101 @@ const ProfilePage = () => {
   return (
     <div className="profile-container">
       <div className="profile-header">
-        <button className="back-button" onClick={handleBackClick}>← {t("back")}</button>
+        <button className="back-button" onClick={handleBackClick}>
+          ← {t("back")}
+        </button>
       </div>
 
       <div className="profile-hero">
-        <div className="profile-image-container" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div
+          className="profile-image-container"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
           {isValidImageUrl(user.photos?.[0]) ? (
-            <img src={user.photos[0]} alt={user.name} className="profile-main-image" style={{ borderRadius: 12, maxWidth: 360 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img
+              src={user.photos[0]}
+              alt={user.name}
+              className="profile-main-image"
+              style={{ borderRadius: 12, maxWidth: 360 }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
           ) : (
-            <div style={{ marginBottom: 12 }}><LetterAvatar name={user.name} size={140} /></div>
+            <div style={{ marginBottom: 12 }}>
+              <LetterAvatar name={user.name} size={140} />
+            </div>
           )}
 
-          {user.verified && <div className="status-badge verified">✓ {t("verified")}</div>}
+          {user.verified && (
+            <div className="status-badge verified">✓ {t("verified")}</div>
+          )}
         </div>
 
         <div className="profile-overview">
           <h1>{user.name}</h1>
 
           <div className="stats-grid">
-            <div className="stat-card"><div className="stat-value">{user.age}</div><div className="stat-label">{t("age")}</div></div>
-            <div className="stat-card"><div className="stat-value">{user.height}</div><div className="stat-label">{t("height")}</div></div>
-            <div className="stat-card"><div className="stat-value">{user.weight}</div><div className="stat-label">{t("weight")}</div></div>
-            <div className="stat-card"><div className="stat-value">{user.chestCircumference}</div><div className="stat-label">{t("chest")}</div></div>
+            <div className="stat-card">
+              <div className="stat-value">{user.age}</div>
+              <div className="stat-label">{t("age")}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{user.height}</div>
+              <div className="stat-label">{t("height")}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{user.weight}</div>
+              <div className="stat-label">{t("weight")}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{user.chestCircumference}</div>
+              <div className="stat-label">{t("chest")}</div>
+            </div>
           </div>
 
-          {/* Only show price amount */}
           {user.price && (
-            <div className="price-only-section">
-              <div className="price-amount">{user.price}</div>
+            <div className="premium-price-box">
+              <div className="premium-price-amount">{user.price}</div>
             </div>
           )}
 
-          {/* Talent & Skills */}
           {user.talents && user.talents.length > 0 && (
             <div className="talents-section">
               <h3>{t("talents")}</h3>
               <div className="talents-grid">
-                {user.talents.map((t, i) => <div key={i} className="talent-item">✨ {t}</div>)}
+                {user.talents.map((t, i) => (
+                  <div key={i} className="talent-item">
+                    ✨ {t}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Gallery below Talent & Skills */}
+          {/* Gallery */}
           {user.photos && user.photos.length > 0 && (
             <div className="profile-gallery">
               <h3>{t("gallery")}</h3>
+
               <div className="gallery-grid">
                 {user.photos.map((p, i) => (
-                  <div key={i} className="gallery-thumb" onClick={() => setModalImage(p)}>
-                    <img src={p} alt={`gallery-${i}`} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  <div
+                    key={i}
+                    className="gallery-thumb"
+                    onClick={() => setModalImage(p)}
+                  >
+                    <img
+                      src={p}
+                      alt={`gallery-${i}`}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
                   </div>
                 ))}
               </div>
@@ -158,10 +210,15 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Modal for viewing gallery images */}
+      {/* POPUP FULLSCREEN IMAGE VIEW */}
       {modalImage && (
-        <div className="modal-overlay" onClick={() => setModalImage(null)}>
-          <img src={modalImage} alt="Full view" className="modal-image" />
+        <div
+          className="image-modal-overlay"
+          onClick={() => setModalImage(null)}
+        >
+          <div className="image-modal-content">
+            <img src={modalImage} alt="Full view" className="image-modal-img" />
+          </div>
         </div>
       )}
     </div>
