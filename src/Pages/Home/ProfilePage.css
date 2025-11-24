@@ -435,22 +435,28 @@
 
   /* -------------------- PREMIUM PRICE DESIGN -------------------- */
 
+/* Full-width solid green price box with centered content */
 .premium-price-box {
-  display: inline-block;
-  background: #d1fae5; /* mint green */
-  color: #065f46; /* deep green text */
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 8px;
-  border: 1px solid #a7f3d0;
-  box-shadow: 0 2px 6px rgba(0, 128, 0, 0.08);
+  width: 100%; /* full width of parent/container */
+  background: #10b981; /* solid mint green */
+  color: white; /* white text */
+  padding: 16px 20px; /* vertical and horizontal padding */
+  border-radius: 12px;
+  font-size: 18px; /* base font size */
+  font-weight: 700;
+  display: flex; /* flex for centering */
+  justify-content: center; /* horizontal center */
+  align-items: center; /* vertical center */
+  margin: 16px 0; /* spacing from other sections */
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25); /* subtle shadow */
 }
 
+/* Price text */
 .premium-price-amount {
-  display: inline-block;
-  font-size: 15px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-align: center; /* ensure text is centered if multi-line */
 }
 /* ---------------------- CLEAN + FIXED GALLERY ---------------------- */
 
