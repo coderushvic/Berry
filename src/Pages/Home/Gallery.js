@@ -35,6 +35,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [modalImage, setModalImage] = useState(null);
 
+  // Fetch user
   useEffect(() => {
     const fetchUser = async () => {
       setLoading(true);
@@ -54,6 +55,7 @@ const ProfilePage = () => {
             ? data.photos.filter(Boolean)
             : [];
 
+          // Email removed — not fetched
           setUser({
             name: data.name || "",
             age: data.age || "",
@@ -77,6 +79,22 @@ const ProfilePage = () => {
 
     fetchUser();
   }, [id]);
+
+  // ENABLE ANDROID HARDWARE BACK BUTTON
+  useEffect(() => {
+    // Prevent Telegram Mini App from closing instantly
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      navigate(-1); // Go back inside the mini app
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [navigate]);
 
   const handleBackClick = () => navigate(-1);
 
@@ -210,7 +228,7 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* POPUP FULLSCREEN IMAGE VIEW */}
+      {/* Fullscreen modal image */}
       {modalImage && (
         <div
           className="image-modal-overlay"
