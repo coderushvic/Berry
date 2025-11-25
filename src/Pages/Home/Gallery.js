@@ -55,7 +55,6 @@ const ProfilePage = () => {
             ? data.photos.filter(Boolean)
             : [];
 
-          // Email removed — not fetched
           setUser({
             name: data.name || "",
             age: data.age || "",
@@ -67,6 +66,11 @@ const ProfilePage = () => {
             talents: data.talents || [],
             verified: data.verified ?? false,
             photos,
+            contactInfo: {
+              telegram: data.contactInfo?.telegram || "",
+              wechat: data.contactInfo?.wechat || "",
+              phone: data.contactInfo?.phone || "",
+            },
           });
         }
       } catch (err) {
@@ -82,11 +86,10 @@ const ProfilePage = () => {
 
   // ENABLE ANDROID HARDWARE BACK BUTTON
   useEffect(() => {
-    // Prevent Telegram Mini App from closing instantly
     window.history.pushState(null, "", window.location.href);
 
     const handlePopState = () => {
-      navigate(-1); // Go back inside the mini app
+      navigate(-1);
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -197,6 +200,30 @@ const ProfilePage = () => {
                     ✨ {t}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* CONTACT INFO BADGES */}
+          {user.contactInfo && (
+            <div className="contact-info-section">
+              <h3>{t("contactInfo")}</h3>
+              <div className="contact-badges">
+                {user.contactInfo.telegram && (
+                  <span className="contact-badge telegram">
+                    <strong>{t("telegram")}:</strong> {user.contactInfo.telegram}
+                  </span>
+                )}
+                {user.contactInfo.wechat && (
+                  <span className="contact-badge wechat">
+                    <strong>{t("wechat")}:</strong> {user.contactInfo.wechat}
+                  </span>
+                )}
+                {user.contactInfo.phone && (
+                  <span className="contact-badge phone">
+                    <strong>{t("phone")}:</strong> {user.contactInfo.phone}
+                  </span>
+                )}
               </div>
             </div>
           )}

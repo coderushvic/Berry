@@ -544,3 +544,40 @@
   from { transform: scale(0.85); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+.contact-info-section {
+  margin-top: 16px;
+}
+
+.contact-info-section h3 {
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.contact-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contact-badge {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  display: inline-block;
+}
+
+.contact-badge.telegram {
+  background-color: #0088cc; /* Telegram Blue */
+}
+
+.contact-badge.wechat {
+  background-color: #2dc100; /* WeChat Green */
+}
+
+.contact-badge.phone {
+  background-color: #6b7280; /* Gray/Neutral for phone */
+}
