@@ -51,5 +51,7 @@
   "usersFound": "users found",
   "income": "Income",
   "statusOnline": "Online",
-  "statusOffline": "Offline"
+  "statusOffline": "Offline",
+  "exitApp": "Exit the app?"
+
 }

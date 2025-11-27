@@ -82,6 +82,8 @@
   "loadingUsers": "正在加载用户...",
   "verifiedProfile": "已认证资料",
   "priceInfo": "价格仅供参考，实际以用户报价为准",
-  "uploadFailed": "上传失败"
+  "uploadFailed": "上传失败",
+  "exitApp": "是否退出小程序？"
+
 
 }
